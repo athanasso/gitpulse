@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -11,7 +11,7 @@ import {
   Modal,
   Linking,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+import { ThemePalette, Spacing } from '../constants/theme';
 import {
   GitHubUser,
   ContributionDay,
@@ -123,6 +123,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 }) => {
   const { colors } = useTheme();
   const { settings } = useCustomization();
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [tokenScopes, setTokenScopes] = useState<string[]>([]);
@@ -634,7 +635,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 styles.profileLangDot,
                 {
                   backgroundColor:
-                    LANGUAGE_COLORS[repo.language] || Colors.primary,
+                    LANGUAGE_COLORS[repo.language] || colors.primary,
                 },
               ]}
             />
@@ -868,7 +869,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         styles.langDot,
                         {
                           backgroundColor:
-                            pin.primaryLanguage.color || Colors.primary,
+                            pin.primaryLanguage.color || colors.primary,
                         },
                       ]}
                     />
@@ -1118,7 +1119,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           {/* Sub-Tab Content */}
           {subLoading ? (
             <View style={styles.subLoadingBox}>
-              <ActivityIndicator size="small" color={Colors.primary} />
+              <ActivityIndicator size="small" color={colors.primary} />
             </View>
           ) : (
             <>
@@ -1536,7 +1537,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   if (loading) {
     return (
       <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+        <ActivityIndicator size="large" color={colors.primary} />
       </View>
     );
   }
@@ -1619,7 +1620,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             <TextInput
               style={styles.tokenInput}
               placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              placeholderTextColor={Colors.textMuted}
+              placeholderTextColor={colors.textMuted}
               value={tokenInput}
               onChangeText={setTokenInput}
               secureTextEntry
@@ -1770,7 +1771,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
           {gistLoading ? (
             <View style={styles.centered}>
-              <ActivityIndicator size="large" color={Colors.primary} />
+              <ActivityIndicator size="large" color={colors.primary} />
             </View>
           ) : (
             <ScrollView style={styles.gistScroll}>
@@ -1805,7 +1806,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   metricsContainer: {
     paddingHorizontal: Spacing.lg,
     marginBottom: Spacing.md,
@@ -1818,18 +1819,18 @@ const styles = StyleSheet.create({
   metricCard: {
     flexBasis: '31%',
     flexGrow: 1,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     paddingVertical: 12,
     paddingHorizontal: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     justifyContent: 'center',
   },
   metricCardActive: {
-    backgroundColor: Colors.cardElevated,
-    borderColor: Colors.primary,
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.primary,
   },
   metricIcon: {
     fontSize: 18,
@@ -1838,19 +1839,19 @@ const styles = StyleSheet.create({
   metricValue: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontFamily: 'monospace',
     marginBottom: 2,
   },
   metricLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
   },
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   centered: {
     flex: 1,
@@ -1863,11 +1864,11 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   authGateCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: Spacing.xl,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     alignItems: 'center',
     marginTop: Spacing.xl,
   },
@@ -1881,7 +1882,7 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.md,
@@ -1892,13 +1893,13 @@ const styles = StyleSheet.create({
   authGateTitle: {
     fontSize: 20,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
     textAlign: 'center',
   },
   authGateDesc: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
     marginBottom: Spacing.lg,
@@ -1907,10 +1908,10 @@ const styles = StyleSheet.create({
     width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
@@ -1924,40 +1925,40 @@ const styles = StyleSheet.create({
   oneClickTokenTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   oneClickTokenSub: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 15,
   },
   scopesGuideBox: {
     width: '100%',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
   },
   scopesGuideHeader: {
     fontSize: 11,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     letterSpacing: 0.8,
     marginBottom: 4,
   },
   scopesGuideHint: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginBottom: Spacing.md,
     lineHeight: 16,
   },
   scopeItemRow: {
     paddingVertical: 8,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
   },
   scopeItemTop: {
     flexDirection: 'row',
@@ -1969,7 +1970,7 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   scopeBadge: {
     paddingHorizontal: 6,
@@ -1977,10 +1978,10 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   badgeRequired: {
-    backgroundColor: Colors.rubyMuted,
+    backgroundColor: colors.rubyMuted,
   },
   badgeRecommended: {
-    backgroundColor: Colors.cyanMuted,
+    backgroundColor: colors.cyanMuted,
   },
   badgeOptional: {
     backgroundColor: 'rgba(148, 163, 184, 0.15)',
@@ -1991,22 +1992,22 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   badgeTextRequired: {
-    color: Colors.ruby,
+    color: colors.ruby,
   },
   badgeTextRecommended: {
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   badgeTextOptional: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   scopeItemDesc: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   tokenHintBold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontFamily: 'monospace',
   },
   tokenBox: {
@@ -2015,17 +2016,17 @@ const styles = StyleSheet.create({
   inputLabel: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 6,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   tokenInput: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
-    color: Colors.textPrimary,
+    borderColor: colors.cardBorder,
+    color: colors.textPrimary,
     paddingHorizontal: Spacing.md,
     paddingVertical: 12,
     fontSize: 14,
@@ -2033,13 +2034,13 @@ const styles = StyleSheet.create({
   },
   tokenHint: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     lineHeight: 16,
     marginTop: 6,
     marginBottom: Spacing.lg,
   },
   connectButton: {
-    backgroundColor: Colors.primary,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingVertical: 14,
     alignItems: 'center',
@@ -2051,11 +2052,11 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   profileCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: Spacing.xl,
   },
   profileBanner: {
@@ -2073,7 +2074,7 @@ const styles = StyleSheet.create({
     width: 68,
     height: 68,
     borderRadius: 34,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
   },
   avatarPlaceholder: {
     alignItems: 'center',
@@ -2082,7 +2083,7 @@ const styles = StyleSheet.create({
   avatarLetter: {
     fontSize: 26,
     fontWeight: '800',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   nameBlock: {
     marginLeft: Spacing.md,
@@ -2091,11 +2092,11 @@ const styles = StyleSheet.create({
   name: {
     fontSize: 19,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   username: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   badgeRow: {
@@ -2103,19 +2104,19 @@ const styles = StyleSheet.create({
     marginTop: 6,
   },
   authBadge: {
-    backgroundColor: Colors.emeraldMuted,
+    backgroundColor: colors.emeraldMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
   authBadgeText: {
-    color: Colors.emerald,
+    color: colors.emerald,
     fontSize: 11,
     fontWeight: '700',
   },
   bio: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 20,
     marginBottom: Spacing.md,
   },
@@ -2127,7 +2128,7 @@ const styles = StyleSheet.create({
   },
   detailText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   profileLinksRow: {
     flexDirection: 'row',
@@ -2138,12 +2139,12 @@ const styles = StyleSheet.create({
   profileLinkPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     maxWidth: '100%',
   },
   profileLinkIcon: {
@@ -2152,12 +2153,12 @@ const styles = StyleSheet.create({
   },
   profileLinkText: {
     fontSize: 12,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
   },
   statsRow: {
     flexDirection: 'row',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     padding: Spacing.md,
     marginBottom: Spacing.lg,
@@ -2169,18 +2170,18 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   statLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   activeScopesCard: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     padding: Spacing.md,
     marginBottom: Spacing.md,
   },
@@ -2193,18 +2194,18 @@ const styles = StyleSheet.create({
   activeScopesHeaderTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
   editScopesLink: {
     fontSize: 11,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
   },
   fineGrainedNote: {
     fontSize: 12,
-    color: Colors.emerald,
+    color: colors.emerald,
     marginTop: 4,
   },
   scopesPillsWrap: {
@@ -2220,12 +2221,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   scopePillActive: {
-    backgroundColor: Colors.emeraldMuted,
-    borderColor: Colors.emerald,
+    backgroundColor: colors.emeraldMuted,
+    borderColor: colors.emerald,
   },
   scopePillMissing: {
-    backgroundColor: Colors.rubyMuted,
-    borderColor: Colors.ruby,
+    backgroundColor: colors.rubyMuted,
+    borderColor: colors.ruby,
   },
   scopePillText: {
     fontSize: 11,
@@ -2233,10 +2234,10 @@ const styles = StyleSheet.create({
     fontFamily: 'monospace',
   },
   scopePillTextActive: {
-    color: Colors.emerald,
+    color: colors.emerald,
   },
   scopePillTextMissing: {
-    color: Colors.ruby,
+    color: colors.ruby,
   },
   scopeWarningInline: {
     marginTop: Spacing.sm,
@@ -2248,7 +2249,7 @@ const styles = StyleSheet.create({
   },
   scopeWarningInlineText: {
     fontSize: 11,
-    color: Colors.gold,
+    color: colors.gold,
     lineHeight: 15,
   },
   scopeCodeTextInline: {
@@ -2264,15 +2265,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(239, 68, 68, 0.08)',
   },
   disconnectButtonText: {
-    color: Colors.ruby,
+    color: colors.ruby,
     fontSize: 13,
     fontWeight: '700',
   },
   profileReadmeCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     padding: Spacing.lg,
     marginBottom: Spacing.xl,
   },
@@ -2283,7 +2284,7 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.md,
     marginBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   profileReadmeTitleRow: {
     flexDirection: 'row',
@@ -2297,23 +2298,23 @@ const styles = StyleSheet.create({
   profileReadmeTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontFamily: 'monospace',
   },
   readmeToggleBtn: {
     paddingHorizontal: 8,
     paddingVertical: 3,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 6,
   },
   readmeToggleBtnText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '600',
   },
   profileReadmeBody: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 20,
     fontFamily: 'monospace',
   },
@@ -2324,10 +2325,10 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   pinnedCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     padding: Spacing.md,
   },
   pinnedHeaderRow: {
@@ -2339,13 +2340,13 @@ const styles = StyleSheet.create({
   pinnedName: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.cyan,
+    color: colors.cyan,
     flex: 1,
     marginRight: 8,
   },
   pinnedDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 17,
     marginBottom: 10,
   },
@@ -2365,7 +2366,7 @@ const styles = StyleSheet.create({
   },
   pinnedMetaText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '500',
   },
   pinnedLangBox: {
@@ -2375,7 +2376,7 @@ const styles = StyleSheet.create({
   },
   pinnedLangText: {
     fontSize: 11,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   langDot: {
@@ -2386,7 +2387,7 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.md,
   },
   subTabScroll: {
@@ -2403,18 +2404,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 14,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   subTabItemActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   subTabText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   subTabTextActive: {
     color: '#FFFFFF',
@@ -2425,11 +2426,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   reposScrollCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: Spacing.md,
   },
   reposCardTopHeader: {
@@ -2442,11 +2443,11 @@ const styles = StyleSheet.create({
   reposCardTopTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   reposCardScrollHint: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontStyle: 'italic',
   },
   reposInnerScroll: {
@@ -2460,14 +2461,14 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
   },
   profileRepoCard: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   profileRepoTopRow: {
     flexDirection: 'row',
@@ -2478,7 +2479,7 @@ const styles = StyleSheet.create({
   profileRepoTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
   },
   profileBadgesGroup: {
@@ -2488,33 +2489,33 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   profileForkBadge: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   profileForkBadgeText: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   profileVisibilityBadge: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   profileVisibilityText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   profileRepoDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 10,
   },
@@ -2539,16 +2540,16 @@ const styles = StyleSheet.create({
   },
   profileMetaText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '500',
   },
   profileUpdatedDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginLeft: 'auto',
   },
   repoVisibilityBadge: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -2556,17 +2557,17 @@ const styles = StyleSheet.create({
   },
   repoVisibilityText: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   listContainer: {
     gap: 10,
   },
   gistCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   gistHeader: {
     flexDirection: 'row',
@@ -2575,7 +2576,7 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   gistBadge: {
-    backgroundColor: Colors.cyanMuted,
+    backgroundColor: colors.cyanMuted,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
@@ -2583,16 +2584,16 @@ const styles = StyleSheet.create({
   gistBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   gistDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   gistDescription: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   gistFooter: {
@@ -2602,24 +2603,24 @@ const styles = StyleSheet.create({
   },
   gistFilesCount: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   gistLang: {
     fontSize: 11,
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '600',
   },
   gistComments: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginLeft: 'auto',
   },
   eventCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   eventHeader: {
     flexDirection: 'row',
@@ -2634,31 +2635,31 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   eventDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   eventDetail: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   orgCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   orgAvatar: {
     width: 44,
     height: 44,
     borderRadius: 8,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     marginRight: Spacing.md,
   },
   orgInfo: {
@@ -2667,11 +2668,11 @@ const styles = StyleSheet.create({
   orgTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   orgDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   socialSwitchRow: {
@@ -2684,80 +2685,80 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     alignItems: 'center',
     borderRadius: 10,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   socialSwitchBtnActive: {
-    backgroundColor: Colors.cardElevated,
-    borderColor: Colors.primary,
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.primary,
   },
   socialSwitchText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   socialSwitchTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   userCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   userCardAvatar: {
     width: 36,
     height: 36,
     borderRadius: 18,
     marginRight: 10,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
   },
   userCardLogin: {
     flex: 1,
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   userCardArrow: {
     fontSize: 16,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   loadMoreBtn: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginTop: Spacing.sm,
   },
   loadMoreText: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontSize: 13,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   emptyText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   gistModalContainer: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   gistModalHeader: {
     flexDirection: 'row',
@@ -2767,19 +2768,19 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   closeBtn: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeBtnText: {
     fontSize: 16,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '700',
   },
   gistModalTitleBox: {
@@ -2790,11 +2791,11 @@ const styles = StyleSheet.create({
   gistModalTitle: {
     fontSize: 15,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   gistModalSub: {
     fontSize: 11,
-    color: Colors.cyan,
+    color: colors.cyan,
     marginTop: 2,
   },
   gistScroll: {
@@ -2802,7 +2803,7 @@ const styles = StyleSheet.create({
   },
   gistCodeBox: {
     padding: Spacing.lg,
-    backgroundColor: Colors.codeBackground,
+    backgroundColor: colors.codeBackground,
     minHeight: '100%',
   },
   gistLineRow: {
@@ -2811,14 +2812,14 @@ const styles = StyleSheet.create({
   },
   gistLineNum: {
     width: 32,
-    color: Colors.codeLineNumber,
+    color: colors.codeLineNumber,
     fontSize: 12,
     fontFamily: 'monospace',
     textAlign: 'right',
     marginRight: 10,
   },
   gistLineText: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 12,
     fontFamily: 'monospace',
   },
@@ -2828,15 +2829,15 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   customizeProfileBtn: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingVertical: 12,
     borderRadius: 12,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   customizeProfileBtnText: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontSize: 13,
     fontWeight: '700',
   },

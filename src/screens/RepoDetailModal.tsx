@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -12,7 +12,8 @@ import {
   FlatList,
   TextInput,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+import { ThemePalette, Spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 import {
   GitHubRepo,
   GitHubFileItem,
@@ -77,7 +78,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   onClose,
   onRepoDeleted,
 }) => {
+  const { colors } = useTheme();
   const { settings } = useCustomization();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [activeTab, setActiveTab] = useState<RepoTab>(settings.defaultRepoDetailTab || 'readme');
   const [loading, setLoading] = useState(false);
 
@@ -575,7 +578,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       name: lang,
       bytes,
       percentage: totalBytes > 0 ? (bytes / totalBytes) * 100 : 0,
-      color: LANGUAGE_COLORS[lang] || Colors.primary,
+      color: LANGUAGE_COLORS[lang] || colors.primary,
     }))
     .sort((a, b) => b.bytes - a.bytes);
 
@@ -606,7 +609,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               disabled={starLoading}
             >
               {starLoading ? (
-                <ActivityIndicator size="small" color={Colors.primary} />
+                <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <Text style={styles.actionIcon}>{isStarred ? '⭐' : '☆'}</Text>
               )}
@@ -654,7 +657,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   styles.languageDot,
                   {
                     backgroundColor:
-                      LANGUAGE_COLORS[repo.language] || Colors.primary,
+                      LANGUAGE_COLORS[repo.language] || colors.primary,
                   },
                 ]}
               />
@@ -784,7 +787,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         {/* Content Body */}
         {loading ? (
           <View style={styles.loadingContainer}>
-            <ActivityIndicator size="large" color={Colors.primary} />
+            <ActivityIndicator size="large" color={colors.primary} />
           </View>
         ) : (
           <ScrollView
@@ -1450,7 +1453,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   Unexpected bad things will happen if you don't read this!
                 </Text>
                 <Text style={styles.safetyWarningDesc}>
-                  This action <Text style={{ fontWeight: 'bold' }}>cannot</Text> be undone. This will permanently delete the <Text style={{ fontFamily: 'monospace', color: Colors.ruby }}>{repo?.full_name}</Text> repository, wiki, issues, comments, packages, secrets, and remove all collaborator associations.
+                  This action <Text style={{ fontWeight: 'bold' }}>cannot</Text> be undone. This will permanently delete the <Text style={{ fontFamily: 'monospace', color: colors.ruby }}>{repo?.full_name}</Text> repository, wiki, issues, comments, packages, secrets, and remove all collaborator associations.
                 </Text>
               </View>
 
@@ -1466,7 +1469,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 value={deleteInputText}
                 onChangeText={setDeleteInputText}
                 placeholder={repo?.full_name}
-                placeholderTextColor={Colors.textMuted}
+                placeholderTextColor={colors.textMuted}
                 autoCapitalize="none"
                 autoCorrect={false}
                 editable={!isDeletingRepo}
@@ -1508,10 +1511,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -1521,18 +1524,18 @@ const styles = StyleSheet.create({
     paddingTop: 50,
     paddingBottom: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   closeButton: {
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
   closeButtonText: {
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -1544,11 +1547,11 @@ const styles = StyleSheet.create({
   repoName: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   repoOwner: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   headerActions: {
@@ -1560,7 +1563,7 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1579,31 +1582,31 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     gap: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   statPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   branchPill: {
     maxWidth: 130,
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
   },
   branchPillText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.cyan,
+    color: colors.cyan,
     marginRight: 4,
   },
   dropdownCaret: {
     fontSize: 10,
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   statIcon: {
     fontSize: 12,
@@ -1612,7 +1615,7 @@ const styles = StyleSheet.create({
   statValue: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   languageDot: {
     width: 8,
@@ -1626,20 +1629,20 @@ const styles = StyleSheet.create({
     gap: 14,
     paddingHorizontal: Spacing.lg,
     paddingVertical: 6,
-    backgroundColor: Colors.backgroundElevated,
+    backgroundColor: colors.backgroundElevated,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
     flexWrap: 'wrap',
   },
   repoMetaTimeText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   tabsScrollView: {
     flexGrow: 0,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
-    backgroundColor: Colors.backgroundElevated,
+    borderBottomColor: colors.cardBorder,
+    backgroundColor: colors.backgroundElevated,
   },
   tabsRow: {
     flexDirection: 'row',
@@ -1653,15 +1656,15 @@ const styles = StyleSheet.create({
     borderBottomColor: 'transparent',
   },
   tabActive: {
-    borderBottomColor: Colors.primary,
+    borderBottomColor: colors.primary,
   },
   tabText: {
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   tabTextActive: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: '700',
   },
   loadingContainer: {
@@ -1677,26 +1680,26 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   readmeCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     padding: Spacing.lg,
   },
   readmeHeader: {
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
     paddingBottom: Spacing.sm,
     marginBottom: Spacing.md,
   },
   readmeHeaderTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   readmeBody: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 22,
     fontFamily: 'monospace',
   },
@@ -1704,10 +1707,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   treeContainer: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     overflow: 'hidden',
   },
   treeUpRow: {
@@ -1715,11 +1718,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
-    backgroundColor: Colors.backgroundElevated,
+    borderBottomColor: colors.cardBorder,
+    backgroundColor: colors.backgroundElevated,
   },
   treeUpText: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontSize: 13,
     fontWeight: '600',
     marginLeft: 8,
@@ -1729,7 +1732,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   treeIcon: {
     fontSize: 16,
@@ -1738,42 +1741,42 @@ const styles = StyleSheet.create({
   treeItemName: {
     flex: 1,
     fontSize: 14,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontWeight: '500',
   },
   treeItemSize: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   fileViewer: {
-    backgroundColor: Colors.codeBackground,
+    backgroundColor: colors.codeBackground,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.codeBorder,
+    borderColor: colors.codeBorder,
     overflow: 'hidden',
   },
   fileViewerHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   backButton: {
     paddingVertical: 4,
     paddingHorizontal: 8,
   },
   backButtonText: {
-    color: Colors.primary,
+    color: colors.primary,
     fontSize: 13,
     fontWeight: '700',
   },
   fileSizeText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   codeHorizontalScroll: {
     paddingVertical: Spacing.sm,
@@ -1787,14 +1790,14 @@ const styles = StyleSheet.create({
   },
   codeLineNumber: {
     width: 36,
-    color: Colors.codeLineNumber,
+    color: colors.codeLineNumber,
     fontSize: 12,
     fontFamily: 'monospace',
     textAlign: 'right',
     marginRight: 12,
   },
   codeLineText: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 12,
     fontFamily: 'monospace',
   },
@@ -1802,11 +1805,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   commitItem: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   commitHeaderRow: {
     flexDirection: 'row',
@@ -1816,37 +1819,37 @@ const styles = StyleSheet.create({
   commitShaBadge: {
     fontSize: 11,
     fontFamily: 'monospace',
-    color: Colors.cyan,
-    backgroundColor: Colors.cyanMuted,
+    color: colors.cyan,
+    backgroundColor: colors.cyanMuted,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
   },
   commitDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   commitMessage: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   commitAuthorLine: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   commitDetailCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   commitDetailMsg: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginTop: Spacing.md,
     marginBottom: Spacing.md,
   },
@@ -1859,15 +1862,15 @@ const styles = StyleSheet.create({
   shaBadge: {
     fontSize: 12,
     fontFamily: 'monospace',
-    color: Colors.primary,
-    backgroundColor: Colors.primaryMuted,
+    color: colors.primary,
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   commitAuthor: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   diffStatsRow: {
     flexDirection: 'row',
@@ -1875,20 +1878,20 @@ const styles = StyleSheet.create({
     gap: 8,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
   },
   diffAdd: {
-    color: Colors.emerald,
+    color: colors.emerald,
     fontSize: 13,
     fontWeight: '700',
   },
   diffDel: {
-    color: Colors.ruby,
+    color: colors.ruby,
     fontSize: 13,
     fontWeight: '700',
   },
   diffTotal: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontSize: 12,
   },
   issuesContainer: {
@@ -1904,18 +1907,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   filterChipActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   filterChipTextActive: {
     color: '#FFFFFF',
@@ -1924,15 +1927,15 @@ const styles = StyleSheet.create({
   sectionHeader: {
     fontSize: 15,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: Spacing.sm,
   },
   issueCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   issueHeaderRow: {
     flexDirection: 'row',
@@ -1941,38 +1944,38 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   stateBadgePR: {
-    backgroundColor: Colors.emeraldMuted,
+    backgroundColor: colors.emeraldMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
   stateBadgeIssue: {
-    backgroundColor: Colors.emeraldMuted,
+    backgroundColor: colors.emeraldMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
   },
   stateBadgeClosed: {
-    backgroundColor: Colors.rubyMuted,
+    backgroundColor: colors.rubyMuted,
   },
   stateBadgeText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   issueDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   issueTitle: {
     fontSize: 14,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   issueBody: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   diffPills: {
@@ -1984,11 +1987,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   workflowCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   workflowHeader: {
     flexDirection: 'row',
@@ -2007,12 +2010,12 @@ const styles = StyleSheet.create({
   workflowName: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   runNumber: {
     fontSize: 12,
     fontFamily: 'monospace',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   workflowMetaRow: {
     flexDirection: 'row',
@@ -2021,27 +2024,27 @@ const styles = StyleSheet.create({
   },
   workflowBranch: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   workflowSha: {
     fontSize: 12,
     fontFamily: 'monospace',
-    color: Colors.primary,
+    color: colors.primary,
   },
   workflowDate: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginLeft: 'auto',
   },
   releasesContainer: {
     gap: 14,
   },
   releaseCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   releaseHeader: {
     flexDirection: 'row',
@@ -2050,7 +2053,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   tagBadge: {
-    backgroundColor: Colors.cyanMuted,
+    backgroundColor: colors.cyanMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -2058,10 +2061,10 @@ const styles = StyleSheet.create({
   tagBadgeText: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   prereleaseBadge: {
-    backgroundColor: Colors.rubyMuted,
+    backgroundColor: colors.rubyMuted,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 6,
@@ -2069,22 +2072,22 @@ const styles = StyleSheet.create({
   prereleaseText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.ruby,
+    color: colors.ruby,
   },
   releaseDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginLeft: 'auto',
   },
   releaseTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 6,
   },
   releaseBody: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: Spacing.sm,
   },
@@ -2092,24 +2095,24 @@ const styles = StyleSheet.create({
     marginTop: Spacing.md,
     paddingTop: Spacing.sm,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
     gap: 8,
   },
   assetsTitle: {
     fontSize: 12,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   assetRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: Spacing.md,
     paddingVertical: 8,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   assetIcon: {
     fontSize: 13,
@@ -2118,29 +2121,29 @@ const styles = StyleSheet.create({
   assetName: {
     flex: 1,
     fontSize: 12,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
   },
   assetSize: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   insightsContainer: {
     gap: 16,
   },
   insightSectionCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   langBarContainer: {
     flexDirection: 'row',
     height: 10,
     borderRadius: 5,
     overflow: 'hidden',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     marginVertical: Spacing.md,
   },
   langBarSegment: {
@@ -2166,19 +2169,19 @@ const styles = StyleSheet.create({
   langLegendName: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginRight: 4,
   },
   langLegendPercent: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   contributorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 8,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   rankBadge: {
     width: 28,
@@ -2187,16 +2190,16 @@ const styles = StyleSheet.create({
   rankText: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   contributorName: {
     flex: 1,
     fontSize: 13,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   contributorCountBadge: {
-    backgroundColor: Colors.primaryMuted,
+    backgroundColor: colors.primaryMuted,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
@@ -2204,40 +2207,40 @@ const styles = StyleSheet.create({
   contributorCountText: {
     fontSize: 11,
     fontWeight: '700',
-    color: Colors.primary,
+    color: colors.primary,
   },
   modalLoadMoreBtn: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 12,
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginTop: Spacing.sm,
   },
   modalLoadMoreText: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontSize: 13,
     fontWeight: '700',
   },
   emptyCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.xl,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   emptyDetailText: {
     fontSize: 13,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     textAlign: 'center',
   },
   emptySubText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontStyle: 'italic',
     paddingVertical: 8,
   },
@@ -2248,11 +2251,11 @@ const styles = StyleSheet.create({
     padding: Spacing.xl,
   },
   branchModalCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     maxHeight: '70%',
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     overflow: 'hidden',
   },
   branchModalHeader: {
@@ -2261,18 +2264,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     padding: Spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
+    borderBottomColor: colors.cardBorder,
   },
   branchModalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   branchModalClose: {
     padding: 4,
   },
   branchModalCloseText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontSize: 16,
     fontWeight: '700',
   },
@@ -2287,7 +2290,7 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   branchItemActive: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
   },
   branchItemIcon: {
     fontSize: 14,
@@ -2296,33 +2299,33 @@ const styles = StyleSheet.create({
   branchItemText: {
     flex: 1,
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   branchItemTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   protectedBadge: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginRight: 8,
   },
   protectedText: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   checkIcon: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '800',
     fontSize: 14,
   },
   dangerZoneCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
     borderColor: 'rgba(239, 68, 68, 0.4)',
@@ -2339,7 +2342,7 @@ const styles = StyleSheet.create({
   dangerZoneTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.ruby,
+    color: colors.ruby,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
   },
@@ -2356,16 +2359,16 @@ const styles = StyleSheet.create({
   dangerActionTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 2,
   },
   dangerActionDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 16,
   },
   deleteRepoBtn: {
-    backgroundColor: Colors.ruby,
+    backgroundColor: colors.ruby,
     paddingHorizontal: 16,
     paddingVertical: 9,
     borderRadius: 10,
@@ -2383,7 +2386,7 @@ const styles = StyleSheet.create({
     padding: Spacing.lg,
   },
   safetyModalCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     borderWidth: 1.5,
     borderColor: 'rgba(239, 68, 68, 0.5)',
@@ -2405,7 +2408,7 @@ const styles = StyleSheet.create({
   safetyModalTitle: {
     fontSize: 16,
     fontWeight: '800',
-    color: Colors.ruby,
+    color: colors.ruby,
     letterSpacing: 0.3,
   },
   safetyCloseBtn: {
@@ -2413,7 +2416,7 @@ const styles = StyleSheet.create({
   },
   safetyCloseText: {
     fontSize: 14,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '700',
   },
   safetyWarningBox: {
@@ -2427,41 +2430,41 @@ const styles = StyleSheet.create({
   safetyWarningTitle: {
     fontSize: 12,
     fontWeight: '800',
-    color: Colors.ruby,
+    color: colors.ruby,
     marginBottom: 4,
   },
   safetyWarningDesc: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   safetyPromptLabel: {
     fontSize: 13,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 8,
   },
   safetyPromptTarget: {
     fontWeight: '700',
     fontFamily: 'monospace',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   safetyInput: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 10,
     borderWidth: 1.5,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 13,
     fontFamily: 'monospace',
     marginBottom: Spacing.lg,
   },
   safetyInputMatched: {
-    borderColor: Colors.ruby,
+    borderColor: colors.ruby,
   },
   safetyDeleteBtn: {
-    backgroundColor: Colors.ruby,
+    backgroundColor: colors.ruby,
     borderRadius: 10,
     paddingVertical: 12,
     paddingHorizontal: 16,

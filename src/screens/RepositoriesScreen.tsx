@@ -10,7 +10,7 @@ import {
   ScrollView,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+import { ThemePalette, Spacing } from '../constants/theme';
 import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
@@ -59,6 +59,7 @@ export const RepositoriesScreen: React.FC = () => {
   const [searchingRemote, setSearchingRemote] = useState(false);
 
   const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const { settings } = useCustomization();
 
   // Filters
@@ -274,7 +275,7 @@ export const RepositoriesScreen: React.FC = () => {
                   styles.langDot,
                   {
                     backgroundColor:
-                      LANGUAGE_COLORS[item.language] || Colors.primary,
+                      LANGUAGE_COLORS[item.language] || colors.primary,
                   },
                 ]}
               />
@@ -309,7 +310,7 @@ export const RepositoriesScreen: React.FC = () => {
         <TextInput
           style={styles.searchInput}
           placeholder="Search repositories, code, topics..."
-          placeholderTextColor={Colors.textMuted}
+          placeholderTextColor={colors.textMuted}
           value={searchQuery}
           onChangeText={handleSearch}
           autoCapitalize="none"
@@ -463,7 +464,7 @@ export const RepositoriesScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => loadRepos(1, true)}
-            tintColor={Colors.primary}
+            tintColor={colors.primary}
           />
         }
         ListFooterComponent={
@@ -518,22 +519,22 @@ export const RepositoriesScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.md,
     marginBottom: 8,
     paddingHorizontal: Spacing.md,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   searchIcon: {
     fontSize: 14,
@@ -542,11 +543,11 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     height: 44,
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 14,
   },
   clearSearch: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontSize: 14,
     padding: 4,
   },
@@ -564,21 +565,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   filterChipActive: {
-    backgroundColor: Colors.cardElevated,
-    borderColor: Colors.primary,
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.primary,
   },
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   filterChipTextActive: {
-    color: Colors.primary,
+    color: colors.primary,
     fontWeight: '700',
   },
   langPill: {
@@ -588,13 +589,13 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   langPillActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   langPillDot: {
     width: 6,
@@ -605,7 +606,7 @@ const styles = StyleSheet.create({
   langPillText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginRight: 4,
   },
   langPillTextActive: {
@@ -614,7 +615,7 @@ const styles = StyleSheet.create({
   },
   langPillCount: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontFamily: 'monospace',
   },
   langPillCountActive: {
@@ -635,7 +636,7 @@ const styles = StyleSheet.create({
   },
   sortLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
     marginRight: 2,
   },
@@ -643,21 +644,21 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 8,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   sortPillActive: {
-    backgroundColor: Colors.cardElevated,
-    borderColor: Colors.cyan,
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.cyan,
   },
   sortPillText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '500',
   },
   sortPillTextActive: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '700',
   },
   sortBarRight: {
@@ -667,7 +668,7 @@ const styles = StyleSheet.create({
   },
   metaCountText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   resetBtn: {
@@ -676,7 +677,7 @@ const styles = StyleSheet.create({
   },
   resetBtnText: {
     fontSize: 11,
-    color: Colors.ruby,
+    color: colors.ruby,
     fontWeight: '700',
   },
   listContent: {
@@ -685,11 +686,11 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   repoCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   repoTopRow: {
     flexDirection: 'row',
@@ -700,7 +701,7 @@ const styles = StyleSheet.create({
   repoTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     flex: 1,
   },
   badgesGroup: {
@@ -710,33 +711,33 @@ const styles = StyleSheet.create({
     marginLeft: 8,
   },
   forkBadge: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   forkBadgeText: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   visibilityBadge: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   visibilityText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontWeight: '600',
   },
   repoDesc: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
     marginBottom: 10,
   },
@@ -761,12 +762,12 @@ const styles = StyleSheet.create({
   },
   metaText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     fontWeight: '500',
   },
   updatedDate: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginLeft: 'auto',
   },
   loadingMoreBox: {
@@ -778,7 +779,7 @@ const styles = StyleSheet.create({
   },
   loadingMoreText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -792,12 +793,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     maxWidth: 280,
   },

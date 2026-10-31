@@ -1,4 +1,6 @@
-import React from 'react';
+import React, { useMemo } from 'react';
+import { useTheme } from '../context/ThemeContext';
+import { ThemePalette, Spacing } from '../constants/theme';
 import {
   View,
   Text,
@@ -6,7 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+
 
 export interface PaginationControlProps {
   page: number;
@@ -29,6 +31,8 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
   onPageChange,
   compact = false,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const canGoPrev = hasPrev && !loading;
   const canGoNext = hasNext && !loading;
 
@@ -56,7 +60,7 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
       {/* Page Info */}
       <View style={styles.infoBox}>
         {loading ? (
-          <ActivityIndicator size="small" color={Colors.cyan} />
+          <ActivityIndicator size="small" color={colors.cyan} />
         ) : (
           <View style={styles.centerCol}>
             <View style={styles.pageBadge}>
@@ -94,15 +98,15 @@ export const PaginationControl: React.FC<PaginationControlProps> = ({
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     paddingHorizontal: Spacing.md,
     paddingVertical: 10,
     marginVertical: Spacing.md,
@@ -116,26 +120,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     borderRadius: 10,
     borderWidth: 1,
-    borderColor: Colors.cardBorderActive,
+    borderColor: colors.cardBorderActive,
     paddingVertical: 8,
     paddingHorizontal: 14,
     minWidth: 80,
   },
   pageButtonDisabled: {
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     backgroundColor: 'transparent',
     opacity: 0.4,
   },
   pageButtonText: {
-    color: Colors.cyan,
+    color: colors.cyan,
     fontSize: 12,
     fontWeight: '700',
   },
   pageButtonTextDisabled: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   infoBox: {
     flex: 1,
@@ -147,23 +151,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   pageBadge: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   pageBadgeText: {
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     fontSize: 12,
     fontWeight: '700',
     fontFamily: 'monospace',
   },
   totalText: {
-    color: Colors.textMuted,
+    color: colors.textMuted,
     fontSize: 10,
     marginTop: 2,
   },
 });
-

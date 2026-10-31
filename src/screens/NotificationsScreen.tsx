@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { useTheme } from '../context/ThemeContext';
+import { ThemePalette, Spacing } from '../constants/theme';
 import {
   View,
   Text,
@@ -10,7 +12,7 @@ import {
   Linking,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+
 import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { formatRepoTimestamp } from '../utils/date';
@@ -22,6 +24,8 @@ type FilterType = 'unread' | 'all' | 'PullRequest' | 'Issue' | 'Release';
 const PAGE_SIZE = 30;
 
 export const NotificationsScreen: React.FC = () => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [notifications, setNotifications] = useState<GitHubNotification[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
@@ -250,7 +254,7 @@ export const NotificationsScreen: React.FC = () => {
             activeOpacity={0.7}
           >
             {markingAll ? (
-              <ActivityIndicator size="small" color={Colors.cyan} />
+              <ActivityIndicator size="small" color={colors.cyan} />
             ) : (
               <Text style={styles.markAllText}>Mark all read</Text>
             )}
@@ -393,7 +397,7 @@ export const NotificationsScreen: React.FC = () => {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={() => loadNotifications(1, true)}
-            tintColor={Colors.primary}
+            tintColor={colors.primary}
           />
         }
         ListFooterComponent={
@@ -447,10 +451,10 @@ export const NotificationsScreen: React.FC = () => {
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -463,25 +467,25 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 24,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   subtitle: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     marginTop: 2,
   },
   markAllButton: {
-    backgroundColor: Colors.cardElevated,
+    backgroundColor: colors.cardElevated,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   markAllText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.cyan,
+    color: colors.cyan,
   },
   scopeWarningCard: {
     flexDirection: 'row',
@@ -503,24 +507,24 @@ const styles = StyleSheet.create({
   scopeWarningTitle: {
     fontSize: 13,
     fontWeight: '700',
-    color: Colors.gold,
+    color: colors.gold,
     marginBottom: 2,
   },
   scopeWarningText: {
     fontSize: 12,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     lineHeight: 18,
   },
   scopeBold: {
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   scopeLinkBtn: {
     marginTop: 6,
   },
   scopeLinkText: {
     fontSize: 12,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
   },
   filterTabsContainer: {
@@ -537,18 +541,18 @@ const styles = StyleSheet.create({
     paddingHorizontal: 14,
     paddingVertical: 7,
     borderRadius: 12,
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   filterTabActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
   },
   filterTabText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   filterTabTextActive: {
     color: '#FFFFFF',
@@ -560,14 +564,14 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   notificationCard: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 14,
     padding: Spacing.md,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   notificationCardUnread: {
-    borderColor: Colors.primary,
+    borderColor: colors.primary,
     backgroundColor: '#0F162B',
   },
   topRow: {
@@ -578,14 +582,14 @@ const styles = StyleSheet.create({
   },
   repoName: {
     fontSize: 12,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
     flex: 1,
   },
   typeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: Colors.backgroundElevated,
+    backgroundColor: colors.backgroundElevated,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 6,
@@ -598,12 +602,12 @@ const styles = StyleSheet.create({
   typeBadgeText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
   },
   subjectTitle: {
     fontSize: 14,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     lineHeight: 20,
     marginBottom: 8,
   },
@@ -613,26 +617,26 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingTop: 6,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
+    borderTopColor: colors.cardBorder,
   },
   reasonText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     textTransform: 'capitalize',
   },
   dateText: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   markReadButton: {
-    backgroundColor: Colors.emeraldMuted,
+    backgroundColor: colors.emeraldMuted,
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 6,
   },
   markReadText: {
     fontSize: 11,
-    color: Colors.emerald,
+    color: colors.emerald,
     fontWeight: '700',
   },
   loadingMoreBox: {
@@ -644,7 +648,7 @@ const styles = StyleSheet.create({
   },
   loadingMoreText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
   emptyContainer: {
     alignItems: 'center',
@@ -658,12 +662,12 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 18,
     fontWeight: '700',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
   emptySubtitle: {
     fontSize: 13,
-    color: Colors.textSecondary,
+    color: colors.textSecondary,
     textAlign: 'center',
     maxWidth: 280,
   },

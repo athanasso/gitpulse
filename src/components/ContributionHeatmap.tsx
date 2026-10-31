@@ -1,4 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import { useTheme } from '../context/ThemeContext';
+import { ThemePalette, Spacing } from '../constants/theme';
 import {
   View,
   Text,
@@ -6,7 +8,7 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+
 import { ContributionDay } from '../types/github';
 
 interface ContributionHeatmapProps {
@@ -18,6 +20,8 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
   days,
   total,
 }) => {
+  const { colors } = useTheme();
+  const styles = useMemo(() => createStyles(colors), [colors]);
   const [selectedDay, setSelectedDay] = useState<ContributionDay | null>(null);
 
   // Chunk days into weeks of 7 days (columns)
@@ -52,15 +56,15 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
   const getDayColor = (level: number) => {
     switch (level) {
       case 1:
-        return Colors.heat1;
+        return colors.heat1;
       case 2:
-        return Colors.heat2;
+        return colors.heat2;
       case 3:
-        return Colors.heat3;
+        return colors.heat3;
       case 4:
-        return Colors.heat4;
+        return colors.heat4;
       default:
-        return Colors.heat0;
+        return colors.heat0;
     }
   };
 
@@ -85,13 +89,13 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
           <Text style={styles.metricLabel}>Contributions</Text>
         </View>
         <View style={styles.metricCard}>
-          <Text style={[styles.metricValue, { color: Colors.emerald }]}>
+          <Text style={[styles.metricValue, { color: colors.emerald }]}>
             {currentStreak}d
           </Text>
           <Text style={styles.metricLabel}>Current Streak</Text>
         </View>
         <View style={styles.metricCard}>
-          <Text style={[styles.metricValue, { color: Colors.gold }]}>
+          <Text style={[styles.metricValue, { color: colors.gold }]}>
             {maxStreak}d
           </Text>
           <Text style={styles.metricLabel}>Longest Streak</Text>
@@ -138,24 +142,24 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
       {/* Heatmap Legend */}
       <View style={styles.legendRow}>
         <Text style={styles.legendText}>Less</Text>
-        <View style={[styles.legendCell, { backgroundColor: Colors.heat0 }]} />
-        <View style={[styles.legendCell, { backgroundColor: Colors.heat1 }]} />
-        <View style={[styles.legendCell, { backgroundColor: Colors.heat2 }]} />
-        <View style={[styles.legendCell, { backgroundColor: Colors.heat3 }]} />
-        <View style={[styles.legendCell, { backgroundColor: Colors.heat4 }]} />
+        <View style={[styles.legendCell, { backgroundColor: colors.heat0 }]} />
+        <View style={[styles.legendCell, { backgroundColor: colors.heat1 }]} />
+        <View style={[styles.legendCell, { backgroundColor: colors.heat2 }]} />
+        <View style={[styles.legendCell, { backgroundColor: colors.heat3 }]} />
+        <View style={[styles.legendCell, { backgroundColor: colors.heat4 }]} />
         <Text style={styles.legendText}>More</Text>
       </View>
     </View>
   );
 };
 
-const styles = StyleSheet.create({
+const createStyles = (colors: ThemePalette) => StyleSheet.create({
   container: {
-    backgroundColor: Colors.card,
+    backgroundColor: colors.card,
     borderRadius: 16,
     padding: Spacing.lg,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
     marginBottom: Spacing.lg,
   },
   metricsRow: {
@@ -166,25 +170,25 @@ const styles = StyleSheet.create({
   metricCard: {
     flex: 1,
     alignItems: 'center',
-    backgroundColor: Colors.backgroundElevated,
+    backgroundColor: colors.backgroundElevated,
     paddingVertical: 10,
     borderRadius: 12,
     marginHorizontal: 4,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
+    borderColor: colors.cardBorder,
   },
   metricValue: {
     fontSize: 18,
     fontWeight: '800',
-    color: Colors.textPrimary,
+    color: colors.textPrimary,
   },
   metricLabel: {
     fontSize: 11,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginTop: 2,
   },
   selectedDayBar: {
-    backgroundColor: Colors.backgroundElevated,
+    backgroundColor: colors.backgroundElevated,
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 8,
@@ -193,7 +197,7 @@ const styles = StyleSheet.create({
   },
   selectedDayText: {
     fontSize: 12,
-    color: Colors.cyan,
+    color: colors.cyan,
     fontWeight: '600',
   },
   matrixScroll: {
@@ -226,7 +230,7 @@ const styles = StyleSheet.create({
   },
   legendText: {
     fontSize: 10,
-    color: Colors.textMuted,
+    color: colors.textMuted,
     marginHorizontal: 4,
   },
   legendCell: {
@@ -241,7 +245,7 @@ const styles = StyleSheet.create({
   },
   emptyHeatmapText: {
     fontSize: 12,
-    color: Colors.textMuted,
+    color: colors.textMuted,
   },
 });
 
