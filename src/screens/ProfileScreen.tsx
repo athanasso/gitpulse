@@ -25,6 +25,7 @@ import {
 import { GitHubApiService } from '../services/GitHubApiService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
+import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 
 type ProfileSubTab =
   | 'repos'
@@ -853,6 +854,9 @@ export const ProfileScreen: React.FC = () => {
                             <Text style={styles.topRepoForks}>
                               🍴 {repo.forks_count}
                             </Text>
+                            <Text style={styles.topRepoUpdated}>
+                              Updated {formatRepoTimestamp(repo.updated_at)}
+                            </Text>
                           </View>
                         </TouchableOpacity>
                       ))}
@@ -911,6 +915,9 @@ export const ProfileScreen: React.FC = () => {
                             <Text style={styles.topRepoStars}>
                               ⭐ {repo.stargazers_count}
                             </Text>
+                            <Text style={styles.topRepoUpdated}>
+                              Updated {formatRepoTimestamp(repo.updated_at)}
+                            </Text>
                           </View>
                         </TouchableOpacity>
                       ))}
@@ -961,7 +968,7 @@ export const ProfileScreen: React.FC = () => {
                                 </Text>
                               </View>
                               <Text style={styles.gistDate}>
-                                {new Date(g.created_at).toLocaleDateString()}
+                                {formatLocalDateTime(g.created_at)}
                               </Text>
                             </View>
 
@@ -1023,7 +1030,7 @@ export const ProfileScreen: React.FC = () => {
                               {ev.repo.name}
                             </Text>
                             <Text style={styles.eventDate}>
-                              {new Date(ev.created_at).toLocaleDateString()}
+                              {formatRepoTimestamp(ev.created_at)}
                             </Text>
                           </View>
                           <Text style={styles.eventDetail}>
@@ -1740,6 +1747,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.md,
     gap: 12,
+    flexWrap: 'wrap',
   },
   topRepoLang: {
     fontSize: 11,
@@ -1753,6 +1761,11 @@ const styles = StyleSheet.create({
   topRepoForks: {
     fontSize: 11,
     color: Colors.textMuted,
+  },
+  topRepoUpdated: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginLeft: 'auto',
   },
   listContainer: {
     gap: 10,

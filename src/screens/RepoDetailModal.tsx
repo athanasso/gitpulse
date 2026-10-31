@@ -24,6 +24,7 @@ import {
   GitHubContributor,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 
 interface RepoDetailModalProps {
   visible: boolean;
@@ -511,6 +512,18 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           )}
         </View>
 
+        {/* Local Time Meta Row */}
+        <View style={styles.repoMetaTimeRow}>
+          <Text style={styles.repoMetaTimeText}>
+            🕒 Updated {formatRepoTimestamp(repo.updated_at)}
+          </Text>
+          {repo.pushed_at ? (
+            <Text style={styles.repoMetaTimeText}>
+              🚀 Pushed {formatRepoTimestamp(repo.pushed_at)}
+            </Text>
+          ) : null}
+        </View>
+
         {/* Scrollable Tab Bar (Never truncated) */}
         <ScrollView
           horizontal
@@ -753,9 +766,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </Text>
                       <Text style={styles.commitAuthor}>
                         {selectedCommit.commit.author.name} ·{' '}
-                        {new Date(
-                          selectedCommit.commit.author.date
-                        ).toLocaleDateString()}
+                        {formatLocalDateTime(selectedCommit.commit.author.date)}
                       </Text>
                     </View>
 
@@ -787,7 +798,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             {c.sha.substring(0, 7)}
                           </Text>
                           <Text style={styles.commitDate}>
-                            {new Date(c.commit.author.date).toLocaleDateString()}
+                            {formatRepoTimestamp(c.commit.author.date)}
                           </Text>
                         </View>
                         <Text style={styles.commitMessage} numberOfLines={2}>
@@ -897,7 +908,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             <Text style={styles.stateBadgeText}>🔀 #{p.number}</Text>
                           </View>
                           <Text style={styles.issueDate}>
-                            {new Date(p.created_at).toLocaleDateString()}
+                            {formatRepoTimestamp(p.created_at)}
                           </Text>
                         </View>
                         <Text style={styles.issueTitle}>{p.title}</Text>
@@ -939,7 +950,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             </Text>
                           </View>
                           <Text style={styles.issueDate}>
-                            {new Date(i.created_at).toLocaleDateString()}
+                            {formatRepoTimestamp(i.created_at)}
                           </Text>
                         </View>
                         <Text style={styles.issueTitle}>{i.title}</Text>
@@ -998,7 +1009,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
                           <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
                           <Text style={styles.workflowDate}>
-                            {new Date(r.created_at).toLocaleDateString()}
+                            {formatRepoTimestamp(r.created_at)}
                           </Text>
                         </View>
                       </View>
@@ -1048,7 +1059,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             </View>
                           )}
                           <Text style={styles.releaseDate}>
-                            {new Date(rel.published_at).toLocaleDateString()}
+                            {formatLocalDateTime(rel.published_at)}
                           </Text>
                         </View>
 
@@ -1375,6 +1386,21 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     marginRight: 6,
+  },
+  repoMetaTimeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 14,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 6,
+    backgroundColor: Colors.backgroundElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+    flexWrap: 'wrap',
+  },
+  repoMetaTimeText: {
+    fontSize: 11,
+    color: Colors.textMuted,
   },
   tabsScrollView: {
     flexGrow: 0,

@@ -14,6 +14,7 @@ import { Colors, Spacing } from '../constants/theme';
 import { GitHubRepo } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
+import { formatRepoTimestamp } from '../utils/date';
 
 type RepoTypeFilter = 'all' | 'sources' | 'forks' | 'public' | 'private';
 type RepoSortOption = 'updated' | 'stars' | 'forks' | 'name';
@@ -263,7 +264,7 @@ export const RepositoriesScreen: React.FC = () => {
           </View>
 
           <Text style={styles.updatedDate}>
-            Updated {new Date(item.updated_at).toLocaleDateString()}
+            Updated {formatRepoTimestamp(item.updated_at)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -697,6 +698,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 12,
+    flexWrap: 'wrap',
   },
   metaItem: {
     flexDirection: 'row',

@@ -13,6 +13,7 @@ import {
 import { Colors, Spacing } from '../constants/theme';
 import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { formatRepoTimestamp } from '../utils/date';
 
 type FilterType = 'unread' | 'all' | 'PullRequest' | 'Issue' | 'Release';
 
@@ -172,7 +173,7 @@ export const NotificationsScreen: React.FC = () => {
             Reason: {item.reason.replace(/_/g, ' ')}
           </Text>
           <Text style={styles.dateText}>
-            {new Date(item.updated_at).toLocaleDateString()}
+            {formatRepoTimestamp(item.updated_at)}
           </Text>
 
           {item.unread && (
