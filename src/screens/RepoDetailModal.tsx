@@ -60,6 +60,11 @@ const LANGUAGE_COLORS: Record<string, string> = {
   Dart: '#00B4AB',
 };
 
+const COMMITS_PAGE_SIZE = 30;
+const ISSUES_PAGE_SIZE = 30;
+const RUNS_PAGE_SIZE = 20;
+const RELEASES_PAGE_SIZE = 20;
+
 export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   visible,
   repo,
@@ -84,15 +89,35 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [fileTree, setFileTree] = useState<GitHubFileItem[]>([]);
   const [viewingFile, setViewingFile] = useState<GitHubFileItem | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+
+  // Commits with pagination
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
+  const [commitsPage, setCommitsPage] = useState(1);
+  const [hasMoreCommits, setHasMoreCommits] = useState(true);
+  const [loadingMoreCommits, setLoadingMoreCommits] = useState(false);
   const [selectedCommit, setSelectedCommit] = useState<GitHubCommit | null>(null);
+
+  // Issues & PRs with pagination
   const [issues, setIssues] = useState<GitHubIssue[]>([]);
   const [prs, setPrs] = useState<GitHubPullRequest[]>([]);
-  const [workflowRuns, setWorkflowRuns] = useState<GitHubWorkflowRun[]>([]);
+  const [issuesPage, setIssuesPage] = useState(1);
+  const [hasMoreIssues, setHasMoreIssues] = useState(true);
+  const [loadingMoreIssues, setLoadingMoreIssues] = useState(false);
   const [issueFilter, setIssueFilter] = useState<'all' | 'open' | 'closed'>('open');
 
-  // Extended Data: Releases & Insights
+  // Actions CI with pagination
+  const [workflowRuns, setWorkflowRuns] = useState<GitHubWorkflowRun[]>([]);
+  const [runsPage, setRunsPage] = useState(1);
+  const [hasMoreRuns, setHasMoreRuns] = useState(true);
+  const [loadingMoreRuns, setLoadingMoreRuns] = useState(false);
+
+  // Releases with pagination
   const [releases, setReleases] = useState<GitHubRelease[]>([]);
+  const [releasesPage, setReleasesPage] = useState(1);
+  const [hasMoreReleases, setHasMoreReleases] = useState(true);
+  const [loadingMoreReleases, setLoadingMoreReleases] = useState(false);
+
+  // Insights
   const [languages, setLanguages] = useState<Record<string, number>>({});
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
 
@@ -104,10 +129,18 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       setReadmeContent('');
       setFileTree([]);
       setCommits([]);
+      setCommitsPage(1);
+      setHasMoreCommits(true);
       setIssues([]);
       setPrs([]);
+      setIssuesPage(1);
+      setHasMoreIssues(true);
       setWorkflowRuns([]);
+      setRunsPage(1);
+      setHasMoreRuns(true);
       setReleases([]);
+      setReleasesPage(1);
+      setHasMoreReleases(true);
       setLanguages({});
       setContributors([]);
       setCurrentPath('');
@@ -145,19 +178,48 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         const tree = await GitHubApiService.getRepoTree(owner, name, currentPath, branch);
         setFileTree(tree);
       } else if (activeTab === 'commits' && commits.length === 0) {
-        const cList = await GitHubApiService.getRepoCommits(owner, name, branch);
+        setCommitsPage(1);
+        const cList = await GitHubApiService.getRepoCommits(
+          owner,
+          name,
+          branch,
+          1,
+          COMMITS_PAGE_SIZE
+        );
         setCommits(cList);
-      } else if (activeTab === 'issues' && issues.length === 0) {
+        setHasMoreCommits(cList.length >= COMMITS_PAGE_SIZE);
+      } else if (activeTab === 'issues' && issues.length === 0 && prs.length === 0) {
+        setIssuesPage(1);
         const { issues: iList, prs: pList } =
-          await GitHubApiService.getIssuesAndPRs(owner, name);
+          await GitHubApiService.getIssuesAndPRs(
+            owner,
+            name,
+            1,
+            ISSUES_PAGE_SIZE
+          );
         setIssues(iList);
         setPrs(pList);
+        setHasMoreIssues(iList.length + pList.length >= ISSUES_PAGE_SIZE);
       } else if (activeTab === 'actions' && workflowRuns.length === 0) {
-        const runs = await GitHubApiService.getWorkflowRuns(owner, name);
+        setRunsPage(1);
+        const runs = await GitHubApiService.getWorkflowRuns(
+          owner,
+          name,
+          1,
+          RUNS_PAGE_SIZE
+        );
         setWorkflowRuns(runs);
+        setHasMoreRuns(runs.length >= RUNS_PAGE_SIZE);
       } else if (activeTab === 'releases' && releases.length === 0) {
-        const rels = await GitHubApiService.getRepoReleases(owner, name);
+        setReleasesPage(1);
+        const rels = await GitHubApiService.getRepoReleases(
+          owner,
+          name,
+          1,
+          RELEASES_PAGE_SIZE
+        );
         setReleases(rels);
+        setHasMoreReleases(rels.length >= RELEASES_PAGE_SIZE);
       } else if (activeTab === 'insights' && Object.keys(languages).length === 0) {
         const [langMap, contribList] = await Promise.all([
           GitHubApiService.getRepoLanguages(owner, name),
@@ -171,6 +233,76 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadMoreCommits = async () => {
+    if (!repo || loadingMoreCommits || !hasMoreCommits) return;
+    setLoadingMoreCommits(true);
+    const [owner, name] = repo.full_name.split('/');
+    const nextPage = commitsPage + 1;
+    const more = await GitHubApiService.getRepoCommits(
+      owner,
+      name,
+      selectedBranch,
+      nextPage,
+      COMMITS_PAGE_SIZE
+    );
+    setCommits((prev) => [...prev, ...more]);
+    setHasMoreCommits(more.length >= COMMITS_PAGE_SIZE);
+    setCommitsPage(nextPage);
+    setLoadingMoreCommits(false);
+  };
+
+  const loadMoreIssues = async () => {
+    if (!repo || loadingMoreIssues || !hasMoreIssues) return;
+    setLoadingMoreIssues(true);
+    const [owner, name] = repo.full_name.split('/');
+    const nextPage = issuesPage + 1;
+    const { issues: moreI, prs: moreP } = await GitHubApiService.getIssuesAndPRs(
+      owner,
+      name,
+      nextPage,
+      ISSUES_PAGE_SIZE
+    );
+    setIssues((prev) => [...prev, ...moreI]);
+    setPrs((prev) => [...prev, ...moreP]);
+    setHasMoreIssues(moreI.length + moreP.length >= ISSUES_PAGE_SIZE);
+    setIssuesPage(nextPage);
+    setLoadingMoreIssues(false);
+  };
+
+  const loadMoreWorkflowRuns = async () => {
+    if (!repo || loadingMoreRuns || !hasMoreRuns) return;
+    setLoadingMoreRuns(true);
+    const [owner, name] = repo.full_name.split('/');
+    const nextPage = runsPage + 1;
+    const more = await GitHubApiService.getWorkflowRuns(
+      owner,
+      name,
+      nextPage,
+      RUNS_PAGE_SIZE
+    );
+    setWorkflowRuns((prev) => [...prev, ...more]);
+    setHasMoreRuns(more.length >= RUNS_PAGE_SIZE);
+    setRunsPage(nextPage);
+    setLoadingMoreRuns(false);
+  };
+
+  const loadMoreReleases = async () => {
+    if (!repo || loadingMoreReleases || !hasMoreReleases) return;
+    setLoadingMoreReleases(true);
+    const [owner, name] = repo.full_name.split('/');
+    const nextPage = releasesPage + 1;
+    const more = await GitHubApiService.getRepoReleases(
+      owner,
+      name,
+      nextPage,
+      RELEASES_PAGE_SIZE
+    );
+    setReleases((prev) => [...prev, ...more]);
+    setHasMoreReleases(more.length >= RELEASES_PAGE_SIZE);
+    setReleasesPage(nextPage);
+    setLoadingMoreReleases(false);
   };
 
   const handleSelectBranch = async (branchName: string) => {
@@ -189,8 +321,16 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     } else if (activeTab === 'commits') {
       setLoading(true);
       setSelectedCommit(null);
-      const cList = await GitHubApiService.getRepoCommits(owner, name, branchName);
+      setCommitsPage(1);
+      const cList = await GitHubApiService.getRepoCommits(
+        owner,
+        name,
+        branchName,
+        1,
+        COMMITS_PAGE_SIZE
+      );
       setCommits(cList);
+      setHasMoreCommits(cList.length >= COMMITS_PAGE_SIZE);
       setLoading(false);
     }
   };
@@ -371,7 +511,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           )}
         </View>
 
-        {/* Scrollable Tab Bar */}
+        {/* Scrollable Tab Bar (Never truncated) */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -591,7 +731,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               </View>
             )}
 
-            {/* COMMITS TAB */}
+            {/* COMMITS TAB WITH PAGINATION */}
             {activeTab === 'commits' && (
               <View style={styles.commitsContainer}>
                 {selectedCommit ? (
@@ -634,29 +774,48 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     )}
                   </View>
                 ) : commits.length > 0 ? (
-                  commits.map((c) => (
-                    <TouchableOpacity
-                      key={c.sha}
-                      style={styles.commitItem}
-                      onPress={() => setSelectedCommit(c)}
-                      activeOpacity={0.7}
-                    >
-                      <View style={styles.commitHeaderRow}>
-                        <Text style={styles.commitShaBadge}>
-                          {c.sha.substring(0, 7)}
+                  <>
+                    {commits.map((c) => (
+                      <TouchableOpacity
+                        key={c.sha}
+                        style={styles.commitItem}
+                        onPress={() => setSelectedCommit(c)}
+                        activeOpacity={0.7}
+                      >
+                        <View style={styles.commitHeaderRow}>
+                          <Text style={styles.commitShaBadge}>
+                            {c.sha.substring(0, 7)}
+                          </Text>
+                          <Text style={styles.commitDate}>
+                            {new Date(c.commit.author.date).toLocaleDateString()}
+                          </Text>
+                        </View>
+                        <Text style={styles.commitMessage} numberOfLines={2}>
+                          {c.commit.message}
                         </Text>
-                        <Text style={styles.commitDate}>
-                          {new Date(c.commit.author.date).toLocaleDateString()}
+                        <Text style={styles.commitAuthorLine}>
+                          by {c.commit.author.name}
                         </Text>
-                      </View>
-                      <Text style={styles.commitMessage} numberOfLines={2}>
-                        {c.commit.message}
-                      </Text>
-                      <Text style={styles.commitAuthorLine}>
-                        by {c.commit.author.name}
-                      </Text>
-                    </TouchableOpacity>
-                  ))
+                      </TouchableOpacity>
+                    ))}
+
+                    {/* Pagination Button */}
+                    {hasMoreCommits && (
+                      <TouchableOpacity
+                        style={styles.modalLoadMoreBtn}
+                        onPress={loadMoreCommits}
+                        disabled={loadingMoreCommits}
+                      >
+                        {loadingMoreCommits ? (
+                          <ActivityIndicator size="small" color={Colors.cyan} />
+                        ) : (
+                          <Text style={styles.modalLoadMoreText}>
+                            Load More Commits
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </>
                 ) : (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyDetailText}>
@@ -667,11 +826,15 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               </View>
             )}
 
-            {/* ISSUES & PRs TAB */}
+            {/* ISSUES & PRs TAB WITH PAGINATION */}
             {activeTab === 'issues' && (
               <View style={styles.issuesContainer}>
-                {/* Sub filter */}
-                <View style={styles.issueFilterRow}>
+                {/* Sub filter (Scrollable so chips never get squished) */}
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  contentContainerStyle={styles.issueFilterRow}
+                >
                   <TouchableOpacity
                     style={[
                       styles.filterChip,
@@ -679,7 +842,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     ]}
                     onPress={() => setIssueFilter('all')}
                   >
-                    <Text style={styles.filterChipText}>All</Text>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        issueFilter === 'all' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      All
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
@@ -688,7 +858,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     ]}
                     onPress={() => setIssueFilter('open')}
                   >
-                    <Text style={styles.filterChipText}>Open</Text>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        issueFilter === 'open' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Open
+                    </Text>
                   </TouchableOpacity>
                   <TouchableOpacity
                     style={[
@@ -697,9 +874,16 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     ]}
                     onPress={() => setIssueFilter('closed')}
                   >
-                    <Text style={styles.filterChipText}>Closed</Text>
+                    <Text
+                      style={[
+                        styles.filterChipText,
+                        issueFilter === 'closed' && styles.filterChipTextActive,
+                      ]}
+                    >
+                      Closed
+                    </Text>
                   </TouchableOpacity>
-                </View>
+                </ScrollView>
 
                 {/* PR Section */}
                 <Text style={styles.sectionHeader}>Pull Requests ({prs.length})</Text>
@@ -769,38 +953,74 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 ) : (
                   <Text style={styles.emptySubText}>No issues found.</Text>
                 )}
+
+                {/* Pagination Button for Issues & PRs */}
+                {hasMoreIssues && (
+                  <TouchableOpacity
+                    style={styles.modalLoadMoreBtn}
+                    onPress={loadMoreIssues}
+                    disabled={loadingMoreIssues}
+                  >
+                    {loadingMoreIssues ? (
+                      <ActivityIndicator size="small" color={Colors.cyan} />
+                    ) : (
+                      <Text style={styles.modalLoadMoreText}>
+                        Load More Issues & PRs
+                      </Text>
+                    )}
+                  </TouchableOpacity>
+                )}
               </View>
             )}
 
-            {/* ACTIONS CI TAB */}
+            {/* ACTIONS CI TAB WITH PAGINATION */}
             {activeTab === 'actions' && (
               <View style={styles.actionsContainer}>
                 {workflowRuns.length > 0 ? (
-                  workflowRuns.map((r) => (
-                    <View key={r.id} style={styles.workflowCard}>
-                      <View style={styles.workflowHeader}>
-                        <View style={styles.conclusionBadge}>
-                          <Text style={styles.conclusionIcon}>
-                            {r.conclusion === 'success'
-                              ? '✅'
-                              : r.conclusion === 'failure'
-                              ? '❌'
-                              : '⏳'}
-                          </Text>
-                          <Text style={styles.workflowName}>{r.name}</Text>
+                  <>
+                    {workflowRuns.map((r) => (
+                      <View key={r.id} style={styles.workflowCard}>
+                        <View style={styles.workflowHeader}>
+                          <View style={styles.conclusionBadge}>
+                            <Text style={styles.conclusionIcon}>
+                              {r.conclusion === 'success'
+                                ? '✅'
+                                : r.conclusion === 'failure'
+                                ? '❌'
+                                : '⏳'}
+                            </Text>
+                            <Text style={styles.workflowName}>{r.name}</Text>
+                          </View>
+                          <Text style={styles.runNumber}>#{r.run_number}</Text>
                         </View>
-                        <Text style={styles.runNumber}>#{r.run_number}</Text>
-                      </View>
 
-                      <View style={styles.workflowMetaRow}>
-                        <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
-                        <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
-                        <Text style={styles.workflowDate}>
-                          {new Date(r.created_at).toLocaleDateString()}
-                        </Text>
+                        <View style={styles.workflowMetaRow}>
+                          <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
+                          <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
+                          <Text style={styles.workflowDate}>
+                            {new Date(r.created_at).toLocaleDateString()}
+                          </Text>
+                        </View>
                       </View>
-                    </View>
-                  ))
+                    ))}
+
+                    {/* Pagination Button */}
+                    {hasMoreRuns && (
+                      <TouchableOpacity
+                        style={styles.modalLoadMoreBtn}
+                        onPress={loadMoreWorkflowRuns}
+                        disabled={loadingMoreRuns}
+                      >
+                        {loadingMoreRuns ? (
+                          <ActivityIndicator size="small" color={Colors.cyan} />
+                        ) : (
+                          <Text style={styles.modalLoadMoreText}>
+                            Load More Actions Runs
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </>
                 ) : (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyDetailText}>
@@ -811,64 +1031,83 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               </View>
             )}
 
-            {/* RELEASES & ASSETS TAB */}
+            {/* RELEASES & ASSETS TAB WITH PAGINATION */}
             {activeTab === 'releases' && (
               <View style={styles.releasesContainer}>
                 {releases.length > 0 ? (
-                  releases.map((rel) => (
-                    <View key={rel.id} style={styles.releaseCard}>
-                      <View style={styles.releaseHeader}>
-                        <View style={styles.tagBadge}>
-                          <Text style={styles.tagBadgeText}>🏷️ {rel.tag_name}</Text>
-                        </View>
-                        {rel.prerelease && (
-                          <View style={styles.prereleaseBadge}>
-                            <Text style={styles.prereleaseText}>Pre-release</Text>
+                  <>
+                    {releases.map((rel) => (
+                      <View key={rel.id} style={styles.releaseCard}>
+                        <View style={styles.releaseHeader}>
+                          <View style={styles.tagBadge}>
+                            <Text style={styles.tagBadgeText}>🏷️ {rel.tag_name}</Text>
                           </View>
-                        )}
-                        <Text style={styles.releaseDate}>
-                          {new Date(rel.published_at).toLocaleDateString()}
-                        </Text>
-                      </View>
-
-                      <Text style={styles.releaseTitle}>
-                        {rel.name || rel.tag_name}
-                      </Text>
-
-                      {rel.body && (
-                        <Text style={styles.releaseBody} numberOfLines={4}>
-                          {rel.body}
-                        </Text>
-                      )}
-
-                      {/* Assets Section */}
-                      {rel.assets && rel.assets.length > 0 && (
-                        <View style={styles.assetsSection}>
-                          <Text style={styles.assetsTitle}>
-                            📦 Assets ({rel.assets.length})
+                          {rel.prerelease && (
+                            <View style={styles.prereleaseBadge}>
+                              <Text style={styles.prereleaseText}>Pre-release</Text>
+                            </View>
+                          )}
+                          <Text style={styles.releaseDate}>
+                            {new Date(rel.published_at).toLocaleDateString()}
                           </Text>
-                          {rel.assets.map((asset) => (
-                            <TouchableOpacity
-                              key={asset.id}
-                              style={styles.assetRow}
-                              onPress={() => Linking.openURL(asset.browser_download_url)}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.assetIcon}>💾</Text>
-                              <Text style={styles.assetName} numberOfLines={1}>
-                                {asset.name}
-                              </Text>
-                              <Text style={styles.assetSize}>
-                                {asset.size > 1048576
+                        </View>
+
+                        <Text style={styles.releaseTitle}>
+                          {rel.name || rel.tag_name}
+                        </Text>
+
+                        {rel.body && (
+                          <Text style={styles.releaseBody} numberOfLines={4}>
+                            {rel.body}
+                          </Text>
+                        )}
+
+                        {/* Assets Section */}
+                        {rel.assets && rel.assets.length > 0 && (
+                          <View style={styles.assetsSection}>
+                            <Text style={styles.assetsTitle}>
+                              📦 Assets ({rel.assets.length})
+                            </Text>
+                            {rel.assets.map((asset) => (
+                              <TouchableOpacity
+                                key={asset.id}
+                                style={styles.assetRow}
+                                onPress={() => Linking.openURL(asset.browser_download_url)}
+                                activeOpacity={0.7}
+                              >
+                                <Text style={styles.assetIcon}>💾</Text>
+                                <Text style={styles.assetName} numberOfLines={1}>
+                                  {asset.name}
+                                </Text>
+                                <Text style={styles.assetSize}>
+                                  {asset.size > 1048576
                                   ? `${(asset.size / 1048576).toFixed(1)} MB`
                                   : `${Math.round(asset.size / 1024)} KB`}
-                              </Text>
-                            </TouchableOpacity>
-                          ))}
-                        </View>
-                      )}
-                    </View>
-                  ))
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
+                      </View>
+                    ))}
+
+                    {/* Pagination Button */}
+                    {hasMoreReleases && (
+                      <TouchableOpacity
+                        style={styles.modalLoadMoreBtn}
+                        onPress={loadMoreReleases}
+                        disabled={loadingMoreReleases}
+                      >
+                        {loadingMoreReleases ? (
+                          <ActivityIndicator size="small" color={Colors.cyan} />
+                        ) : (
+                          <Text style={styles.modalLoadMoreText}>
+                            Load More Releases
+                          </Text>
+                        )}
+                      </TouchableOpacity>
+                    )}
+                  </>
                 ) : (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyDetailText}>
@@ -1148,8 +1387,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
   },
   tab: {
+    flexShrink: 0,
     paddingVertical: 12,
-    paddingHorizontal: 12,
+    paddingHorizontal: 14,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
   },
@@ -1163,6 +1403,7 @@ const styles = StyleSheet.create({
   },
   tabTextActive: {
     color: Colors.textPrimary,
+    fontWeight: '700',
   },
   loadingContainer: {
     flex: 1,
@@ -1400,9 +1641,10 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.sm,
   },
   filterChip: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 14,
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -1414,7 +1656,11 @@ const styles = StyleSheet.create({
   filterChipText: {
     fontSize: 12,
     fontWeight: '600',
-    color: Colors.textPrimary,
+    color: Colors.textSecondary,
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '700',
   },
   sectionHeader: {
     fontSize: 15,
@@ -1700,6 +1946,21 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     color: Colors.primary,
+  },
+  modalLoadMoreBtn: {
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginTop: Spacing.sm,
+  },
+  modalLoadMoreText: {
+    color: Colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
   },
   emptyCard: {
     backgroundColor: Colors.card,

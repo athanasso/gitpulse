@@ -6,6 +6,7 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
   Linking,
   ActivityIndicator,
 } from 'react-native';
@@ -15,35 +16,66 @@ import { GitHubApiService } from '../services/GitHubApiService';
 
 type FilterType = 'unread' | 'all' | 'PullRequest' | 'Issue' | 'Release';
 
+const PAGE_SIZE = 30;
+
 export const NotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<GitHubNotification[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
   const [activeFilter, setActiveFilter] = useState<FilterType>('unread');
   const [isAuth, setIsAuth] = useState(false);
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
   useEffect(() => {
-    loadNotifications();
+    loadNotifications(true);
   }, []);
 
-  const loadNotifications = async () => {
-    setRefreshing(true);
-    setScopeError(null);
+  const loadNotifications = async (isRefresh: boolean = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+      setScopeError(null);
+      setPage(1);
+      setHasMore(true);
+    }
+
     const auth = await GitHubApiService.init();
     setIsAuth(auth);
 
     if (auth) {
-      const list = await GitHubApiService.getNotifications();
+      const currentPage = isRefresh ? 1 : page;
+      const list = await GitHubApiService.getNotifications(currentPage, PAGE_SIZE);
       const err = GitHubApiService.getLastNotificationError();
       if (err) {
         setScopeError(err);
       }
-      setNotifications(list);
+
+      if (isRefresh) {
+        setNotifications(list);
+        setRefreshing(false);
+        setHasMore(list.length >= PAGE_SIZE);
+        setPage(2);
+      } else {
+        setNotifications((prev) => [...prev, ...list]);
+        setHasMore(list.length >= PAGE_SIZE);
+        setPage((prev) => prev + 1);
+        setLoadingMore(false);
+      }
     } else {
       setNotifications([]);
+      setRefreshing(false);
+      setLoadingMore(false);
     }
-    setRefreshing(false);
+  };
+
+  const handleEndReached = async () => {
+    if (hasMore && !loadingMore && !refreshing && isAuth) {
+      setLoadingMore(true);
+      await loadNotifications(false);
+    }
   };
 
   const markAsRead = async (id: string) => {
@@ -208,106 +240,127 @@ export const NotificationsScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Filter Tabs */}
-      <View style={styles.filterTabs}>
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            activeFilter === 'unread' && styles.filterTabActive,
-          ]}
-          onPress={() => setActiveFilter('unread')}
+      {/* Filter Tabs (Horizontal Scrollable View so texts are never cut off) */}
+      <View style={styles.filterTabsContainer}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterTabsScroll}
         >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.filterTabText,
-              activeFilter === 'unread' && styles.filterTabTextActive,
+              styles.filterTab,
+              activeFilter === 'unread' && styles.filterTabActive,
             ]}
+            onPress={() => setActiveFilter('unread')}
+            activeOpacity={0.7}
           >
-            Unread ({unreadCount})
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === 'unread' && styles.filterTabTextActive,
+              ]}
+            >
+              Unread ({unreadCount})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            activeFilter === 'all' && styles.filterTabActive,
-          ]}
-          onPress={() => setActiveFilter('all')}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.filterTabText,
-              activeFilter === 'all' && styles.filterTabTextActive,
+              styles.filterTab,
+              activeFilter === 'all' && styles.filterTabActive,
             ]}
+            onPress={() => setActiveFilter('all')}
+            activeOpacity={0.7}
           >
-            All ({notifications.length})
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === 'all' && styles.filterTabTextActive,
+              ]}
+            >
+              All ({notifications.length})
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            activeFilter === 'PullRequest' && styles.filterTabActive,
-          ]}
-          onPress={() => setActiveFilter('PullRequest')}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.filterTabText,
-              activeFilter === 'PullRequest' && styles.filterTabTextActive,
+              styles.filterTab,
+              activeFilter === 'PullRequest' && styles.filterTabActive,
             ]}
+            onPress={() => setActiveFilter('PullRequest')}
+            activeOpacity={0.7}
           >
-            🔀 PRs
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === 'PullRequest' && styles.filterTabTextActive,
+              ]}
+            >
+              🔀 Pull Requests
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            activeFilter === 'Issue' && styles.filterTabActive,
-          ]}
-          onPress={() => setActiveFilter('Issue')}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.filterTabText,
-              activeFilter === 'Issue' && styles.filterTabTextActive,
+              styles.filterTab,
+              activeFilter === 'Issue' && styles.filterTabActive,
             ]}
+            onPress={() => setActiveFilter('Issue')}
+            activeOpacity={0.7}
           >
-            🟢 Issues
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === 'Issue' && styles.filterTabTextActive,
+              ]}
+            >
+              🟢 Issues
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[
-            styles.filterTab,
-            activeFilter === 'Release' && styles.filterTabActive,
-          ]}
-          onPress={() => setActiveFilter('Release')}
-        >
-          <Text
+          <TouchableOpacity
             style={[
-              styles.filterTabText,
-              activeFilter === 'Release' && styles.filterTabTextActive,
+              styles.filterTab,
+              activeFilter === 'Release' && styles.filterTabActive,
             ]}
+            onPress={() => setActiveFilter('Release')}
+            activeOpacity={0.7}
           >
-            🏷️ Releases
-          </Text>
-        </TouchableOpacity>
+            <Text
+              style={[
+                styles.filterTabText,
+                activeFilter === 'Release' && styles.filterTabTextActive,
+              ]}
+            >
+              🏷️ Releases
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
       </View>
 
-      {/* List */}
+      {/* List with Pagination */}
       <FlatList
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={loadNotifications}
+            onRefresh={() => loadNotifications(true)}
             tintColor={Colors.primary}
           />
+        }
+        ListFooterComponent={
+          loadingMore ? (
+            <View style={styles.loadingMoreBox}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.loadingMoreText}>Loading more notifications...</Text>
+            </View>
+          ) : undefined
         }
         ListEmptyComponent={
           !refreshing ? (
@@ -412,16 +465,19 @@ const styles = StyleSheet.create({
     color: Colors.cyan,
     fontWeight: '600',
   },
-  filterTabs: {
+  filterTabsContainer: {
+    marginBottom: Spacing.md,
+  },
+  filterTabsScroll: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
-    gap: 6,
-    marginBottom: Spacing.md,
-    flexWrap: 'wrap',
+    gap: 8,
+    alignItems: 'center',
   },
   filterTab: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: 12,
     backgroundColor: Colors.card,
     borderWidth: 1,
@@ -438,6 +494,7 @@ const styles = StyleSheet.create({
   },
   filterTabTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: Spacing.lg,
@@ -519,6 +576,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.emerald,
     fontWeight: '700',
+  },
+  loadingMoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   emptyContainer: {
     alignItems: 'center',

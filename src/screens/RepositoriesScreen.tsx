@@ -8,13 +8,14 @@ import {
   TouchableOpacity,
   RefreshControl,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing } from '../constants/theme';
 import { GitHubRepo } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
 
-type RepoTypeFilter = 'all' | 'public' | 'private' | 'sources' | 'forks';
+type RepoTypeFilter = 'all' | 'sources' | 'forks' | 'public' | 'private';
 type RepoSortOption = 'updated' | 'stars' | 'forks' | 'name';
 
 const LANGUAGE_COLORS: Record<string, string> = {
@@ -37,45 +38,104 @@ const LANGUAGE_COLORS: Record<string, string> = {
   Dart: '#00B4AB',
 };
 
+const PAGE_SIZE = 30;
+
 export const RepositoriesScreen: React.FC = () => {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
-  const [remoteResults, setRemoteResults] = useState<GitHubRepo[]>([]);
+  const [page, setPage] = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Search & Remote results
   const [searchQuery, setSearchQuery] = useState('');
+  const [remoteResults, setRemoteResults] = useState<GitHubRepo[]>([]);
+  const [searchPage, setSearchPage] = useState(1);
+  const [hasMoreSearch, setHasMoreSearch] = useState(true);
+  const [searchingRemote, setSearchingRemote] = useState(false);
+
+  // Filters
   const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
   const [typeFilter, setTypeFilter] = useState<RepoTypeFilter>('all');
   const [sortBy, setSortBy] = useState<RepoSortOption>('updated');
-  const [refreshing, setRefreshing] = useState(false);
+
+  // Detail Modal
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
   useEffect(() => {
-    loadRepos();
+    loadRepos(true);
   }, []);
 
-  const loadRepos = async () => {
-    setRefreshing(true);
-    const list = await GitHubApiService.getUserRepos();
-    setRepos(list);
-    setRefreshing(false);
+  const loadRepos = async (isRefresh: boolean = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+      setPage(1);
+      setHasMore(true);
+    }
+
+    const currentPage = isRefresh ? 1 : page;
+    const list = await GitHubApiService.getUserRepos(currentPage, PAGE_SIZE);
+
+    if (isRefresh) {
+      setRepos(list);
+      setRefreshing(false);
+      setHasMore(list.length >= PAGE_SIZE);
+      setPage(2);
+    } else {
+      setRepos((prev) => [...prev, ...list]);
+      setHasMore(list.length >= PAGE_SIZE);
+      setPage((prev) => prev + 1);
+      setLoadingMore(false);
+    }
+  };
+
+  const handleEndReached = async () => {
+    if (searchQuery.trim().length >= 3) {
+      // Paginate search
+      if (hasMoreSearch && !searchingRemote) {
+        setSearchingRemote(true);
+        const nextPage = searchPage + 1;
+        const moreResults = await GitHubApiService.searchRepos(
+          searchQuery,
+          nextPage,
+          PAGE_SIZE
+        );
+        setRemoteResults((prev) => [...prev, ...moreResults]);
+        setHasMoreSearch(moreResults.length >= PAGE_SIZE);
+        setSearchPage(nextPage);
+        setSearchingRemote(false);
+      }
+    } else {
+      // Paginate repos
+      if (hasMore && !loadingMore && !refreshing) {
+        setLoadingMore(true);
+        await loadRepos(false);
+      }
+    }
   };
 
   const handleSearch = async (text: string) => {
     setSearchQuery(text);
 
     if (text.trim().length >= 3) {
-      const results = await GitHubApiService.searchRepos(text);
+      setSearchingRemote(true);
+      setSearchPage(1);
+      const results = await GitHubApiService.searchRepos(text, 1, PAGE_SIZE);
       setRemoteResults(results);
+      setHasMoreSearch(results.length >= PAGE_SIZE);
+      setSearchingRemote(false);
     } else {
       setRemoteResults([]);
     }
   };
 
-  // Base list: remote search results if searching and non-empty, otherwise user's repos
-  const sourceList = searchQuery.trim().length >= 3 && remoteResults.length > 0
-    ? remoteResults
-    : repos;
+  const sourceList =
+    searchQuery.trim().length >= 3 && remoteResults.length > 0
+      ? remoteResults
+      : repos;
 
-  // Extract all unique languages dynamically from whatever repos exist in data
+  // Extract all unique languages dynamically from repos
   const dynamicLanguages = useMemo(() => {
     const counts: Record<string, number> = {};
     repos.forEach((r) => {
@@ -231,123 +291,152 @@ export const RepositoriesScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Type / Visibility Filter Row */}
-      <View style={styles.typeFilterRow}>
-        {(['all', 'sources', 'forks', 'public', 'private'] as RepoTypeFilter[]).map((t) => (
-          <TouchableOpacity
-            key={t}
-            style={[
-              styles.typeChip,
-              typeFilter === t && styles.typeChipActive,
-            ]}
-            onPress={() => setTypeFilter(t)}
-          >
-            <Text
-              style={[
-                styles.typeChipText,
-                typeFilter === t && styles.typeChipTextActive,
-              ]}
-            >
-              {t.charAt(0).toUpperCase() + t.slice(1)}
-            </Text>
-          </TouchableOpacity>
-        ))}
+      {/* Type / Visibility Filter Row (Fully scrollable to prevent text clipping) */}
+      <View style={styles.filterGroup}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {(['all', 'sources', 'forks', 'public', 'private'] as RepoTypeFilter[]).map((t) => {
+            const isSelected = typeFilter === t;
+            const label = t.charAt(0).toUpperCase() + t.slice(1);
+            return (
+              <TouchableOpacity
+                key={t}
+                style={[
+                  styles.filterChip,
+                  isSelected && styles.filterChipActive,
+                ]}
+                onPress={() => setTypeFilter(t)}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.filterChipText,
+                    isSelected && styles.filterChipTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
       {/* Dynamic Languages Scrollable Bar */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        style={styles.langScroll}
-        contentContainerStyle={styles.langScrollContent}
-      >
-        {dynamicLanguages.map((l) => {
-          const isSelected = selectedLanguage === l.name;
-          const color = LANGUAGE_COLORS[l.name];
-          return (
-            <TouchableOpacity
-              key={l.name}
-              style={[
-                styles.langPill,
-                isSelected && styles.langPillActive,
-              ]}
-              onPress={() => setSelectedLanguage(l.name)}
-            >
-              {color && (
-                <View
+      <View style={styles.filterGroup}>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.filterScrollContent}
+        >
+          {dynamicLanguages.map((l) => {
+            const isSelected = selectedLanguage === l.name;
+            const color = LANGUAGE_COLORS[l.name];
+            return (
+              <TouchableOpacity
+                key={l.name}
+                style={[
+                  styles.langPill,
+                  isSelected && styles.langPillActive,
+                ]}
+                onPress={() => setSelectedLanguage(l.name)}
+                activeOpacity={0.7}
+              >
+                {color && (
+                  <View
+                    style={[
+                      styles.langPillDot,
+                      { backgroundColor: isSelected ? '#FFFFFF' : color },
+                    ]}
+                  />
+                )}
+                <Text
                   style={[
-                    styles.langPillDot,
-                    { backgroundColor: isSelected ? '#FFFFFF' : color },
+                    styles.langPillText,
+                    isSelected && styles.langPillTextActive,
                   ]}
-                />
-              )}
-              <Text
-                style={[
-                  styles.langPillText,
-                  isSelected && styles.langPillTextActive,
-                ]}
-              >
-                {l.name}
-              </Text>
-              <Text
-                style={[
-                  styles.langPillCount,
-                  isSelected && styles.langPillCountActive,
-                ]}
-              >
-                {l.count}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
-
-      {/* Meta Bar: Counts & Sort Switcher */}
-      <View style={styles.metaBar}>
-        <Text style={styles.metaBarCount}>
-          {filteredRepos.length}{' '}
-          {filteredRepos.length === 1 ? 'repository' : 'repositories'}
-        </Text>
-
-        <View style={styles.sortGroup}>
-          <Text style={styles.sortLabel}>Sort:</Text>
-          {(['updated', 'stars', 'forks', 'name'] as RepoSortOption[]).map((s) => (
-            <TouchableOpacity
-              key={s}
-              onPress={() => setSortBy(s)}
-              style={[styles.sortChip, sortBy === s && styles.sortChipActive]}
-            >
-              <Text
-                style={[
-                  styles.sortChipText,
-                  sortBy === s && styles.sortChipTextActive,
-                ]}
-              >
-                {s.charAt(0).toUpperCase() + s.slice(1)}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-
-        {hasActiveFilters && (
-          <TouchableOpacity onPress={resetFilters} style={styles.resetFiltersBtn}>
-            <Text style={styles.resetFiltersText}>Reset</Text>
-          </TouchableOpacity>
-        )}
+                >
+                  {l.name}
+                </Text>
+                <Text
+                  style={[
+                    styles.langPillCount,
+                    isSelected && styles.langPillCountActive,
+                  ]}
+                >
+                  {l.count}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </ScrollView>
       </View>
 
-      {/* Repositories List */}
+      {/* Sort Options & Counter Bar */}
+      <View style={styles.sortBar}>
+        <View style={styles.sortBarLeft}>
+          <Text style={styles.sortLabel}>Sort:</Text>
+          {(['updated', 'stars', 'forks', 'name'] as RepoSortOption[]).map((s) => {
+            const isSelected = sortBy === s;
+            const label = s.charAt(0).toUpperCase() + s.slice(1);
+            return (
+              <TouchableOpacity
+                key={s}
+                onPress={() => setSortBy(s)}
+                style={[styles.sortPill, isSelected && styles.sortPillActive]}
+                activeOpacity={0.7}
+              >
+                <Text
+                  style={[
+                    styles.sortPillText,
+                    isSelected && styles.sortPillTextActive,
+                  ]}
+                >
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        <View style={styles.sortBarRight}>
+          <Text style={styles.metaCountText}>
+            {filteredRepos.length}{' '}
+            {filteredRepos.length === 1 ? 'repo' : 'repos'}
+          </Text>
+          {hasActiveFilters && (
+            <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
+              <Text style={styles.resetBtnText}>Reset</Text>
+            </TouchableOpacity>
+          )}
+        </View>
+      </View>
+
+      {/* Repositories List with Infinite Scroll Pagination */}
       <FlatList
         data={filteredRepos}
-        keyExtractor={(item) => item.id.toString()}
+        keyExtractor={(item) => `${item.id}-${item.full_name}`}
         renderItem={renderRepoItem}
         contentContainerStyle={styles.listContent}
+        onEndReached={handleEndReached}
+        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={loadRepos}
+            onRefresh={() => loadRepos(true)}
             tintColor={Colors.primary}
           />
+        }
+        ListFooterComponent={
+          loadingMore || searchingRemote ? (
+            <View style={styles.loadingMoreBox}>
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={styles.loadingMoreText}>Loading more repositories...</Text>
+            </View>
+          ) : undefined
         }
         ListEmptyComponent={
           !refreshing ? (
@@ -393,7 +482,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardElevated,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
+    marginBottom: 8,
     paddingHorizontal: Spacing.md,
     borderRadius: 14,
     borderWidth: 1,
@@ -414,48 +503,43 @@ const styles = StyleSheet.create({
     fontSize: 14,
     padding: 4,
   },
-  typeFilterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xs,
-    gap: 6,
+  filterGroup: {
+    marginBottom: 6,
   },
-  typeChip: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 10,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  typeChipActive: {
-    backgroundColor: Colors.cardElevated,
-    borderColor: Colors.primary,
-  },
-  typeChipText: {
-    fontSize: 11,
-    fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  typeChipTextActive: {
-    color: Colors.primary,
-  },
-  langScroll: {
-    flexGrow: 0,
-    marginTop: Spacing.xs,
-    marginBottom: Spacing.xs,
-  },
-  langScrollContent: {
+  filterScrollContent: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
     gap: 8,
     alignItems: 'center',
   },
+  filterChip: {
+    flexShrink: 0,
+    paddingHorizontal: 14,
+    paddingVertical: 7,
+    borderRadius: 12,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  filterChipActive: {
+    backgroundColor: Colors.cardElevated,
+    borderColor: Colors.primary,
+  },
+  filterChipText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  filterChipTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
   langPill: {
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
     borderRadius: 12,
     backgroundColor: Colors.card,
     borderWidth: 1,
@@ -479,6 +563,7 @@ const styles = StyleSheet.create({
   },
   langPillTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   langPillCount: {
     fontSize: 10,
@@ -488,53 +573,64 @@ const styles = StyleSheet.create({
   langPillCountActive: {
     color: 'rgba(255,255,255,0.7)',
   },
-  metaBar: {
+  sortBar: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.xs,
-    marginBottom: Spacing.xs,
+    paddingVertical: 6,
+    marginBottom: 4,
   },
-  metaBarCount: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    fontWeight: '600',
-  },
-  sortGroup: {
+  sortBarLeft: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
+    gap: 6,
   },
   sortLabel: {
     fontSize: 11,
     color: Colors.textMuted,
+    fontWeight: '600',
     marginRight: 2,
   },
-  sortChip: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 6,
+  sortPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
   },
-  sortChipActive: {
+  sortPillActive: {
     backgroundColor: Colors.cardElevated,
+    borderColor: Colors.cyan,
   },
-  sortChipText: {
+  sortPillText: {
     fontSize: 11,
     color: Colors.textMuted,
+    fontWeight: '500',
   },
-  sortChipTextActive: {
+  sortPillTextActive: {
     color: Colors.cyan,
     fontWeight: '700',
   },
-  resetFiltersBtn: {
+  sortBarRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  metaCountText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  resetBtn: {
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
-  resetFiltersText: {
+  resetBtnText: {
     fontSize: 11,
     color: Colors.ruby,
-    fontWeight: '600',
+    fontWeight: '700',
   },
   listContent: {
     paddingHorizontal: Spacing.lg,
@@ -624,6 +720,17 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginLeft: 'auto',
+  },
+  loadingMoreBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    gap: 8,
+  },
+  loadingMoreText: {
+    fontSize: 12,
+    color: Colors.textMuted,
   },
   emptyContainer: {
     alignItems: 'center',

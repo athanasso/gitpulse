@@ -9,7 +9,6 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
-  FlatList,
   Modal,
   Linking,
 } from 'react-native';
@@ -35,6 +34,8 @@ type ProfileSubTab =
   | 'orgs'
   | 'social';
 
+const PAGE_SIZE = 30;
+
 export const ProfileScreen: React.FC = () => {
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [loading, setLoading] = useState(true);
@@ -48,14 +49,44 @@ export const ProfileScreen: React.FC = () => {
     days: ContributionDay[];
   }>({ total: 0, days: [] });
 
-  // Sub-tab Data
+  // Repos with pagination
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
+  const [pageRepos, setPageRepos] = useState(1);
+  const [hasMoreRepos, setHasMoreRepos] = useState(true);
+  const [loadingMoreRepos, setLoadingMoreRepos] = useState(false);
+
+  // Starred with pagination
   const [starredRepos, setStarredRepos] = useState<GitHubRepo[]>([]);
+  const [pageStarred, setPageStarred] = useState(1);
+  const [hasMoreStarred, setHasMoreStarred] = useState(true);
+  const [loadingMoreStarred, setLoadingMoreStarred] = useState(false);
+
+  // Gists with pagination
   const [gists, setGists] = useState<GitHubGist[]>([]);
+  const [pageGists, setPageGists] = useState(1);
+  const [hasMoreGists, setHasMoreGists] = useState(true);
+  const [loadingMoreGists, setLoadingMoreGists] = useState(false);
+
+  // Events with pagination
   const [events, setEvents] = useState<GitHubEvent[]>([]);
+  const [pageEvents, setPageEvents] = useState(1);
+  const [hasMoreEvents, setHasMoreEvents] = useState(true);
+  const [loadingMoreEvents, setLoadingMoreEvents] = useState(false);
+
+  // Orgs
   const [orgs, setOrs] = useState<GitHubOrg[]>([]);
+
+  // Followers & Following with pagination
   const [followers, setFollowers] = useState<GitHubFollower[]>([]);
+  const [pageFollowers, setPageFollowers] = useState(1);
+  const [hasMoreFollowers, setHasMoreFollowers] = useState(true);
+  const [loadingMoreFollowers, setLoadingMoreFollowers] = useState(false);
+
   const [following, setFollowing] = useState<GitHubFollower[]>([]);
+  const [pageFollowing, setPageFollowing] = useState(1);
+  const [hasMoreFollowing, setHasMoreFollowing] = useState(true);
+  const [loadingMoreFollowing, setLoadingMoreFollowing] = useState(false);
+
   const [socialTab, setSocialTab] = useState<'followers' | 'following'>('followers');
 
   // Auth & Modals
@@ -85,10 +116,12 @@ export const ProfileScreen: React.FC = () => {
         if (u) {
           const [c, rList] = await Promise.all([
             GitHubApiService.getContributions(),
-            GitHubApiService.getUserRepos(),
+            GitHubApiService.getUserRepos(1, PAGE_SIZE),
           ]);
           setContributions(c);
           setRepos(rList);
+          setHasMoreRepos(rList.length >= PAGE_SIZE);
+          setPageRepos(2);
         }
       } else {
         setUser(null);
@@ -108,18 +141,24 @@ export const ProfileScreen: React.FC = () => {
 
     if (tab === 'starred' && starredRepos.length === 0) {
       setSubLoading(true);
-      const starred = await GitHubApiService.getUserStarredRepos();
+      const starred = await GitHubApiService.getUserStarredRepos(1, PAGE_SIZE);
       setStarredRepos(starred);
+      setHasMoreStarred(starred.length >= PAGE_SIZE);
+      setPageStarred(2);
       setSubLoading(false);
     } else if (tab === 'gists' && gists.length === 0) {
       setSubLoading(true);
-      const gList = await GitHubApiService.getGists();
+      const gList = await GitHubApiService.getGists(1, PAGE_SIZE);
       setGists(gList);
+      setHasMoreGists(gList.length >= PAGE_SIZE);
+      setPageGists(2);
       setSubLoading(false);
     } else if (tab === 'activity' && events.length === 0) {
       setSubLoading(true);
-      const eList = await GitHubApiService.getUserEvents();
+      const eList = await GitHubApiService.getUserEvents(user?.login, 1, PAGE_SIZE);
       setEvents(eList);
+      setHasMoreEvents(eList.length >= PAGE_SIZE);
+      setPageEvents(2);
       setSubLoading(false);
     } else if (tab === 'orgs' && orgs.length === 0) {
       setSubLoading(true);
@@ -129,13 +168,79 @@ export const ProfileScreen: React.FC = () => {
     } else if (tab === 'social' && followers.length === 0 && following.length === 0) {
       setSubLoading(true);
       const [fList, folList] = await Promise.all([
-        GitHubApiService.getFollowers(),
-        GitHubApiService.getFollowing(),
+        GitHubApiService.getFollowers(user?.login, 1, PAGE_SIZE),
+        GitHubApiService.getFollowing(user?.login, 1, PAGE_SIZE),
       ]);
       setFollowers(fList);
+      setHasMoreFollowers(fList.length >= PAGE_SIZE);
+      setPageFollowers(2);
+
       setFollowing(folList);
+      setHasMoreFollowing(folList.length >= PAGE_SIZE);
+      setPageFollowing(2);
       setSubLoading(false);
     }
+  };
+
+  // Pagination Load More Handlers
+  const loadMoreRepos = async () => {
+    if (loadingMoreRepos || !hasMoreRepos) return;
+    setLoadingMoreRepos(true);
+    const more = await GitHubApiService.getUserRepos(pageRepos, PAGE_SIZE);
+    setRepos((prev) => [...prev, ...more]);
+    setHasMoreRepos(more.length >= PAGE_SIZE);
+    setPageRepos((prev) => prev + 1);
+    setLoadingMoreRepos(false);
+  };
+
+  const loadMoreStarred = async () => {
+    if (loadingMoreStarred || !hasMoreStarred) return;
+    setLoadingMoreStarred(true);
+    const more = await GitHubApiService.getUserStarredRepos(pageStarred, PAGE_SIZE);
+    setStarredRepos((prev) => [...prev, ...more]);
+    setHasMoreStarred(more.length >= PAGE_SIZE);
+    setPageStarred((prev) => prev + 1);
+    setLoadingMoreStarred(false);
+  };
+
+  const loadMoreGists = async () => {
+    if (loadingMoreGists || !hasMoreGists) return;
+    setLoadingMoreGists(true);
+    const more = await GitHubApiService.getGists(pageGists, PAGE_SIZE);
+    setGists((prev) => [...prev, ...more]);
+    setHasMoreGists(more.length >= PAGE_SIZE);
+    setPageGists((prev) => prev + 1);
+    setLoadingMoreGists(false);
+  };
+
+  const loadMoreEvents = async () => {
+    if (loadingMoreEvents || !hasMoreEvents) return;
+    setLoadingMoreEvents(true);
+    const more = await GitHubApiService.getUserEvents(user?.login, pageEvents, PAGE_SIZE);
+    setEvents((prev) => [...prev, ...more]);
+    setHasMoreEvents(more.length >= PAGE_SIZE);
+    setPageEvents((prev) => prev + 1);
+    setLoadingMoreEvents(false);
+  };
+
+  const loadMoreFollowers = async () => {
+    if (loadingMoreFollowers || !hasMoreFollowers) return;
+    setLoadingMoreFollowers(true);
+    const more = await GitHubApiService.getFollowers(user?.login, pageFollowers, PAGE_SIZE);
+    setFollowers((prev) => [...prev, ...more]);
+    setHasMoreFollowers(more.length >= PAGE_SIZE);
+    setPageFollowers((prev) => prev + 1);
+    setLoadingMoreFollowers(false);
+  };
+
+  const loadMoreFollowing = async () => {
+    if (loadingMoreFollowing || !hasMoreFollowing) return;
+    setLoadingMoreFollowing(true);
+    const more = await GitHubApiService.getFollowing(user?.login, pageFollowing, PAGE_SIZE);
+    setFollowing((prev) => [...prev, ...more]);
+    setHasMoreFollowing(more.length >= PAGE_SIZE);
+    setPageFollowing((prev) => prev + 1);
+    setLoadingMoreFollowing(false);
   };
 
   const handleConnectToken = async () => {
@@ -155,10 +260,12 @@ export const ProfileScreen: React.FC = () => {
 
         const [c, rList] = await Promise.all([
           GitHubApiService.getContributions(),
-          GitHubApiService.getUserRepos(),
+          GitHubApiService.getUserRepos(1, PAGE_SIZE),
         ]);
         setContributions(c);
         setRepos(rList);
+        setHasMoreRepos(rList.length >= PAGE_SIZE);
+        setPageRepos(2);
 
         Alert.alert('Connected', `Signed in as @${u.login}`);
       }
@@ -410,7 +517,7 @@ export const ProfileScreen: React.FC = () => {
             total={contributions.total}
           />
 
-          {/* Sub-Tab Navigation Bar */}
+          {/* Sub-Tab Navigation Bar (Fully scrollable, never clipped) */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -423,6 +530,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'repos' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('repos')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -440,6 +548,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'starred' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('starred')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -447,7 +556,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'starred' && styles.subTabTextActive,
                 ]}
               >
-                Starred
+                Starred ({starredRepos.length})
               </Text>
             </TouchableOpacity>
 
@@ -457,6 +566,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'gists' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('gists')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -464,7 +574,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'gists' && styles.subTabTextActive,
                 ]}
               >
-                Gists
+                Gists ({gists.length})
               </Text>
             </TouchableOpacity>
 
@@ -474,6 +584,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'activity' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('activity')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -481,7 +592,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'activity' && styles.subTabTextActive,
                 ]}
               >
-                Activity Feed
+                Activity Feed ({events.length})
               </Text>
             </TouchableOpacity>
 
@@ -491,6 +602,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'orgs' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('orgs')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -498,7 +610,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'orgs' && styles.subTabTextActive,
                 ]}
               >
-                Organizations
+                Organizations ({orgs.length})
               </Text>
             </TouchableOpacity>
 
@@ -508,6 +620,7 @@ export const ProfileScreen: React.FC = () => {
                 activeSubTab === 'social' && styles.subTabItemActive,
               ]}
               onPress={() => handleSubTabChange('social')}
+              activeOpacity={0.7}
             >
               <Text
                 style={[
@@ -515,7 +628,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'social' && styles.subTabTextActive,
                 ]}
               >
-                Network
+                Network ({followers.length + following.length})
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -527,48 +640,64 @@ export const ProfileScreen: React.FC = () => {
             </View>
           ) : (
             <>
-              {/* REPOSITORIES SUB-TAB */}
+              {/* REPOSITORIES SUB-TAB WITH PAGINATION */}
               {activeSubTab === 'repos' && (
                 <View style={styles.reposGrid}>
                   {repos.length > 0 ? (
-                    repos.map((repo) => (
-                      <TouchableOpacity
-                        key={repo.id}
-                        style={styles.topRepoCard}
-                        onPress={() => {
-                          setSelectedRepo(repo);
-                          setRepoModalVisible(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.repoCardHeader}>
-                          <Text style={styles.topRepoName} numberOfLines={1}>
-                            {repo.name}
-                          </Text>
-                          <View style={styles.repoVisibilityBadge}>
-                            <Text style={styles.repoVisibilityText}>
-                              {repo.private ? '🔒 Private' : 'Public'}
+                    <>
+                      {repos.map((repo) => (
+                        <TouchableOpacity
+                          key={repo.id}
+                          style={styles.topRepoCard}
+                          onPress={() => {
+                            setSelectedRepo(repo);
+                            setRepoModalVisible(true);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.repoCardHeader}>
+                            <Text style={styles.topRepoName} numberOfLines={1}>
+                              {repo.name}
+                            </Text>
+                            <View style={styles.repoVisibilityBadge}>
+                              <Text style={styles.repoVisibilityText}>
+                                {repo.private ? '🔒 Private' : 'Public'}
+                              </Text>
+                            </View>
+                          </View>
+                          {repo.description ? (
+                            <Text style={styles.topRepoDesc} numberOfLines={2}>
+                              {repo.description}
+                            </Text>
+                          ) : null}
+                          <View style={styles.topRepoFooter}>
+                            {repo.language ? (
+                              <Text style={styles.topRepoLang}>{repo.language}</Text>
+                            ) : null}
+                            <Text style={styles.topRepoStars}>
+                              ⭐ {repo.stargazers_count}
+                            </Text>
+                            <Text style={styles.topRepoForks}>
+                              🍴 {repo.forks_count}
                             </Text>
                           </View>
-                        </View>
-                        {repo.description ? (
-                          <Text style={styles.topRepoDesc} numberOfLines={2}>
-                            {repo.description}
-                          </Text>
-                        ) : null}
-                        <View style={styles.topRepoFooter}>
-                          {repo.language ? (
-                            <Text style={styles.topRepoLang}>{repo.language}</Text>
-                          ) : null}
-                          <Text style={styles.topRepoStars}>
-                            ⭐ {repo.stargazers_count}
-                          </Text>
-                          <Text style={styles.topRepoForks}>
-                            🍴 {repo.forks_count}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
+                        </TouchableOpacity>
+                      ))}
+
+                      {hasMoreRepos && (
+                        <TouchableOpacity
+                          style={styles.loadMoreBtn}
+                          onPress={loadMoreRepos}
+                          disabled={loadingMoreRepos}
+                        >
+                          {loadingMoreRepos ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Text style={styles.loadMoreText}>Load More Repositories</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>No repositories found.</Text>
@@ -577,40 +706,56 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* STARRED SUB-TAB */}
+              {/* STARRED SUB-TAB WITH PAGINATION */}
               {activeSubTab === 'starred' && (
                 <View style={styles.reposGrid}>
                   {starredRepos.length > 0 ? (
-                    starredRepos.map((repo) => (
-                      <TouchableOpacity
-                        key={repo.id}
-                        style={styles.topRepoCard}
-                        onPress={() => {
-                          setSelectedRepo(repo);
-                          setRepoModalVisible(true);
-                        }}
-                        activeOpacity={0.7}
-                      >
-                        <View style={styles.repoCardHeader}>
-                          <Text style={styles.topRepoName} numberOfLines={1}>
-                            {repo.full_name}
-                          </Text>
-                        </View>
-                        {repo.description ? (
-                          <Text style={styles.topRepoDesc} numberOfLines={2}>
-                            {repo.description}
-                          </Text>
-                        ) : null}
-                        <View style={styles.topRepoFooter}>
-                          {repo.language ? (
-                            <Text style={styles.topRepoLang}>{repo.language}</Text>
+                    <>
+                      {starredRepos.map((repo) => (
+                        <TouchableOpacity
+                          key={repo.id}
+                          style={styles.topRepoCard}
+                          onPress={() => {
+                            setSelectedRepo(repo);
+                            setRepoModalVisible(true);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <View style={styles.repoCardHeader}>
+                            <Text style={styles.topRepoName} numberOfLines={1}>
+                              {repo.full_name}
+                            </Text>
+                          </View>
+                          {repo.description ? (
+                            <Text style={styles.topRepoDesc} numberOfLines={2}>
+                              {repo.description}
+                            </Text>
                           ) : null}
-                          <Text style={styles.topRepoStars}>
-                            ⭐ {repo.stargazers_count}
-                          </Text>
-                        </View>
-                      </TouchableOpacity>
-                    ))
+                          <View style={styles.topRepoFooter}>
+                            {repo.language ? (
+                              <Text style={styles.topRepoLang}>{repo.language}</Text>
+                            ) : null}
+                            <Text style={styles.topRepoStars}>
+                              ⭐ {repo.stargazers_count}
+                            </Text>
+                          </View>
+                        </TouchableOpacity>
+                      ))}
+
+                      {hasMoreStarred && (
+                        <TouchableOpacity
+                          style={styles.loadMoreBtn}
+                          onPress={loadMoreStarred}
+                          disabled={loadingMoreStarred}
+                        >
+                          {loadingMoreStarred ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Text style={styles.loadMoreText}>Load More Starred Repos</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>
@@ -621,51 +766,67 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* GISTS SUB-TAB */}
+              {/* GISTS SUB-TAB WITH PAGINATION */}
               {activeSubTab === 'gists' && (
                 <View style={styles.listContainer}>
                   {gists.length > 0 ? (
-                    gists.map((g) => {
-                      const fileNames = Object.keys(g.files);
-                      const firstFile = g.files[fileNames[0]];
-                      return (
-                        <TouchableOpacity
-                          key={g.id}
-                          style={styles.gistCard}
-                          onPress={() => openGist(g)}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.gistHeader}>
-                            <View style={styles.gistBadge}>
-                              <Text style={styles.gistBadgeText}>
-                                {g.public ? 'Public Gist' : 'Secret Gist'}
+                    <>
+                      {gists.map((g) => {
+                        const fileNames = Object.keys(g.files);
+                        const firstFile = g.files[fileNames[0]];
+                        return (
+                          <TouchableOpacity
+                            key={g.id}
+                            style={styles.gistCard}
+                            onPress={() => openGist(g)}
+                            activeOpacity={0.7}
+                          >
+                            <View style={styles.gistHeader}>
+                              <View style={styles.gistBadge}>
+                                <Text style={styles.gistBadgeText}>
+                                  {g.public ? 'Public Gist' : 'Secret Gist'}
+                                </Text>
+                              </View>
+                              <Text style={styles.gistDate}>
+                                {new Date(g.created_at).toLocaleDateString()}
                               </Text>
                             </View>
-                            <Text style={styles.gistDate}>
-                              {new Date(g.created_at).toLocaleDateString()}
-                            </Text>
-                          </View>
 
-                          <Text style={styles.gistDescription} numberOfLines={2}>
-                            {g.description || fileNames[0] || 'Untitled Gist'}
-                          </Text>
-
-                          <View style={styles.gistFooter}>
-                            <Text style={styles.gistFilesCount}>
-                              📄 {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
+                            <Text style={styles.gistDescription} numberOfLines={2}>
+                              {g.description || fileNames[0] || 'Untitled Gist'}
                             </Text>
-                            {firstFile?.language && (
-                              <Text style={styles.gistLang}>
-                                {firstFile.language}
+
+                            <View style={styles.gistFooter}>
+                              <Text style={styles.gistFilesCount}>
+                                📄 {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
                               </Text>
-                            )}
-                            <Text style={styles.gistComments}>
-                              💬 {g.comments}
-                            </Text>
-                          </View>
+                              {firstFile?.language && (
+                                <Text style={styles.gistLang}>
+                                  {firstFile.language}
+                                </Text>
+                              )}
+                              <Text style={styles.gistComments}>
+                                💬 {g.comments}
+                              </Text>
+                            </View>
+                          </TouchableOpacity>
+                        );
+                      })}
+
+                      {hasMoreGists && (
+                        <TouchableOpacity
+                          style={styles.loadMoreBtn}
+                          onPress={loadMoreGists}
+                          disabled={loadingMoreGists}
+                        >
+                          {loadingMoreGists ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Text style={styles.loadMoreText}>Load More Gists</Text>
+                          )}
                         </TouchableOpacity>
-                      );
-                    })
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>No gists found.</Text>
@@ -674,28 +835,44 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* ACTIVITY FEED SUB-TAB */}
+              {/* ACTIVITY FEED SUB-TAB WITH PAGINATION */}
               {activeSubTab === 'activity' && (
                 <View style={styles.listContainer}>
                   {events.length > 0 ? (
-                    events.map((ev) => (
-                      <View key={ev.id} style={styles.eventCard}>
-                        <View style={styles.eventHeader}>
-                          <Text style={styles.eventIcon}>
-                            {getEventIcon(ev.type)}
-                          </Text>
-                          <Text style={styles.eventRepoName} numberOfLines={1}>
-                            {ev.repo.name}
-                          </Text>
-                          <Text style={styles.eventDate}>
-                            {new Date(ev.created_at).toLocaleDateString()}
+                    <>
+                      {events.map((ev) => (
+                        <View key={ev.id} style={styles.eventCard}>
+                          <View style={styles.eventHeader}>
+                            <Text style={styles.eventIcon}>
+                              {getEventIcon(ev.type)}
+                            </Text>
+                            <Text style={styles.eventRepoName} numberOfLines={1}>
+                              {ev.repo.name}
+                            </Text>
+                            <Text style={styles.eventDate}>
+                              {new Date(ev.created_at).toLocaleDateString()}
+                            </Text>
+                          </View>
+                          <Text style={styles.eventDetail}>
+                            {getEventDescription(ev)}
                           </Text>
                         </View>
-                        <Text style={styles.eventDetail}>
-                          {getEventDescription(ev)}
-                        </Text>
-                      </View>
-                    ))
+                      ))}
+
+                      {hasMoreEvents && (
+                        <TouchableOpacity
+                          style={styles.loadMoreBtn}
+                          onPress={loadMoreEvents}
+                          disabled={loadingMoreEvents}
+                        >
+                          {loadingMoreEvents ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Text style={styles.loadMoreText}>Load More Activity</Text>
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>
@@ -744,7 +921,7 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* SOCIAL (FOLLOWERS / FOLLOWING) SUB-TAB */}
+              {/* SOCIAL (FOLLOWERS / FOLLOWING) SUB-TAB WITH PAGINATION */}
               {activeSubTab === 'social' && (
                 <View style={styles.listContainer}>
                   {/* Follower / Following sub-switch */}
@@ -784,34 +961,52 @@ export const ProfileScreen: React.FC = () => {
                   </View>
 
                   {(socialTab === 'followers' ? followers : following).length > 0 ? (
-                    (socialTab === 'followers' ? followers : following).map((u) => (
-                      <TouchableOpacity
-                        key={u.id}
-                        style={styles.userCard}
-                        onPress={() => Linking.openURL(u.html_url)}
-                        activeOpacity={0.7}
-                      >
-                        {u.avatar_url ? (
-                          <Image
-                            source={{ uri: u.avatar_url }}
-                            style={styles.userCardAvatar}
-                          />
-                        ) : (
-                          <View
-                            style={[
-                              styles.userCardAvatar,
-                              styles.avatarPlaceholder,
-                            ]}
-                          >
-                            <Text style={styles.avatarLetter}>
-                              {u.login.charAt(0).toUpperCase()}
+                    <>
+                      {(socialTab === 'followers' ? followers : following).map((u) => (
+                        <TouchableOpacity
+                          key={u.id}
+                          style={styles.userCard}
+                          onPress={() => Linking.openURL(u.html_url)}
+                          activeOpacity={0.7}
+                        >
+                          {u.avatar_url ? (
+                            <Image
+                              source={{ uri: u.avatar_url }}
+                              style={styles.userCardAvatar}
+                            />
+                          ) : (
+                            <View
+                              style={[
+                                styles.userCardAvatar,
+                                styles.avatarPlaceholder,
+                              ]}
+                            >
+                              <Text style={styles.avatarLetter}>
+                                {u.login.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <Text style={styles.userCardLogin}>@{u.login}</Text>
+                          <Text style={styles.userCardArrow}>↗</Text>
+                        </TouchableOpacity>
+                      ))}
+
+                      {(socialTab === 'followers' ? hasMoreFollowers : hasMoreFollowing) && (
+                        <TouchableOpacity
+                          style={styles.loadMoreBtn}
+                          onPress={socialTab === 'followers' ? loadMoreFollowers : loadMoreFollowing}
+                          disabled={socialTab === 'followers' ? loadingMoreFollowers : loadingMoreFollowing}
+                        >
+                          {(socialTab === 'followers' ? loadingMoreFollowers : loadingMoreFollowing) ? (
+                            <ActivityIndicator size="small" color={Colors.primary} />
+                          ) : (
+                            <Text style={styles.loadMoreText}>
+                              Load More {socialTab === 'followers' ? 'Followers' : 'Following'}
                             </Text>
-                          </View>
-                        )}
-                        <Text style={styles.userCardLogin}>@{u.login}</Text>
-                        <Text style={styles.userCardArrow}>↗</Text>
-                      </TouchableOpacity>
-                    ))
+                          )}
+                        </TouchableOpacity>
+                      )}
+                    </>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>
@@ -1104,11 +1299,13 @@ const styles = StyleSheet.create({
   subTabBar: {
     flexDirection: 'row',
     gap: 8,
+    alignItems: 'center',
   },
   subTabItem: {
-    paddingHorizontal: 14,
-    paddingVertical: 8,
-    borderRadius: 12,
+    flexShrink: 0,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 14,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -1124,6 +1321,7 @@ const styles = StyleSheet.create({
   },
   subTabTextActive: {
     color: '#FFFFFF',
+    fontWeight: '700',
   },
   subLoadingBox: {
     paddingVertical: Spacing.xl,
@@ -1309,9 +1507,9 @@ const styles = StyleSheet.create({
   },
   socialSwitchBtn: {
     flex: 1,
-    paddingVertical: 8,
+    paddingVertical: 10,
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: 10,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -1327,6 +1525,7 @@ const styles = StyleSheet.create({
   },
   socialSwitchTextActive: {
     color: Colors.primary,
+    fontWeight: '700',
   },
   userCard: {
     flexDirection: 'row',
@@ -1353,6 +1552,21 @@ const styles = StyleSheet.create({
   userCardArrow: {
     fontSize: 16,
     color: Colors.textMuted,
+  },
+  loadMoreBtn: {
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 12,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginTop: Spacing.sm,
+  },
+  loadMoreText: {
+    color: Colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
   },
   emptyCard: {
     backgroundColor: Colors.card,

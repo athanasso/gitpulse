@@ -166,9 +166,12 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch authenticated user's repositories using API key
+   * Fetch authenticated user's repositories using API key with pagination
    */
-  async getUserRepos(): Promise<GitHubRepo[]> {
+  async getUserRepos(
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubRepo[]> {
     await this.ensureInit();
     if (!this.token) {
       return [];
@@ -176,7 +179,7 @@ class GitHubApiServiceClass {
 
     try {
       const res = await fetch(
-        'https://api.github.com/user/repos?sort=updated&per_page=100&affiliation=owner,collaborator',
+        `https://api.github.com/user/repos?sort=updated&page=${page}&per_page=${per_page}&affiliation=owner,collaborator`,
         { headers: this.getHeaders() }
       );
 
@@ -193,9 +196,13 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Search repositories via official GitHub Search API
+   * Search repositories via official GitHub Search API with pagination
    */
-  async searchRepos(query: string): Promise<GitHubRepo[]> {
+  async searchRepos(
+    query: string,
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubRepo[]> {
     await this.ensureInit();
     if (!query.trim()) return [];
 
@@ -203,7 +210,7 @@ class GitHubApiServiceClass {
       const res = await fetch(
         `https://api.github.com/search/repositories?q=${encodeURIComponent(
           query
-        )}&sort=stars&per_page=30`,
+        )}&sort=stars&page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
 
@@ -308,19 +315,20 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch commit history for a repository
+   * Fetch commit history for a repository with pagination
    */
   async getRepoCommits(
     owner: string,
     repo: string,
-    branch?: string
+    branch?: string,
+    page: number = 1,
+    per_page: number = 30
   ): Promise<GitHubCommit[]> {
+    await this.ensureInit();
     try {
-      const queryBranch = branch
-        ? `?sha=${encodeURIComponent(branch)}&per_page=30`
-        : '?per_page=30';
+      const queryBranch = branch ? `&sha=${encodeURIComponent(branch)}` : '';
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/commits${queryBranch}`,
+        `https://api.github.com/repos/${owner}/${repo}/commits?page=${page}&per_page=${per_page}${queryBranch}`,
         { headers: this.getHeaders() }
       );
 
@@ -336,15 +344,18 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch issues & pull requests
+   * Fetch issues & pull requests with pagination
    */
   async getIssuesAndPRs(
     owner: string,
-    repo: string
+    repo: string,
+    page: number = 1,
+    per_page: number = 30
   ): Promise<{ issues: GitHubIssue[]; prs: GitHubPullRequest[] }> {
+    await this.ensureInit();
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/issues?state=all&per_page=30`,
+        `https://api.github.com/repos/${owner}/${repo}/issues?state=all&page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
 
@@ -373,15 +384,18 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch GitHub Actions workflow runs
+   * Fetch GitHub Actions workflow runs with pagination
    */
   async getWorkflowRuns(
     owner: string,
-    repo: string
+    repo: string,
+    page: number = 1,
+    per_page: number = 20
   ): Promise<GitHubWorkflowRun[]> {
+    await this.ensureInit();
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/actions/runs?per_page=20`,
+        `https://api.github.com/repos/${owner}/${repo}/actions/runs?page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
 
@@ -403,9 +417,12 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch user notifications using API key
+   * Fetch user notifications using API key with pagination
    */
-  async getNotifications(): Promise<GitHubNotification[]> {
+  async getNotifications(
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubNotification[]> {
     await this.ensureInit();
     this.lastNotificationError = null;
     if (!this.token) {
@@ -414,7 +431,7 @@ class GitHubApiServiceClass {
 
     try {
       const res = await fetch(
-        'https://api.github.com/notifications?all=true&per_page=50',
+        `https://api.github.com/notifications?all=true&page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
 
@@ -572,14 +589,17 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch authenticated user's starred repositories
+   * Fetch authenticated user's starred repositories with pagination
    */
-  async getUserStarredRepos(): Promise<GitHubRepo[]> {
+  async getUserStarredRepos(
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubRepo[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
       const res = await fetch(
-        'https://api.github.com/user/starred?per_page=100&sort=updated',
+        `https://api.github.com/user/starred?sort=updated&page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
       if (res.ok) {
@@ -653,15 +673,19 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch authenticated user's gists (public and secret)
+   * Fetch authenticated user's gists (public and secret) with pagination
    */
-  async getGists(): Promise<GitHubGist[]> {
+  async getGists(
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubGist[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
-      const res = await fetch('https://api.github.com/gists?per_page=50', {
-        headers: this.getHeaders(),
-      });
+      const res = await fetch(
+        `https://api.github.com/gists?page=${page}&per_page=${per_page}`,
+        { headers: this.getHeaders() }
+      );
       if (res.ok) {
         const data = await res.json();
         return Array.isArray(data) ? data : [];
@@ -693,15 +717,21 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch followers
+   * Fetch followers with pagination
    */
-  async getFollowers(username?: string): Promise<GitHubFollower[]> {
+  async getFollowers(
+    username?: string,
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubFollower[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
       const endpoint = username
-        ? `https://api.github.com/users/${encodeURIComponent(username)}/followers?per_page=50`
-        : 'https://api.github.com/user/followers?per_page=50';
+        ? `https://api.github.com/users/${encodeURIComponent(
+            username
+          )}/followers?page=${page}&per_page=${per_page}`
+        : `https://api.github.com/user/followers?page=${page}&per_page=${per_page}`;
       const res = await fetch(endpoint, { headers: this.getHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -714,15 +744,21 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch users following
+   * Fetch users following with pagination
    */
-  async getFollowing(username?: string): Promise<GitHubFollower[]> {
+  async getFollowing(
+    username?: string,
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubFollower[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
       const endpoint = username
-        ? `https://api.github.com/users/${encodeURIComponent(username)}/following?per_page=50`
-        : 'https://api.github.com/user/following?per_page=50';
+        ? `https://api.github.com/users/${encodeURIComponent(
+            username
+          )}/following?page=${page}&per_page=${per_page}`
+        : `https://api.github.com/user/following?page=${page}&per_page=${per_page}`;
       const res = await fetch(endpoint, { headers: this.getHeaders() });
       if (res.ok) {
         const data = await res.json();
@@ -735,16 +771,22 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch public user event stream
+   * Fetch public user event stream with pagination
    */
-  async getUserEvents(username?: string): Promise<GitHubEvent[]> {
+  async getUserEvents(
+    username?: string,
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubEvent[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
       const user = username || this.cachedUser?.login;
       if (!user) return [];
       const res = await fetch(
-        `https://api.github.com/users/${encodeURIComponent(user)}/events?per_page=50`,
+        `https://api.github.com/users/${encodeURIComponent(
+          user
+        )}/events?page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
       if (res.ok) {
@@ -758,12 +800,17 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch repository releases & binary assets
+   * Fetch repository releases & binary assets with pagination
    */
-  async getRepoReleases(owner: string, repo: string): Promise<GitHubRelease[]> {
+  async getRepoReleases(
+    owner: string,
+    repo: string,
+    page: number = 1,
+    per_page: number = 20
+  ): Promise<GitHubRelease[]> {
     try {
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/releases?per_page=30`,
+        `https://api.github.com/repos/${owner}/${repo}/releases?page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
       if (res.ok) {
