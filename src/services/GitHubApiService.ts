@@ -757,6 +757,31 @@ class GitHubApiServiceClass {
   }
 
   /**
+   * Fetch total starred repositories count via REST Link header or fallback
+   */
+  async getStarredCount(username?: string): Promise<number> {
+    await this.ensureInit();
+    if (!this.token && !username) return 0;
+    try {
+      const endpoint = username
+        ? `https://api.github.com/users/${encodeURIComponent(username)}/starred?per_page=1`
+        : 'https://api.github.com/user/starred?per_page=1';
+      const res = await fetch(endpoint, { headers: this.getHeaders() });
+      if (!res.ok) return 0;
+      const link = res.headers.get('link') || res.headers.get('Link');
+      if (link) {
+        const match = link.match(/[?&]page=(\d+)[^>]*>;\s*rel="last"/);
+        if (match) return parseInt(match[1], 10);
+      }
+      const data = await res.json();
+      return Array.isArray(data) ? data.length : 0;
+    } catch (e) {
+      console.warn('Failed to fetch starred count', e);
+      return 0;
+    }
+  }
+
+  /**
    * Fetch authenticated user's starred repositories with pagination
    */
   async getUserStarredRepos(
@@ -902,11 +927,13 @@ class GitHubApiServiceClass {
   /**
    * Fetch authenticated user's organizations
    */
-  async getOrgs(): Promise<GitHubOrg[]> {
+  async getOrgs(username?: string): Promise<GitHubOrg[]> {
     await this.ensureInit();
-    if (!this.token) return [];
     try {
-      const res = await fetch('https://api.github.com/user/orgs?per_page=50', {
+      const endpoint = username
+        ? `https://api.github.com/users/${encodeURIComponent(username)}/orgs?per_page=100`
+        : 'https://api.github.com/user/orgs?per_page=100';
+      const res = await fetch(endpoint, {
         headers: this.getHeaders(),
       });
       if (res.ok) {

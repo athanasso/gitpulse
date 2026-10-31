@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export type ProfileSectionId =
+  | 'overviewMetrics'
   | 'socialLinks'
   | 'tokenPermissions'
   | 'readme'
@@ -17,6 +18,12 @@ export interface ProfileSectionMeta {
 }
 
 export const PROFILE_SECTIONS_META: Record<ProfileSectionId, ProfileSectionMeta> = {
+  overviewMetrics: {
+    id: 'overviewMetrics',
+    title: 'Quick Stats & Metrics Cards',
+    desc: 'Prefetched metric cards for Repositories, Starred, Orgs, Gists, and Network',
+    icon: '📊',
+  },
   socialLinks: {
     id: 'socialLinks',
     title: 'Social & Web Links',
@@ -79,6 +86,7 @@ export interface CustomizationSettings {
 
 export const DEFAULT_CUSTOMIZATION: CustomizationSettings = {
   profileSectionOrder: [
+    'overviewMetrics',
     'socialLinks',
     'tokenPermissions',
     'readme',
@@ -87,6 +95,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationSettings = {
     'subtabs',
   ],
   profileSectionVisibility: {
+    overviewMetrics: true,
     socialLinks: true,
     tokenPermissions: true,
     readme: true,
@@ -144,7 +153,7 @@ export const CustomizationProvider: React.FC<{ children: React.ReactNode }> = ({
             ...parsed,
             profileSectionOrder:
               parsed.profileSectionOrder &&
-              parsed.profileSectionOrder.length === DEFAULT_CUSTOMIZATION.profileSectionOrder.length
+              Array.isArray(parsed.profileSectionOrder)
                 ? parsed.profileSectionOrder
                 : DEFAULT_CUSTOMIZATION.profileSectionOrder,
             profileSectionVisibility: {

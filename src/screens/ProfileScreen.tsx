@@ -153,6 +153,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   // Starred with pagination
   const [starredRepos, setStarredRepos] = useState<GitHubRepo[]>([]);
+  const [totalStarredCount, setTotalStarredCount] = useState<number>(0);
   const [pageStarred, setPageStarred] = useState(1);
   const [hasMoreStarred, setHasMoreStarred] = useState(true);
   const [loadingMoreStarred, setLoadingMoreStarred] = useState(false);
@@ -170,7 +171,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [loadingMoreEvents, setLoadingMoreEvents] = useState(false);
 
   // Orgs
-  const [orgs, setOrs] = useState<GitHubOrg[]>([]);
+  const [orgs, setOrgs] = useState<GitHubOrg[]>([]);
 
   // Followers & Following with pagination
   const [followers, setFollowers] = useState<GitHubFollower[]>([]);
@@ -252,12 +253,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setTokenScopes(GitHubApiService.getTokenScopes());
 
         if (u) {
-          const [c, rList, socials, pinned, readme] = await Promise.all([
+          const [
+            c,
+            rList,
+            socials,
+            pinned,
+            readme,
+            starredList,
+            starredCount,
+            orgsList,
+            gistsList,
+          ] = await Promise.all([
             GitHubApiService.getContributions(),
             GitHubApiService.getUserRepos(1, PAGE_SIZE),
             GitHubApiService.getSocialAccounts(u.login),
             GitHubApiService.getPinnedItems(u.login),
             GitHubApiService.getProfileReadme(u.login),
+            GitHubApiService.getUserStarredRepos(1, PAGE_SIZE),
+            GitHubApiService.getStarredCount(u.login),
+            GitHubApiService.getOrgs(u.login),
+            GitHubApiService.getGists(1, PAGE_SIZE),
           ]);
           setContributions(c);
           setRepos(rList);
@@ -266,6 +281,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           setSocialAccounts(socials);
           setPinnedItems(pinned);
           setProfileReadme(readme);
+          setStarredRepos(starredList);
+          setHasMoreStarred(starredList.length >= PAGE_SIZE);
+          setPageStarred(1);
+          setTotalStarredCount(starredCount);
+          setOrgs(orgsList);
+          setGists(gistsList);
+          setHasMoreGists(gistsList.length >= PAGE_SIZE);
+          setPageGists(1);
         }
       } else {
         setUser(null);
@@ -307,7 +330,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     } else if (tab === 'orgs' && orgs.length === 0) {
       setSubLoading(true);
       const oList = await GitHubApiService.getOrgs();
-      setOrs(oList);
+      setOrgs(oList);
       setSubLoading(false);
     } else if (tab === 'social' && followers.length === 0 && following.length === 0) {
       setSubLoading(true);
@@ -411,12 +434,26 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setTokenScopes(GitHubApiService.getTokenScopes());
         setTokenInput('');
 
-        const [c, rList, socials, pinned, readme] = await Promise.all([
+        const [
+          c,
+          rList,
+          socials,
+          pinned,
+          readme,
+          starredList,
+          starredCount,
+          orgsList,
+          gistsList,
+        ] = await Promise.all([
           GitHubApiService.getContributions(),
           GitHubApiService.getUserRepos(1, PAGE_SIZE),
           GitHubApiService.getSocialAccounts(u.login),
           GitHubApiService.getPinnedItems(u.login),
           GitHubApiService.getProfileReadme(u.login),
+          GitHubApiService.getUserStarredRepos(1, PAGE_SIZE),
+          GitHubApiService.getStarredCount(u.login),
+          GitHubApiService.getOrgs(u.login),
+          GitHubApiService.getGists(1, PAGE_SIZE),
         ]);
         setContributions(c);
         setRepos(rList);
@@ -425,6 +462,14 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         setSocialAccounts(socials);
         setPinnedItems(pinned);
         setProfileReadme(readme);
+        setStarredRepos(starredList);
+        setHasMoreStarred(starredList.length >= PAGE_SIZE);
+        setPageStarred(1);
+        setTotalStarredCount(starredCount);
+        setOrgs(orgsList);
+        setGists(gistsList);
+        setHasMoreGists(gistsList.length >= PAGE_SIZE);
+        setPageGists(1);
 
         showDialog({
           title: 'Connected',
@@ -469,7 +514,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             setStarredRepos([]);
             setGists([]);
             setEvents([]);
-            setOrs([]);
+            setOrgs([]);
             setFollowers([]);
             setFollowing([]);
             setSocialAccounts([]);
@@ -848,6 +893,97 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
   };
 
+  const renderOverviewMetrics = () => {
+    if (!user) return null;
+    const totalRepos =
+      (user.public_repos || 0) + (user.total_private_repos || 0);
+    const totalGists = user.public_gists || gists.length || 0;
+
+    const metrics = [
+      {
+        id: 'repos',
+        label: 'Repositories',
+        value: totalRepos,
+        icon: '📦',
+        tab: 'repos' as ProfileSubTab,
+      },
+      {
+        id: 'starred',
+        label: 'Starred Repos',
+        value: totalStarredCount || starredRepos.length,
+        icon: '⭐',
+        tab: 'starred' as ProfileSubTab,
+      },
+      {
+        id: 'orgs',
+        label: 'Organizations',
+        value: orgs.length,
+        icon: '🏢',
+        tab: 'orgs' as ProfileSubTab,
+      },
+      {
+        id: 'gists',
+        label: 'Gists & Snippets',
+        value: totalGists,
+        icon: '📝',
+        tab: 'gists' as ProfileSubTab,
+      },
+      {
+        id: 'followers',
+        label: 'Followers',
+        value: user.followers || 0,
+        icon: '👥',
+        tab: 'social' as ProfileSubTab,
+        action: () => {
+          setSocialTab('followers');
+          handleSubTabChange('social');
+        },
+      },
+      {
+        id: 'following',
+        label: 'Following',
+        value: user.following || 0,
+        icon: '🤝',
+        tab: 'social' as ProfileSubTab,
+        action: () => {
+          setSocialTab('following');
+          handleSubTabChange('social');
+        },
+      },
+    ];
+
+    return (
+      <View key="overviewMetrics" style={styles.metricsContainer}>
+        <View style={styles.metricsGrid}>
+          {metrics.map((m) => {
+            const isActive = activeSubTab === m.tab;
+            return (
+              <TouchableOpacity
+                key={m.id}
+                style={[
+                  styles.metricCard,
+                  isActive && styles.metricCardActive,
+                ]}
+                onPress={() => {
+                  if (m.action) {
+                    m.action();
+                  } else {
+                    handleSubTabChange(m.tab);
+                  }
+                }}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.metricIcon}>{m.icon}</Text>
+                <Text style={styles.metricValue}>{m.value}</Text>
+                <Text style={styles.metricLabel}>{m.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+      </View>
+    );
+  };
+
   const renderHeatmap = () => (
     <View key="heatmap" style={styles.heatmapCardWrapper}>
       <Text style={styles.sectionHeader}>Contribution Activity (Official API)</Text>
@@ -902,7 +1038,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   activeSubTab === 'starred' && styles.subTabTextActive,
                 ]}
               >
-                Starred ({starredRepos.length})
+                Starred ({totalStarredCount || starredRepos.length})
               </Text>
             </TouchableOpacity>
 
@@ -974,7 +1110,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   activeSubTab === 'social' && styles.subTabTextActive,
                 ]}
               >
-                Network ({followers.length + following.length})
+                Network ({(user?.followers || 0) + (user?.following || 0)})
               </Text>
             </TouchableOpacity>
           </ScrollView>
@@ -1051,7 +1187,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <View style={styles.reposScrollCard}>
                   <View style={styles.reposCardTopHeader}>
                     <Text style={styles.reposCardTopTitle}>
-                      Starred Repositories ({starredRepos.length})
+                      Starred Repositories ({totalStarredCount || starredRepos.length})
                     </Text>
                     <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
                   </View>
@@ -1205,34 +1341,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 </View>
               )}
 
-              {/* ORGANIZATIONS SUB-TAB */}
+              {/* ORGANIZATIONS SUB-TAB WITH SCROLLABLE CARD */}
               {activeSubTab === 'orgs' && (
-                <View style={styles.listContainer}>
+                <View style={styles.reposScrollCard}>
+                  <View style={styles.reposCardTopHeader}>
+                    <Text style={styles.reposCardTopTitle}>
+                      Organizations ({orgs.length})
+                    </Text>
+                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                  </View>
+
                   {orgs.length > 0 ? (
-                    orgs.map((org) => (
-                      <View key={org.id} style={styles.orgCard}>
-                        {org.avatar_url ? (
-                          <Image
-                            source={{ uri: org.avatar_url }}
-                            style={styles.orgAvatar}
-                          />
-                        ) : (
-                          <View style={[styles.orgAvatar, styles.avatarPlaceholder]}>
-                            <Text style={styles.avatarLetter}>
-                              {org.login.charAt(0).toUpperCase()}
-                            </Text>
+                    <ScrollView
+                      style={styles.reposInnerScroll}
+                      contentContainerStyle={styles.reposInnerScrollContent}
+                      nestedScrollEnabled={true}
+                      showsVerticalScrollIndicator={true}
+                    >
+                      {orgs.map((org) => (
+                        <View key={org.id} style={styles.orgCard}>
+                          {org.avatar_url ? (
+                            <Image
+                              source={{ uri: org.avatar_url }}
+                              style={styles.orgAvatar}
+                            />
+                          ) : (
+                            <View style={[styles.orgAvatar, styles.avatarPlaceholder]}>
+                              <Text style={styles.avatarLetter}>
+                                {org.login.charAt(0).toUpperCase()}
+                              </Text>
+                            </View>
+                          )}
+                          <View style={styles.orgInfo}>
+                            <Text style={styles.orgTitle}>@{org.login}</Text>
+                            {org.description ? (
+                              <Text style={styles.orgDesc} numberOfLines={2}>
+                                {org.description}
+                              </Text>
+                            ) : null}
                           </View>
-                        )}
-                        <View style={styles.orgInfo}>
-                          <Text style={styles.orgTitle}>@{org.login}</Text>
-                          {org.description ? (
-                            <Text style={styles.orgDesc} numberOfLines={2}>
-                              {org.description}
-                            </Text>
-                          ) : null}
                         </View>
-                      </View>
-                    ))
+                      ))}
+                    </ScrollView>
                   ) : (
                     <View style={styles.emptyCard}>
                       <Text style={styles.emptyText}>
@@ -1364,6 +1514,8 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     if (!settings.profileSectionVisibility[secId]) return null;
 
     switch (secId) {
+      case 'overviewMetrics':
+        return renderOverviewMetrics();
       case 'socialLinks':
         return renderSocialLinks();
       case 'tokenPermissions':
@@ -1654,6 +1806,48 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 };
 
 const styles = StyleSheet.create({
+  metricsContainer: {
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+  },
+  metricsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+  },
+  metricCard: {
+    flexBasis: '31%',
+    flexGrow: 1,
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  metricCardActive: {
+    backgroundColor: Colors.cardElevated,
+    borderColor: Colors.primary,
+  },
+  metricIcon: {
+    fontSize: 18,
+    marginBottom: 4,
+  },
+  metricValue: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    fontFamily: 'monospace',
+    marginBottom: 2,
+  },
+  metricLabel: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
   container: {
     flex: 1,
     backgroundColor: Colors.background,
