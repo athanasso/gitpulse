@@ -15,6 +15,7 @@ export const NotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<GitHubNotification[]>([]);
   const [refreshing, setRefreshing] = useState(false);
   const [activeFilter, setActiveFilter] = useState<'all' | 'unread'>('unread');
+  const [isAuth, setIsAuth] = useState(false);
 
   useEffect(() => {
     loadNotifications();
@@ -22,8 +23,15 @@ export const NotificationsScreen: React.FC = () => {
 
   const loadNotifications = async () => {
     setRefreshing(true);
-    const list = await GitHubApiService.getNotifications();
-    setNotifications(list);
+    const auth = GitHubApiService.isAuthenticated();
+    setIsAuth(auth);
+
+    if (auth) {
+      const list = await GitHubApiService.getNotifications();
+      setNotifications(list);
+    } else {
+      setNotifications([]);
+    }
     setRefreshing(false);
   };
 
@@ -144,13 +152,23 @@ export const NotificationsScreen: React.FC = () => {
           />
         }
         ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyIcon}>🎉</Text>
-            <Text style={styles.emptyTitle}>All caught up!</Text>
-            <Text style={styles.emptySubtitle}>
-              No unread notifications across your repositories.
-            </Text>
-          </View>
+          !isAuth ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🔒</Text>
+              <Text style={styles.emptyTitle}>Personal Token Required</Text>
+              <Text style={styles.emptySubtitle}>
+                Add a GitHub Personal Access Token (PAT) with notifications scope in the Profile tab to view your inbox.
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>🎉</Text>
+              <Text style={styles.emptyTitle}>All caught up!</Text>
+              <Text style={styles.emptySubtitle}>
+                No unread notifications across your repositories.
+              </Text>
+            </View>
+          )
         }
       />
     </View>
@@ -312,3 +330,4 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+

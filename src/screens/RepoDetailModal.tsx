@@ -278,7 +278,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 <View style={styles.readmeHeader}>
                   <Text style={styles.readmeHeaderTitle}>📖 README.md</Text>
                 </View>
-                <Text style={styles.readmeBody}>{readmeContent}</Text>
+                <Text style={styles.readmeBody}>
+                  {readmeContent || 'No README.md found in this repository.'}
+                </Text>
               </View>
             )}
 
@@ -306,16 +308,20 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       style={styles.codeHorizontalScroll}
                     >
                       <View style={styles.codeEditorBox}>
-                        {fileContent.split('\n').map((line, idx) => (
-                          <View key={idx} style={styles.codeLineRow}>
-                            <Text style={styles.codeLineNumber}>{idx + 1}</Text>
-                            <Text style={styles.codeLineText}>{line || ' '}</Text>
-                          </View>
-                        ))}
+                        {fileContent ? (
+                          fileContent.split('\n').map((line, idx) => (
+                            <View key={idx} style={styles.codeLineRow}>
+                              <Text style={styles.codeLineNumber}>{idx + 1}</Text>
+                              <Text style={styles.codeLineText}>{line || ' '}</Text>
+                            </View>
+                          ))
+                        ) : (
+                          <Text style={styles.emptyDetailText}>Empty file or binary content.</Text>
+                        )}
                       </View>
                     </ScrollView>
                   </View>
-                ) : (
+                ) : fileTree.length > 0 ? (
                   // Directory Tree
                   <View style={styles.treeContainer}>
                     {currentPath !== '' && (
@@ -351,6 +357,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         )}
                       </TouchableOpacity>
                     ))}
+                  </View>
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDetailText}>No files found in this repository branch.</Text>
                   </View>
                 )}
               </View>
@@ -398,7 +408,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </View>
                     )}
                   </View>
-                ) : (
+                ) : commits.length > 0 ? (
                   commits.map((c) => (
                     <TouchableOpacity
                       key={c.sha}
@@ -422,6 +432,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </Text>
                     </TouchableOpacity>
                   ))
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDetailText}>No commits found in this repository.</Text>
+                  </View>
                 )}
               </View>
             )}
@@ -462,95 +476,111 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
 
                 {/* PR Section */}
                 <Text style={styles.sectionHeader}>Pull Requests ({prs.length})</Text>
-                {prs
-                  .filter((p) => issueFilter === 'all' || p.state === issueFilter)
-                  .map((p) => (
-                    <View key={p.id} style={styles.issueCard}>
-                      <View style={styles.issueHeaderRow}>
-                        <View style={styles.stateBadgePR}>
-                          <Text style={styles.stateBadgeText}>🔀 #{p.number}</Text>
+                {prs.length > 0 ? (
+                  prs
+                    .filter((p) => issueFilter === 'all' || p.state === issueFilter)
+                    .map((p) => (
+                      <View key={p.id} style={styles.issueCard}>
+                        <View style={styles.issueHeaderRow}>
+                          <View style={styles.stateBadgePR}>
+                            <Text style={styles.stateBadgeText}>🔀 #{p.number}</Text>
+                          </View>
+                          <Text style={styles.issueDate}>
+                            {new Date(p.created_at).toLocaleDateString()}
+                          </Text>
                         </View>
-                        <Text style={styles.issueDate}>
-                          {new Date(p.created_at).toLocaleDateString()}
-                        </Text>
+                        <Text style={styles.issueTitle}>{p.title}</Text>
+                        {p.body && (
+                          <Text style={styles.issueBody} numberOfLines={2}>
+                            {p.body}
+                          </Text>
+                        )}
+                        {p.additions !== undefined && (
+                          <View style={styles.diffPills}>
+                            <Text style={styles.diffAdd}>+{p.additions}</Text>
+                            <Text style={styles.diffDel}>-{p.deletions}</Text>
+                          </View>
+                        )}
                       </View>
-                      <Text style={styles.issueTitle}>{p.title}</Text>
-                      {p.body && (
-                        <Text style={styles.issueBody} numberOfLines={2}>
-                          {p.body}
-                        </Text>
-                      )}
-                      {p.additions !== undefined && (
-                        <View style={styles.diffPills}>
-                          <Text style={styles.diffAdd}>+{p.additions}</Text>
-                          <Text style={styles.diffDel}>-{p.deletions}</Text>
-                        </View>
-                      )}
-                    </View>
-                  ))}
+                    ))
+                ) : (
+                  <Text style={styles.emptySubText}>No pull requests found.</Text>
+                )}
 
                 {/* Issues Section */}
                 <Text style={[styles.sectionHeader, { marginTop: Spacing.lg }]}>
                   Issues ({issues.length})
                 </Text>
-                {issues
-                  .filter((i) => issueFilter === 'all' || i.state === issueFilter)
-                  .map((i) => (
-                    <View key={i.id} style={styles.issueCard}>
-                      <View style={styles.issueHeaderRow}>
-                        <View
-                          style={[
-                            styles.stateBadgeIssue,
-                            i.state === 'closed' && styles.stateBadgeClosed,
-                          ]}
-                        >
-                          <Text style={styles.stateBadgeText}>
-                            {i.state === 'open' ? '🟢' : '🟣'} #{i.number}
+                {issues.length > 0 ? (
+                  issues
+                    .filter((i) => issueFilter === 'all' || i.state === issueFilter)
+                    .map((i) => (
+                      <View key={i.id} style={styles.issueCard}>
+                        <View style={styles.issueHeaderRow}>
+                          <View
+                            style={[
+                              styles.stateBadgeIssue,
+                              i.state === 'closed' && styles.stateBadgeClosed,
+                            ]}
+                          >
+                            <Text style={styles.stateBadgeText}>
+                              {i.state === 'open' ? '🟢' : '🟣'} #{i.number}
+                            </Text>
+                          </View>
+                          <Text style={styles.issueDate}>
+                            {new Date(i.created_at).toLocaleDateString()}
                           </Text>
                         </View>
-                        <Text style={styles.issueDate}>
-                          {new Date(i.created_at).toLocaleDateString()}
-                        </Text>
+                        <Text style={styles.issueTitle}>{i.title}</Text>
+                        {i.body && (
+                          <Text style={styles.issueBody} numberOfLines={2}>
+                            {i.body}
+                          </Text>
+                        )}
                       </View>
-                      <Text style={styles.issueTitle}>{i.title}</Text>
-                      {i.body && (
-                        <Text style={styles.issueBody} numberOfLines={2}>
-                          {i.body}
-                        </Text>
-                      )}
-                    </View>
-                  ))}
+                    ))
+                ) : (
+                  <Text style={styles.emptySubText}>No issues found.</Text>
+                )}
               </View>
             )}
 
             {/* ACTIONS CI TAB */}
             {activeTab === 'actions' && (
               <View style={styles.actionsContainer}>
-                {workflowRuns.map((r) => (
-                  <View key={r.id} style={styles.workflowCard}>
-                    <View style={styles.workflowHeader}>
-                      <View style={styles.conclusionBadge}>
-                        <Text style={styles.conclusionIcon}>
-                          {r.conclusion === 'success'
-                            ? '✅'
-                            : r.conclusion === 'failure'
-                            ? '❌'
-                            : '⏳'}
-                        </Text>
-                        <Text style={styles.workflowName}>{r.name}</Text>
+                {workflowRuns.length > 0 ? (
+                  workflowRuns.map((r) => (
+                    <View key={r.id} style={styles.workflowCard}>
+                      <View style={styles.workflowHeader}>
+                        <View style={styles.conclusionBadge}>
+                          <Text style={styles.conclusionIcon}>
+                            {r.conclusion === 'success'
+                              ? '✅'
+                              : r.conclusion === 'failure'
+                              ? '❌'
+                              : '⏳'}
+                          </Text>
+                          <Text style={styles.workflowName}>{r.name}</Text>
+                        </View>
+                        <Text style={styles.runNumber}>#{r.run_number}</Text>
                       </View>
-                      <Text style={styles.runNumber}>#{r.run_number}</Text>
-                    </View>
 
-                    <View style={styles.workflowMetaRow}>
-                      <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
-                      <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
-                      <Text style={styles.workflowDate}>
-                        {new Date(r.created_at).toLocaleDateString()}
-                      </Text>
+                      <View style={styles.workflowMetaRow}>
+                        <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
+                        <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
+                        <Text style={styles.workflowDate}>
+                          {new Date(r.created_at).toLocaleDateString()}
+                        </Text>
+                      </View>
                     </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDetailText}>
+                      No GitHub Actions workflow runs found for this repository.
+                    </Text>
                   </View>
-                ))}
+                )}
               </View>
             )}
           </ScrollView>
@@ -1035,4 +1065,25 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginLeft: 'auto',
   },
+  emptyCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  emptyDetailText: {
+    fontSize: 13,
+    color: Colors.textMuted,
+    textAlign: 'center',
+  },
+  emptySubText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+    paddingVertical: 8,
+  },
 });
+

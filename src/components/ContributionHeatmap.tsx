@@ -64,6 +64,18 @@ export const ContributionHeatmap: React.FC<ContributionHeatmapProps> = ({
     }
   };
 
+  if (days.length === 0) {
+    return (
+      <View style={styles.container}>
+        <View style={styles.emptyHeatmap}>
+          <Text style={styles.emptyHeatmapText}>
+            No public contribution data available for this user.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       {/* Metrics Row */}
@@ -222,4 +234,14 @@ const styles = StyleSheet.create({
     height: 10,
     borderRadius: 2,
   },
+  emptyHeatmap: {
+    paddingVertical: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyHeatmapText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+  },
 });
+

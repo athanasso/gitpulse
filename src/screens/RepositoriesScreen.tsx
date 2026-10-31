@@ -187,6 +187,17 @@ export const RepositoriesScreen: React.FC = () => {
             tintColor={Colors.primary}
           />
         }
+        ListEmptyComponent={
+          !refreshing ? (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyIcon}>📂</Text>
+              <Text style={styles.emptyTitle}>No Repositories Found</Text>
+              <Text style={styles.emptySubtitle}>
+                No repositories match your filter or account.
+              </Text>
+            </View>
+          ) : undefined
+        }
       />
 
       {/* Detail Modal */}
@@ -329,4 +340,25 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginLeft: 'auto',
   },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 60,
+  },
+  emptyIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  emptySubtitle: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+  },
 });
+

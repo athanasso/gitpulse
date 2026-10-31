@@ -22,7 +22,7 @@ export default function App() {
   useKeepAwake();
 
   const [activeTab, setActiveTab] = useState<Tab>('repos');
-  const [unreadCount, setUnreadCount] = useState<number>(2);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
     GitHubApiService.init().then(() => {
@@ -229,3 +229,4 @@ const styles = StyleSheet.create({
     color: Colors.primary,
   },
 });
+
