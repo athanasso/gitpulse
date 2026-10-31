@@ -34,9 +34,22 @@ export const RepositoriesScreen: React.FC = () => {
     setRefreshing(false);
   };
 
-  const handleSearch = (text: string) => {
+  const handleSearch = async (text: string) => {
     setSearchQuery(text);
+    if (!text.trim()) {
+      filterList('', selectedLanguage, repos);
+      return;
+    }
+
     filterList(text, selectedLanguage, repos);
+
+    // If local repos are empty or user wants global search, query real GitHub Search API
+    if (text.length >= 3) {
+      const results = await GitHubApiService.searchRepos(text);
+      if (results.length > 0) {
+        filterList(text, selectedLanguage, results);
+      }
+    }
   };
 
   const handleLanguageFilter = (lang: string) => {
@@ -189,13 +202,23 @@ export const RepositoriesScreen: React.FC = () => {
         }
         ListEmptyComponent={
           !refreshing ? (
-            <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>📂</Text>
-              <Text style={styles.emptyTitle}>No Repositories Found</Text>
-              <Text style={styles.emptySubtitle}>
-                No repositories match your filter or account.
-              </Text>
-            </View>
+            !GitHubApiService.isAuthenticated() && !searchQuery.trim() ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>🔑</Text>
+                <Text style={styles.emptyTitle}>GitHub Token Required</Text>
+                <Text style={styles.emptySubtitle}>
+                  Connect your Personal Access Token in Profile to view your repositories, or search public repositories above.
+                </Text>
+              </View>
+            ) : (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyIcon}>📂</Text>
+                <Text style={styles.emptyTitle}>No Repositories Found</Text>
+                <Text style={styles.emptySubtitle}>
+                  No repositories match your search or account.
+                </Text>
+              </View>
+            )
           ) : undefined
         }
       />

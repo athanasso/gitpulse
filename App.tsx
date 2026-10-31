@@ -25,10 +25,12 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState<number>(0);
 
   useEffect(() => {
-    GitHubApiService.init().then(() => {
-      GitHubApiService.getNotifications().then((n) => {
-        setUnreadCount(n.filter((x) => x.unread).length);
-      });
+    GitHubApiService.init().then((isAuth) => {
+      if (isAuth) {
+        GitHubApiService.getNotifications().then((n) => {
+          setUnreadCount(n.filter((x) => x.unread).length);
+        });
+      }
     });
   }, []);
 
