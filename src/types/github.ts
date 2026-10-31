@@ -5,6 +5,8 @@ export interface GitHubUser {
   name: string;
   bio: string | null;
   public_repos: number;
+  total_private_repos?: number;
+  owned_private_repos?: number;
   public_gists: number;
   followers: number;
   following: number;

@@ -26,6 +26,7 @@ class GitHubApiServiceClass {
   private token: string | null = null;
   private cachedUser: GitHubUser | null = null;
   private tokenScopes: string[] = [];
+  private lastSearchTotalCount: number = 0;
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
 
@@ -147,6 +148,18 @@ class GitHubApiServiceClass {
     return this.tokenScopes.includes(scope);
   }
 
+  getLastSearchTotalCount(): number {
+    return this.lastSearchTotalCount;
+  }
+
+  getUserTotalReposCount(): number {
+    if (!this.cachedUser) return 0;
+    return (
+      (this.cachedUser.public_repos || 0) +
+      (this.cachedUser.total_private_repos || 0)
+    );
+  }
+
   isAuthenticated(): boolean {
     return !!this.token;
   }
@@ -258,6 +271,8 @@ class GitHubApiServiceClass {
       }
 
       const data = await res.json();
+      this.lastSearchTotalCount =
+        typeof data.total_count === 'number' ? data.total_count : 0;
       return Array.isArray(data.items) ? data.items : [];
     } catch (e) {
       console.warn('Search repositories failed', e);

@@ -580,7 +580,9 @@ export const ProfileScreen: React.FC = () => {
                   style={styles.statBox}
                   onPress={() => handleSubTabChange('repos')}
                 >
-                  <Text style={styles.statNumber}>{user.public_repos}</Text>
+                  <Text style={styles.statNumber}>
+                    {(user.public_repos || 0) + (user.total_private_repos || 0)}
+                  </Text>
                   <Text style={styles.statLabel}>Repositories</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
@@ -713,7 +715,10 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'repos' && styles.subTabTextActive,
                 ]}
               >
-                Repositories ({repos.length})
+                Repositories (
+                {(user?.public_repos || 0) + (user?.total_private_repos || 0) ||
+                  repos.length}
+                )
               </Text>
             </TouchableOpacity>
 
@@ -749,7 +754,7 @@ export const ProfileScreen: React.FC = () => {
                   activeSubTab === 'gists' && styles.subTabTextActive,
                 ]}
               >
-                Gists ({gists.length})
+                Gists ({user?.public_gists ?? gists.length})
               </Text>
             </TouchableOpacity>
 
@@ -868,11 +873,20 @@ export const ProfileScreen: React.FC = () => {
                           hasNext={hasMoreRepos}
                           hasPrev={pageRepos > 1}
                           totalPages={
-                            user?.public_repos
-                              ? Math.ceil(user.public_repos / PAGE_SIZE)
+                            user
+                              ? Math.ceil(
+                                  ((user.public_repos || 0) +
+                                    (user.total_private_repos || 0)) /
+                                    PAGE_SIZE
+                                )
                               : undefined
                           }
-                          totalCount={user?.public_repos}
+                          totalCount={
+                            user
+                              ? (user.public_repos || 0) +
+                                (user.total_private_repos || 0)
+                              : undefined
+                          }
                           loading={loadingMoreRepos}
                           onPageChange={goToReposPage}
                         />

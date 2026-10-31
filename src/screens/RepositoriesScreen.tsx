@@ -11,7 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { Colors, Spacing } from '../constants/theme';
-import { GitHubRepo } from '../types/github';
+import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatRepoTimestamp } from '../utils/date';
@@ -64,6 +64,9 @@ export const RepositoriesScreen: React.FC = () => {
   // Detail Modal
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
+  const [currentUser, setCurrentUser] = useState<GitHubUser | null>(
+    GitHubApiService.getCachedUser()
+  );
 
   const flatListRef = React.useRef<FlatList<GitHubRepo>>(null);
 
@@ -78,10 +81,15 @@ export const RepositoriesScreen: React.FC = () => {
       setPageLoading(true);
     }
 
-    const list = await GitHubApiService.getUserRepos(targetPage, PAGE_SIZE);
+    const [list, u] = await Promise.all([
+      GitHubApiService.getUserRepos(targetPage, PAGE_SIZE),
+      currentUser ? Promise.resolve(currentUser) : GitHubApiService.getCurrentUser(),
+    ]);
+
     setRepos(list);
     setPage(targetPage);
     setHasMore(list.length >= PAGE_SIZE);
+    if (u) setCurrentUser(u);
 
     if (isRefresh) {
       setRefreshing(false);
@@ -124,16 +132,24 @@ export const RepositoriesScreen: React.FC = () => {
   };
 
   const isSearch = searchQuery.trim().length >= 3 && remoteResults.length > 0;
-  const currentUser = GitHubApiService.getCachedUser();
-  const totalRepos = currentUser?.public_repos;
-  const totalPages = totalRepos ? Math.ceil(totalRepos / PAGE_SIZE) : undefined;
+  const searchTotal = GitHubApiService.getLastSearchTotalCount();
+
+  // The real total number of repositories in user's GitHub account (or search result)
+  const realTotalRepos = isSearch
+    ? searchTotal || remoteResults.length
+    : currentUser
+    ? (currentUser.public_repos || 0) + (currentUser.total_private_repos || 0)
+    : repos.length;
+
+  const totalPages =
+    realTotalRepos > 0 ? Math.ceil(realTotalRepos / PAGE_SIZE) : undefined;
 
   const sourceList = isSearch ? remoteResults : repos;
 
   // Extract all unique languages dynamically from repos
   const dynamicLanguages = useMemo(() => {
     const counts: Record<string, number> = {};
-    repos.forEach((r) => {
+    sourceList.forEach((r) => {
       if (r.language) {
         counts[r.language] = (counts[r.language] || 0) + 1;
       }
@@ -141,10 +157,10 @@ export const RepositoriesScreen: React.FC = () => {
 
     const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
     return [
-      { name: 'All', count: repos.length },
+      { name: 'All', count: realTotalRepos },
       ...sorted.map((lang) => ({ name: lang, count: counts[lang] })),
     ];
-  }, [repos]);
+  }, [sourceList, realTotalRepos]);
 
   // Dynamic Filtering & Sorting
   const filteredRepos = useMemo(() => {
@@ -296,6 +312,11 @@ export const RepositoriesScreen: React.FC = () => {
           {(['all', 'sources', 'forks', 'public', 'private'] as RepoTypeFilter[]).map((t) => {
             const isSelected = typeFilter === t;
             const label = t.charAt(0).toUpperCase() + t.slice(1);
+            const displayText =
+              t === 'all' && realTotalRepos > 0
+                ? `All (${realTotalRepos})`
+                : label;
+
             return (
               <TouchableOpacity
                 key={t}
@@ -312,7 +333,7 @@ export const RepositoriesScreen: React.FC = () => {
                     isSelected && styles.filterChipTextActive,
                   ]}
                 >
-                  {label}
+                  {displayText}
                 </Text>
               </TouchableOpacity>
             );
@@ -399,8 +420,9 @@ export const RepositoriesScreen: React.FC = () => {
 
         <View style={styles.sortBarRight}>
           <Text style={styles.metaCountText}>
-            {filteredRepos.length}{' '}
-            {filteredRepos.length === 1 ? 'repo' : 'repos'}
+            {hasActiveFilters
+              ? `${filteredRepos.length} of ${realTotalRepos}`
+              : `${realTotalRepos} ${realTotalRepos === 1 ? 'repo' : 'repos'}`}
           </Text>
           {hasActiveFilters && (
             <TouchableOpacity onPress={resetFilters} style={styles.resetBtn}>
@@ -431,8 +453,8 @@ export const RepositoriesScreen: React.FC = () => {
                 page={isSearch ? searchPage : page}
                 hasNext={isSearch ? hasMoreSearch : hasMore}
                 hasPrev={(isSearch ? searchPage : page) > 1}
-                totalPages={!isSearch ? totalPages : undefined}
-                totalCount={!isSearch ? totalRepos : undefined}
+                totalPages={totalPages}
+                totalCount={realTotalRepos}
                 loading={pageLoading || searchingRemote}
                 onPageChange={goToPage}
               />
