@@ -40,6 +40,26 @@ type ProfileSubTab =
 
 const PAGE_SIZE = 30;
 
+const LANGUAGE_COLORS: Record<string, string> = {
+  TypeScript: '#3178C6',
+  JavaScript: '#F7DF1E',
+  Python: '#3572A5',
+  Rust: '#DEA584',
+  Go: '#00ADD8',
+  Java: '#B07219',
+  'C++': '#F34B7D',
+  C: '#555555',
+  'C#': '#178600',
+  Ruby: '#701516',
+  PHP: '#4F5D95',
+  HTML: '#E34C26',
+  CSS: '#563D7C',
+  Shell: '#89E051',
+  Swift: '#F05138',
+  Kotlin: '#A97BFF',
+  Dart: '#00B4AB',
+};
+
 const GITHUB_NEW_TOKEN_URL =
   'https://github.com/settings/tokens/new?description=GitPulse+Mobile&scopes=repo,read:user,notifications,gist,read:org';
 
@@ -153,6 +173,10 @@ export const ProfileScreen: React.FC = () => {
   const [profileReadme, setProfileReadme] = useState<string>('');
   const [readmeExpanded, setReadmeExpanded] = useState<boolean>(false);
 
+  // Inner ScrollView refs for smooth page reset
+  const reposScrollRef = React.useRef<any>(null);
+  const starredScrollRef = React.useRef<any>(null);
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -253,6 +277,7 @@ export const ProfileScreen: React.FC = () => {
     setHasMoreRepos(list.length >= PAGE_SIZE);
     setPageRepos(newPage);
     setLoadingMoreRepos(false);
+    reposScrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const goToStarredPage = async (newPage: number) => {
@@ -263,6 +288,7 @@ export const ProfileScreen: React.FC = () => {
     setHasMoreStarred(list.length >= PAGE_SIZE);
     setPageStarred(newPage);
     setLoadingMoreStarred(false);
+    starredScrollRef.current?.scrollTo({ y: 0, animated: true });
   };
 
   const goToGistsPage = async (newPage: number) => {
@@ -441,6 +467,73 @@ export const ProfileScreen: React.FC = () => {
         return '📌';
     }
   };
+
+  const renderProfileRepoCard = (repo: GitHubRepo, showFullName: boolean = false) => (
+    <TouchableOpacity
+      key={repo.id}
+      style={styles.profileRepoCard}
+      onPress={() => {
+        setSelectedRepo(repo);
+        setRepoModalVisible(true);
+      }}
+      activeOpacity={0.7}
+    >
+      <View style={styles.profileRepoTopRow}>
+        <Text style={styles.profileRepoTitle} numberOfLines={1}>
+          {showFullName ? repo.full_name : repo.name}
+        </Text>
+        <View style={styles.profileBadgesGroup}>
+          {repo.fork && (
+            <View style={styles.profileForkBadge}>
+              <Text style={styles.profileForkBadgeText}>🍴 Fork</Text>
+            </View>
+          )}
+          <View style={styles.profileVisibilityBadge}>
+            <Text style={styles.profileVisibilityText}>
+              {repo.private ? '🔒 Private' : 'Public'}
+            </Text>
+          </View>
+        </View>
+      </View>
+
+      {repo.description ? (
+        <Text style={styles.profileRepoDesc} numberOfLines={2}>
+          {repo.description}
+        </Text>
+      ) : null}
+
+      <View style={styles.profileRepoFooter}>
+        {repo.language ? (
+          <View style={styles.profileMetaItem}>
+            <View
+              style={[
+                styles.profileLangDot,
+                {
+                  backgroundColor:
+                    LANGUAGE_COLORS[repo.language] || Colors.primary,
+                },
+              ]}
+            />
+            <Text style={styles.profileMetaText}>{repo.language}</Text>
+          </View>
+        ) : null}
+
+        <View style={styles.profileMetaItem}>
+          <Text style={styles.profileMetaIcon}>⭐</Text>
+          <Text style={styles.profileMetaText}>{repo.stargazers_count}</Text>
+        </View>
+
+        <View style={styles.profileMetaItem}>
+          <Text style={styles.profileMetaIcon}>🍴</Text>
+          <Text style={styles.profileMetaText}>{repo.forks_count}</Text>
+        </View>
+
+        <Text style={styles.profileUpdatedDate}>
+          Updated {formatRepoTimestamp(repo.updated_at)}
+        </Text>
+      </View>
+    </TouchableOpacity>
+  );
 
   if (loading) {
     return (
@@ -1009,76 +1102,56 @@ export const ProfileScreen: React.FC = () => {
             </View>
           ) : (
             <>
-              {/* REPOSITORIES SUB-TAB WITH PAGINATION */}
+              {/* REPOSITORIES SUB-TAB WITH SCROLLABLE CARD & PAGINATION */}
               {activeSubTab === 'repos' && (
-                <View style={styles.reposGrid}>
+                <View style={styles.reposScrollCard}>
+                  <View style={styles.reposCardTopHeader}>
+                    <Text style={styles.reposCardTopTitle}>
+                      Repositories (
+                      {(user?.public_repos || 0) + (user?.total_private_repos || 0) ||
+                        repos.length}
+                      )
+                    </Text>
+                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                  </View>
+
                   {repos.length > 0 ? (
                     <>
-                      {repos.map((repo) => (
-                        <TouchableOpacity
-                          key={repo.id}
-                          style={styles.topRepoCard}
-                          onPress={() => {
-                            setSelectedRepo(repo);
-                            setRepoModalVisible(true);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.repoCardHeader}>
-                            <Text style={styles.topRepoName} numberOfLines={1}>
-                              {repo.name}
-                            </Text>
-                            <View style={styles.repoVisibilityBadge}>
-                              <Text style={styles.repoVisibilityText}>
-                                {repo.private ? '🔒 Private' : 'Public'}
-                              </Text>
-                            </View>
-                          </View>
-                          {repo.description ? (
-                            <Text style={styles.topRepoDesc} numberOfLines={2}>
-                              {repo.description}
-                            </Text>
-                          ) : null}
-                          <View style={styles.topRepoFooter}>
-                            {repo.language ? (
-                              <Text style={styles.topRepoLang}>{repo.language}</Text>
-                            ) : null}
-                            <Text style={styles.topRepoStars}>
-                              ⭐ {repo.stargazers_count}
-                            </Text>
-                            <Text style={styles.topRepoForks}>
-                              🍴 {repo.forks_count}
-                            </Text>
-                            <Text style={styles.topRepoUpdated}>
-                              Updated {formatRepoTimestamp(repo.updated_at)}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                      <ScrollView
+                        ref={reposScrollRef}
+                        style={styles.reposInnerScroll}
+                        contentContainerStyle={styles.reposInnerScrollContent}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                      >
+                        {repos.map((repo) => renderProfileRepoCard(repo))}
+                      </ScrollView>
 
                       {(hasMoreRepos || pageRepos > 1) && (
-                        <PaginationControl
-                          page={pageRepos}
-                          hasNext={hasMoreRepos}
-                          hasPrev={pageRepos > 1}
-                          totalPages={
-                            user
-                              ? Math.ceil(
-                                  ((user.public_repos || 0) +
-                                    (user.total_private_repos || 0)) /
-                                    PAGE_SIZE
-                                )
-                              : undefined
-                          }
-                          totalCount={
-                            user
-                              ? (user.public_repos || 0) +
-                                (user.total_private_repos || 0)
-                              : undefined
-                          }
-                          loading={loadingMoreRepos}
-                          onPageChange={goToReposPage}
-                        />
+                        <View style={styles.reposCardPagination}>
+                          <PaginationControl
+                            page={pageRepos}
+                            hasNext={hasMoreRepos}
+                            hasPrev={pageRepos > 1}
+                            totalPages={
+                              user
+                                ? Math.ceil(
+                                    ((user.public_repos || 0) +
+                                      (user.total_private_repos || 0)) /
+                                      PAGE_SIZE
+                                  )
+                                : undefined
+                            }
+                            totalCount={
+                              user
+                                ? (user.public_repos || 0) +
+                                  (user.total_private_repos || 0)
+                                : undefined
+                            }
+                            loading={loadingMoreRepos}
+                            onPageChange={goToReposPage}
+                          />
+                        </View>
                       )}
                     </>
                   ) : (
@@ -1089,53 +1162,38 @@ export const ProfileScreen: React.FC = () => {
                 </View>
               )}
 
-              {/* STARRED SUB-TAB WITH PAGINATION */}
+              {/* STARRED SUB-TAB WITH SCROLLABLE CARD & PAGINATION */}
               {activeSubTab === 'starred' && (
-                <View style={styles.reposGrid}>
+                <View style={styles.reposScrollCard}>
+                  <View style={styles.reposCardTopHeader}>
+                    <Text style={styles.reposCardTopTitle}>
+                      Starred Repositories ({starredRepos.length})
+                    </Text>
+                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                  </View>
+
                   {starredRepos.length > 0 ? (
                     <>
-                      {starredRepos.map((repo) => (
-                        <TouchableOpacity
-                          key={repo.id}
-                          style={styles.topRepoCard}
-                          onPress={() => {
-                            setSelectedRepo(repo);
-                            setRepoModalVisible(true);
-                          }}
-                          activeOpacity={0.7}
-                        >
-                          <View style={styles.repoCardHeader}>
-                            <Text style={styles.topRepoName} numberOfLines={1}>
-                              {repo.full_name}
-                            </Text>
-                          </View>
-                          {repo.description ? (
-                            <Text style={styles.topRepoDesc} numberOfLines={2}>
-                              {repo.description}
-                            </Text>
-                          ) : null}
-                          <View style={styles.topRepoFooter}>
-                            {repo.language ? (
-                              <Text style={styles.topRepoLang}>{repo.language}</Text>
-                            ) : null}
-                            <Text style={styles.topRepoStars}>
-                              ⭐ {repo.stargazers_count}
-                            </Text>
-                            <Text style={styles.topRepoUpdated}>
-                              Updated {formatRepoTimestamp(repo.updated_at)}
-                            </Text>
-                          </View>
-                        </TouchableOpacity>
-                      ))}
+                      <ScrollView
+                        ref={starredScrollRef}
+                        style={styles.reposInnerScroll}
+                        contentContainerStyle={styles.reposInnerScrollContent}
+                        nestedScrollEnabled={true}
+                        showsVerticalScrollIndicator={true}
+                      >
+                        {starredRepos.map((repo) => renderProfileRepoCard(repo, true))}
+                      </ScrollView>
 
                       {(hasMoreStarred || pageStarred > 1) && (
-                        <PaginationControl
-                          page={pageStarred}
-                          hasNext={hasMoreStarred}
-                          hasPrev={pageStarred > 1}
-                          loading={loadingMoreStarred}
-                          onPageChange={goToStarredPage}
-                        />
+                        <View style={styles.reposCardPagination}>
+                          <PaginationControl
+                            page={pageStarred}
+                            hasNext={hasMoreStarred}
+                            hasPrev={pageStarred > 1}
+                            loading={loadingMoreStarred}
+                            onPageChange={goToStarredPage}
+                          />
+                        </View>
                       )}
                     </>
                   ) : (
@@ -2060,26 +2118,128 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.xl,
     alignItems: 'center',
   },
-  reposGrid: {
-    gap: 10,
-  },
-  topRepoCard: {
+  reposScrollCard: {
     backgroundColor: Colors.card,
+    borderRadius: 16,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginBottom: Spacing.md,
+  },
+  reposCardTopHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.sm,
+    paddingHorizontal: 2,
+  },
+  reposCardTopTitle: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  reposCardScrollHint: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+  reposInnerScroll: {
+    maxHeight: 460,
+  },
+  reposInnerScrollContent: {
+    gap: 10,
+    paddingVertical: 2,
+  },
+  reposCardPagination: {
+    marginTop: Spacing.sm,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.cardBorder,
+  },
+  profileRepoCard: {
+    backgroundColor: Colors.cardElevated,
     borderRadius: 12,
     padding: Spacing.md,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  repoCardHeader: {
+  profileRepoTopRow: {
     flexDirection: 'row',
-    alignItems: 'center',
     justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
   },
-  topRepoName: {
-    flex: 1,
+  profileRepoTitle: {
     fontSize: 15,
     fontWeight: '700',
     color: Colors.textPrimary,
+    flex: 1,
+  },
+  profileBadgesGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 8,
+  },
+  profileForkBadge: {
+    backgroundColor: Colors.card,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  profileForkBadgeText: {
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  profileVisibilityBadge: {
+    backgroundColor: Colors.card,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  profileVisibilityText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  profileRepoDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: 10,
+  },
+  profileRepoFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  profileMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  profileLangDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  profileMetaIcon: {
+    fontSize: 12,
+  },
+  profileMetaText: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  profileUpdatedDate: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginLeft: 'auto',
   },
   repoVisibilityBadge: {
     backgroundColor: Colors.cardElevated,
@@ -2091,37 +2251,6 @@ const styles = StyleSheet.create({
   repoVisibilityText: {
     fontSize: 10,
     color: Colors.textMuted,
-  },
-  topRepoDesc: {
-    fontSize: 12,
-    color: Colors.textSecondary,
-    marginTop: 4,
-    lineHeight: 18,
-  },
-  topRepoFooter: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: Spacing.md,
-    gap: 12,
-    flexWrap: 'wrap',
-  },
-  topRepoLang: {
-    fontSize: 11,
-    color: Colors.cyan,
-    fontWeight: '600',
-  },
-  topRepoStars: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  topRepoForks: {
-    fontSize: 11,
-    color: Colors.textMuted,
-  },
-  topRepoUpdated: {
-    fontSize: 11,
-    color: Colors.textMuted,
-    marginLeft: 'auto',
   },
   listContainer: {
     gap: 10,
