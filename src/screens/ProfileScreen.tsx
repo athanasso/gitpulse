@@ -36,8 +36,52 @@ type ProfileSubTab =
 
 const PAGE_SIZE = 30;
 
+const GITHUB_NEW_TOKEN_URL =
+  'https://github.com/settings/tokens/new?description=GitPulse+Mobile&scopes=repo,read:user,notifications,gist,read:org';
+
+interface ScopeSpec {
+  scope: string;
+  name: string;
+  level: 'Required' | 'Recommended' | 'Optional';
+  desc: string;
+}
+
+const SCOPES_SPECS: ScopeSpec[] = [
+  {
+    scope: 'repo',
+    name: 'Repositories',
+    level: 'Required',
+    desc: 'Browse private & public repos, file trees, commit history, branches, issues, workflows, and star/unstar.',
+  },
+  {
+    scope: 'read:user',
+    name: 'User Profile',
+    level: 'Required',
+    desc: 'Profile bio, avatar, GraphQL contribution calendar heatmap, followers & following.',
+  },
+  {
+    scope: 'notifications',
+    name: 'Inbox & Notifications',
+    level: 'Recommended',
+    desc: 'Fetch notifications list, filter unread, and mark threads as read via GitHub API.',
+  },
+  {
+    scope: 'gist',
+    name: 'Gists & Snippets',
+    level: 'Recommended',
+    desc: 'View personal gists, inspect gist files, and read snippet source code.',
+  },
+  {
+    scope: 'read:org',
+    name: 'Organizations',
+    level: 'Optional',
+    desc: 'View organization memberships and team profile badges.',
+  },
+];
+
 export const ProfileScreen: React.FC = () => {
   const [user, setUser] = useState<GitHubUser | null>(null);
+  const [tokenScopes, setTokenScopes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
@@ -110,8 +154,10 @@ export const ProfileScreen: React.FC = () => {
       setIsAuth(auth);
 
       if (auth) {
+        setTokenScopes(GitHubApiService.getTokenScopes());
         const u = await GitHubApiService.getCurrentUser();
         setUser(u);
+        setTokenScopes(GitHubApiService.getTokenScopes());
 
         if (u) {
           const [c, rList] = await Promise.all([
@@ -256,6 +302,7 @@ export const ProfileScreen: React.FC = () => {
       if (u) {
         setUser(u);
         setIsAuth(true);
+        setTokenScopes(GitHubApiService.getTokenScopes());
         setTokenInput('');
 
         const [c, rList] = await Promise.all([
@@ -289,6 +336,7 @@ export const ProfileScreen: React.FC = () => {
             await GitHubApiService.setToken(null);
             setUser(null);
             setIsAuth(false);
+            setTokenScopes([]);
             setContributions({ total: 0, days: [] });
             setRepos([]);
             setStarredRepos([]);
@@ -390,17 +438,71 @@ export const ProfileScreen: React.FC = () => {
           <View style={styles.authGateIconBox}>
             <Text style={styles.authGateIcon}>🔑</Text>
           </View>
-          <Text style={styles.authGateTitle}>Connect GitHub API Key</Text>
+          <Text style={styles.authGateTitle}>Connect GitHub Account</Text>
           <Text style={styles.authGateDesc}>
-            GitPulse accesses GitHub exclusively through official authenticated
-            APIs using your Personal Access Token. Zero data scraping, zero third-party proxies.
+            GitPulse accesses GitHub exclusively through official authenticated APIs with zero third-party proxies. Your Personal Access Token (PAT) stays on your device.
           </Text>
+
+          {/* Quick Setup Shortcut */}
+          <TouchableOpacity
+            style={styles.oneClickTokenBtn}
+            onPress={() => Linking.openURL(GITHUB_NEW_TOKEN_URL)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.oneClickTokenIcon}>⚡</Text>
+            <View style={styles.oneClickTokenTextWrap}>
+              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub ↗</Text>
+              <Text style={styles.oneClickTokenSub}>
+                Opens GitHub with all 5 required scopes pre-checked automatically
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Permissions Checklist */}
+          <View style={styles.scopesGuideBox}>
+            <Text style={styles.scopesGuideHeader}>TOKEN PERMISSIONS NEEDED</Text>
+            <Text style={styles.scopesGuideHint}>
+              Select these scopes on GitHub (or use the shortcut button above):
+            </Text>
+
+            {SCOPES_SPECS.map((item) => (
+              <View key={item.scope} style={styles.scopeItemRow}>
+                <View style={styles.scopeItemTop}>
+                  <Text style={styles.scopeCodeText}>{item.scope}</Text>
+                  <View
+                    style={[
+                      styles.scopeBadge,
+                      item.level === 'Required'
+                        ? styles.badgeRequired
+                        : item.level === 'Recommended'
+                        ? styles.badgeRecommended
+                        : styles.badgeOptional,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scopeBadgeText,
+                        item.level === 'Required'
+                          ? styles.badgeTextRequired
+                          : item.level === 'Recommended'
+                          ? styles.badgeTextRecommended
+                          : styles.badgeTextOptional,
+                      ]}
+                    >
+                      {item.level.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.scopeItemDesc}>{item.desc}</Text>
+              </View>
+            ))}
+          </View>
 
           <View style={styles.tokenBox}>
             <Text style={styles.inputLabel}>Personal Access Token (PAT)</Text>
             <TextInput
               style={styles.tokenInput}
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxx"
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
               placeholderTextColor={Colors.textMuted}
               value={tokenInput}
               onChangeText={setTokenInput}
@@ -409,7 +511,7 @@ export const ProfileScreen: React.FC = () => {
               autoCorrect={false}
             />
             <Text style={styles.tokenHint}>
-              Generate at github.com → Settings → Developer Settings → Personal Access Tokens with scopes: repo, read:user, notifications, gist.
+              Classic token starting with <Text style={styles.tokenHintBold}>ghp_</Text> recommended. Stored encrypted on-device.
             </Text>
 
             <TouchableOpacity
@@ -506,6 +608,67 @@ export const ProfileScreen: React.FC = () => {
                   <Text style={styles.statNumber}>{user.public_gists}</Text>
                   <Text style={styles.statLabel}>Gists</Text>
                 </TouchableOpacity>
+              </View>
+
+              {/* Active Token Scopes Card */}
+              <View style={styles.activeScopesCard}>
+                <View style={styles.activeScopesHeaderRow}>
+                  <Text style={styles.activeScopesHeaderTitle}>
+                    🔑 Token Permissions
+                  </Text>
+                  <TouchableOpacity
+                    onPress={() => Linking.openURL('https://github.com/settings/tokens')}
+                  >
+                    <Text style={styles.editScopesLink}>Manage on GitHub ↗</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {tokenScopes.length === 0 ? (
+                  <Text style={styles.fineGrainedNote}>
+                    ● Active Personal Access Token (Resource-scoped / Fine-Grained)
+                  </Text>
+                ) : (
+                  <>
+                    <View style={styles.scopesPillsWrap}>
+                      {SCOPES_SPECS.map((spec) => {
+                        const hasThis =
+                          tokenScopes.includes(spec.scope) ||
+                          (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
+                          (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
+
+                        return (
+                          <View
+                            key={spec.scope}
+                            style={[
+                              styles.scopePill,
+                              hasThis ? styles.scopePillActive : styles.scopePillMissing,
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.scopePillText,
+                                hasThis
+                                  ? styles.scopePillTextActive
+                                  : styles.scopePillTextMissing,
+                              ]}
+                            >
+                              {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
+                              {spec.scope}
+                            </Text>
+                          </View>
+                        );
+                      })}
+                    </View>
+
+                    {!tokenScopes.includes('notifications') && (
+                      <View style={styles.scopeWarningInline}>
+                        <Text style={styles.scopeWarningInlineText}>
+                          ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
+                        </Text>
+                      </View>
+                    )}
+                  </>
+                )}
               </View>
 
               <TouchableOpacity
@@ -1152,7 +1315,113 @@ const styles = StyleSheet.create({
     color: Colors.textSecondary,
     textAlign: 'center',
     lineHeight: 20,
-    marginBottom: Spacing.xl,
+    marginBottom: Spacing.lg,
+  },
+  oneClickTokenBtn: {
+    width: '100%',
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.primaryMuted,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  oneClickTokenIcon: {
+    fontSize: 22,
+    marginRight: Spacing.md,
+  },
+  oneClickTokenTextWrap: {
+    flex: 1,
+  },
+  oneClickTokenTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  oneClickTokenSub: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    lineHeight: 15,
+  },
+  scopesGuideBox: {
+    width: '100%',
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  scopesGuideHeader: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    letterSpacing: 0.8,
+    marginBottom: 4,
+  },
+  scopesGuideHint: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    marginBottom: Spacing.md,
+    lineHeight: 16,
+  },
+  scopeItemRow: {
+    paddingVertical: 8,
+    borderTopWidth: 1,
+    borderTopColor: Colors.cardBorder,
+  },
+  scopeItemTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 4,
+  },
+  scopeCodeText: {
+    fontFamily: 'monospace',
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.cyan,
+  },
+  scopeBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  badgeRequired: {
+    backgroundColor: Colors.rubyMuted,
+  },
+  badgeRecommended: {
+    backgroundColor: Colors.cyanMuted,
+  },
+  badgeOptional: {
+    backgroundColor: 'rgba(148, 163, 184, 0.15)',
+  },
+  scopeBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  badgeTextRequired: {
+    color: Colors.ruby,
+  },
+  badgeTextRecommended: {
+    color: Colors.cyan,
+  },
+  badgeTextOptional: {
+    color: Colors.textSecondary,
+  },
+  scopeItemDesc: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  tokenHintBold: {
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontFamily: 'monospace',
   },
   tokenBox: {
     width: '100%',
@@ -1294,6 +1563,85 @@ const styles = StyleSheet.create({
     fontSize: 11,
     color: Colors.textMuted,
     marginTop: 2,
+  },
+  activeScopesCard: {
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+  },
+  activeScopesHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.sm,
+  },
+  activeScopesHeaderTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  editScopesLink: {
+    fontSize: 11,
+    color: Colors.cyan,
+    fontWeight: '600',
+  },
+  fineGrainedNote: {
+    fontSize: 12,
+    color: Colors.emerald,
+    marginTop: 4,
+  },
+  scopesPillsWrap: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    marginTop: 4,
+  },
+  scopePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  scopePillActive: {
+    backgroundColor: Colors.emeraldMuted,
+    borderColor: Colors.emerald,
+  },
+  scopePillMissing: {
+    backgroundColor: Colors.rubyMuted,
+    borderColor: Colors.ruby,
+  },
+  scopePillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: 'monospace',
+  },
+  scopePillTextActive: {
+    color: Colors.emerald,
+  },
+  scopePillTextMissing: {
+    color: Colors.ruby,
+  },
+  scopeWarningInline: {
+    marginTop: Spacing.sm,
+    backgroundColor: 'rgba(245, 158, 11, 0.1)',
+    borderRadius: 8,
+    padding: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  scopeWarningInlineText: {
+    fontSize: 11,
+    color: Colors.gold,
+    lineHeight: 15,
+  },
+  scopeCodeTextInline: {
+    fontFamily: 'monospace',
+    fontWeight: '700',
   },
   disconnectButton: {
     paddingVertical: 10,

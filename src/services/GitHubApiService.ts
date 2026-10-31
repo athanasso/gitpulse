@@ -20,10 +20,12 @@ import {
 
 const PAT_STORAGE_KEY = '@gitpulse_pat_token';
 const USER_CACHE_KEY = '@gitpulse_cached_user';
+const SCOPES_STORAGE_KEY = '@gitpulse_token_scopes';
 
 class GitHubApiServiceClass {
   private token: string | null = null;
   private cachedUser: GitHubUser | null = null;
+  private tokenScopes: string[] = [];
   private initialized: boolean = false;
   private initPromise: Promise<boolean> | null = null;
 
@@ -33,9 +35,10 @@ class GitHubApiServiceClass {
 
     this.initPromise = (async () => {
       try {
-        const [storedToken, storedUser] = await Promise.all([
+        const [storedToken, storedUser, storedScopes] = await Promise.all([
           AsyncStorage.getItem(PAT_STORAGE_KEY),
           AsyncStorage.getItem(USER_CACHE_KEY),
+          AsyncStorage.getItem(SCOPES_STORAGE_KEY),
         ]);
 
         if (storedToken) {
@@ -46,6 +49,13 @@ class GitHubApiServiceClass {
             this.cachedUser = JSON.parse(storedUser);
           } catch {
             this.cachedUser = null;
+          }
+        }
+        if (storedScopes) {
+          try {
+            this.tokenScopes = JSON.parse(storedScopes);
+          } catch {
+            this.tokenScopes = [];
           }
         }
 
@@ -74,9 +84,11 @@ class GitHubApiServiceClass {
     if (!cleanToken) {
       this.token = null;
       this.cachedUser = null;
+      this.tokenScopes = [];
       await Promise.all([
         AsyncStorage.removeItem(PAT_STORAGE_KEY),
         AsyncStorage.removeItem(USER_CACHE_KEY),
+        AsyncStorage.removeItem(SCOPES_STORAGE_KEY),
       ]);
       return null;
     }
@@ -102,9 +114,18 @@ class GitHubApiServiceClass {
     this.token = cleanToken;
     this.cachedUser = userData;
 
+    const rawScopes = res.headers.get('x-oauth-scopes');
+    this.tokenScopes = rawScopes
+      ? rawScopes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean)
+      : [];
+
     await Promise.all([
       AsyncStorage.setItem(PAT_STORAGE_KEY, cleanToken),
       AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData)),
+      AsyncStorage.setItem(SCOPES_STORAGE_KEY, JSON.stringify(this.tokenScopes)),
     ]);
 
     return userData;
@@ -116,6 +137,14 @@ class GitHubApiServiceClass {
 
   getCachedUser(): GitHubUser | null {
     return this.cachedUser;
+  }
+
+  getTokenScopes(): string[] {
+    return this.tokenScopes;
+  }
+
+  hasScope(scope: string): boolean {
+    return this.tokenScopes.includes(scope);
   }
 
   isAuthenticated(): boolean {
@@ -157,6 +186,16 @@ class GitHubApiServiceClass {
 
       const data: GitHubUser = await res.json();
       this.cachedUser = data;
+
+      const rawScopes = res.headers.get('x-oauth-scopes');
+      if (rawScopes !== null) {
+        this.tokenScopes = rawScopes
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+        await AsyncStorage.setItem(SCOPES_STORAGE_KEY, JSON.stringify(this.tokenScopes));
+      }
+
       await AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(data));
       return data;
     } catch (e) {
