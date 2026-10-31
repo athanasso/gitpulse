@@ -70,7 +70,7 @@ const LANGUAGE_COLORS: Record<string, string> = {
 };
 
 const GITHUB_NEW_TOKEN_URL =
-  'https://github.com/settings/tokens/new?description=GitPulse+Mobile&scopes=repo,read:user,notifications,gist,read:org';
+  'https://github.com/settings/tokens/new?description=GitPulse+Mobile&scopes=repo,read:user,notifications,gist,read:org,delete_repo';
 
 interface ScopeSpec {
   scope: string;
@@ -109,6 +109,12 @@ const SCOPES_SPECS: ScopeSpec[] = [
     name: 'Organizations',
     level: 'Optional',
     desc: 'View organization memberships and team profile badges.',
+  },
+  {
+    scope: 'delete_repo',
+    name: 'Delete Repositories',
+    level: 'Optional',
+    desc: 'Permit deleting repositories you own directly from the repository Danger Zone card.',
   },
 ];
 

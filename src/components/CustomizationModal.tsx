@@ -543,6 +543,61 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
                     );
                   })}
                 </View>
+
+                {/* REPO DELETION / DANGER ZONE TOGGLE */}
+                <View
+                  style={[
+                    styles.sectionGroup,
+                    {
+                      marginTop: 20,
+                      paddingTop: 16,
+                      borderTopWidth: 1,
+                      borderTopColor: colors.cardBorder,
+                    },
+                  ]}
+                >
+                  <Text style={[styles.sectionTitle, { color: colors.ruby }]}>
+                    ⚠️ Danger Zone (Repository Deletion)
+                  </Text>
+                  <Text style={[styles.sectionDesc, { color: colors.textSecondary }]}>
+                    When enabled, an admin Danger Zone appears on repositories you own, allowing permanent deletion via GitHub API.
+                  </Text>
+
+                  <TouchableOpacity
+                    style={[
+                      styles.optionCard,
+                      {
+                        backgroundColor: settings.enableRepoDeletion ? colors.cardElevated : colors.card,
+                        borderColor: settings.enableRepoDeletion ? colors.ruby : colors.cardBorder,
+                        marginTop: 10,
+                      },
+                    ]}
+                    onPress={() => updateSettings({ enableRepoDeletion: !settings.enableRepoDeletion })}
+                    activeOpacity={0.7}
+                  >
+                    <View
+                      style={[
+                        styles.checkbox,
+                        {
+                          backgroundColor: settings.enableRepoDeletion ? colors.ruby : 'transparent',
+                          borderColor: settings.enableRepoDeletion ? colors.ruby : colors.cardBorder,
+                        },
+                      ]}
+                    >
+                      {settings.enableRepoDeletion && <Text style={styles.checkboxCheck}>✓</Text>}
+                    </View>
+                    <View style={styles.optionContent}>
+                      <Text style={[styles.optionTitle, { color: colors.textPrimary }]}>
+                        Allow repository deletion in Danger Zone
+                      </Text>
+                      <Text style={[styles.optionDesc, { color: colors.textSecondary }]}>
+                        {settings.enableRepoDeletion
+                          ? 'Enabled: Safety confirmation modal will be available on your repos.'
+                          : 'Disabled: Danger Zone is hidden to prevent accidental deletion.'}
+                      </Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
             )}
           </ScrollView>

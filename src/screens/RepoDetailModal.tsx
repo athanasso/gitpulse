@@ -10,6 +10,7 @@ import {
   Share,
   Linking,
   FlatList,
+  TextInput,
 } from 'react-native';
 import { Colors, Spacing } from '../constants/theme';
 import {
@@ -108,6 +109,60 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
 
   const hideDialog = () => {
     setDialogConfig((prev) => ({ ...prev, visible: false }));
+  };
+
+  // GitHub-style safety modal state for repo deletion
+  const [safetyModalVisible, setSafetyModalVisible] = useState(false);
+  const [deleteInputText, setDeleteInputText] = useState('');
+  const [isDeletingRepo, setIsDeletingRepo] = useState(false);
+
+  const isSafetyMatched = Boolean(
+    repo &&
+      deleteInputText.trim().toLowerCase() === repo.full_name.toLowerCase()
+  );
+
+  const handleOpenSafetyModal = () => {
+    setDeleteInputText('');
+    setSafetyModalVisible(true);
+  };
+
+  const handleExecuteDelete = async () => {
+    if (!repo || !isSafetyMatched) return;
+    setIsDeletingRepo(true);
+    const [owner, name] = repo.full_name.split('/');
+    const res = await GitHubApiService.deleteRepo(owner, name);
+    setIsDeletingRepo(false);
+    setSafetyModalVisible(false);
+
+    if (res.success) {
+      showDialog({
+        title: 'Repository Deleted',
+        message: `"${repo.full_name}" was permanently deleted from GitHub.`,
+        icon: '✅',
+        type: 'success',
+        buttons: [
+          {
+            text: 'Done',
+            style: 'success',
+            onPress: () => {
+              hideDialog();
+              onClose();
+              onRepoDeleted?.(repo.id);
+            },
+          },
+        ],
+      });
+    } else {
+      showDialog({
+        title: 'Deletion Failed',
+        message:
+          res.error ||
+          'Could not delete repository. Verify that your Personal Access Token has the "delete_repo" scope enabled.',
+        icon: '⚠️',
+        type: 'danger',
+        buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
+      });
+    }
   };
 
   const currentUser = GitHubApiService.getCachedUser();
@@ -749,7 +804,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 </View>
 
                 {/* Danger Zone: Delete Repository (if owner / admin) */}
-                {isOwner && (
+                {isOwner && settings.enableRepoDeletion && (
                   <View style={styles.dangerZoneCard}>
                     <View style={styles.dangerZoneHeader}>
                       <Text style={styles.dangerZoneTitle}>⚠️ Danger Zone</Text>
@@ -765,7 +820,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </View>
                       <TouchableOpacity
                         style={styles.deleteRepoBtn}
-                        onPress={handlePromptDelete}
+                        onPress={handleOpenSafetyModal}
                         activeOpacity={0.7}
                       >
                         <Text style={styles.deleteRepoBtnText}>Delete</Text>
@@ -1364,6 +1419,76 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   </View>
                 }
               />
+            </View>
+          </View>
+        </Modal>
+
+        {/* GitHub-Style Delete Safety Modal */}
+        <Modal
+          visible={safetyModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => {
+            if (!isDeletingRepo) setSafetyModalVisible(false);
+          }}
+        >
+          <View style={styles.safetyModalOverlay}>
+            <View style={styles.safetyModalCard}>
+              <View style={styles.safetyModalHeader}>
+                <Text style={styles.safetyModalTitle}>⚠️ Delete repository</Text>
+                <TouchableOpacity
+                  onPress={() => setSafetyModalVisible(false)}
+                  disabled={isDeletingRepo}
+                  style={styles.safetyCloseBtn}
+                >
+                  <Text style={styles.safetyCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.safetyWarningBox}>
+                <Text style={styles.safetyWarningTitle}>
+                  Unexpected bad things will happen if you don't read this!
+                </Text>
+                <Text style={styles.safetyWarningDesc}>
+                  This action <Text style={{ fontWeight: 'bold' }}>cannot</Text> be undone. This will permanently delete the <Text style={{ fontFamily: 'monospace', color: Colors.ruby }}>{repo?.full_name}</Text> repository, wiki, issues, comments, packages, secrets, and remove all collaborator associations.
+                </Text>
+              </View>
+
+              <Text style={styles.safetyPromptLabel}>
+                To confirm, type <Text style={styles.safetyPromptTarget}>{repo?.full_name}</Text> in the box below:
+              </Text>
+
+              <TextInput
+                style={[
+                  styles.safetyInput,
+                  isSafetyMatched && styles.safetyInputMatched,
+                ]}
+                value={deleteInputText}
+                onChangeText={setDeleteInputText}
+                placeholder={repo?.full_name}
+                placeholderTextColor={Colors.textMuted}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!isDeletingRepo}
+              />
+
+              <TouchableOpacity
+                style={[
+                  styles.safetyDeleteBtn,
+                  (!isSafetyMatched || isDeletingRepo) && styles.safetyDeleteBtnDisabled,
+                ]}
+                onPress={handleExecuteDelete}
+                disabled={!isSafetyMatched || isDeletingRepo}
+                activeOpacity={0.8}
+              >
+                {isDeletingRepo ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <Text style={styles.safetyDeleteBtnText}>
+                    I understand the consequences, delete this repository
+                  </Text>
+                )}
+              </TouchableOpacity>
             </View>
           </View>
         </Modal>
@@ -2249,5 +2374,107 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '700',
+  },
+  safetyModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.85)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  safetyModalCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1.5,
+    borderColor: 'rgba(239, 68, 68, 0.5)',
+    width: '100%',
+    maxWidth: 420,
+    padding: Spacing.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.6,
+    shadowRadius: 20,
+    elevation: 20,
+  },
+  safetyModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  safetyModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.ruby,
+    letterSpacing: 0.3,
+  },
+  safetyCloseBtn: {
+    padding: 6,
+  },
+  safetyCloseText: {
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '700',
+  },
+  safetyWarningBox: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.25)',
+    padding: Spacing.md,
+    marginBottom: Spacing.lg,
+  },
+  safetyWarningTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.ruby,
+    marginBottom: 4,
+  },
+  safetyWarningDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+  },
+  safetyPromptLabel: {
+    fontSize: 13,
+    color: Colors.textPrimary,
+    marginBottom: 8,
+  },
+  safetyPromptTarget: {
+    fontWeight: '700',
+    fontFamily: 'monospace',
+    color: Colors.cyan,
+  },
+  safetyInput: {
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 10,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: Colors.textPrimary,
+    fontSize: 13,
+    fontFamily: 'monospace',
+    marginBottom: Spacing.lg,
+  },
+  safetyInputMatched: {
+    borderColor: Colors.ruby,
+  },
+  safetyDeleteBtn: {
+    backgroundColor: Colors.ruby,
+    borderRadius: 10,
+    paddingVertical: 12,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  safetyDeleteBtnDisabled: {
+    opacity: 0.35,
+  },
+  safetyDeleteBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '800',
+    textAlign: 'center',
   },
 });

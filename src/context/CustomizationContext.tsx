@@ -74,6 +74,7 @@ export interface CustomizationSettings {
     | 'actions'
     | 'releases'
     | 'insights';
+  enableRepoDeletion: boolean;
 }
 
 export const DEFAULT_CUSTOMIZATION: CustomizationSettings = {
@@ -102,6 +103,7 @@ export const DEFAULT_CUSTOMIZATION: CustomizationSettings = {
   repoShowForkBadge: true,
 
   defaultRepoDetailTab: 'readme',
+  enableRepoDeletion: false,
 };
 
 const STORAGE_KEY = '@gitpulse_customization_v1';
