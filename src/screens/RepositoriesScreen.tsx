@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   View,
   Text,
@@ -7,17 +7,43 @@ import {
   TextInput,
   TouchableOpacity,
   RefreshControl,
+  ScrollView,
 } from 'react-native';
 import { Colors, Spacing } from '../constants/theme';
 import { GitHubRepo } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
 
+type RepoTypeFilter = 'all' | 'public' | 'private' | 'sources' | 'forks';
+type RepoSortOption = 'updated' | 'stars' | 'forks' | 'name';
+
+const LANGUAGE_COLORS: Record<string, string> = {
+  TypeScript: '#3178C6',
+  JavaScript: '#F7DF1E',
+  Python: '#3572A5',
+  Rust: '#DEA584',
+  Go: '#00ADD8',
+  Java: '#B07219',
+  'C++': '#F34B7D',
+  C: '#555555',
+  'C#': '#178600',
+  Ruby: '#701516',
+  PHP: '#4F5D95',
+  HTML: '#E34C26',
+  CSS: '#563D7C',
+  Shell: '#89E051',
+  Swift: '#F05138',
+  Kotlin: '#A97BFF',
+  Dart: '#00B4AB',
+};
+
 export const RepositoriesScreen: React.FC = () => {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
-  const [filteredRepos, setFilteredRepos] = useState<GitHubRepo[]>([]);
+  const [remoteResults, setRemoteResults] = useState<GitHubRepo[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
+  const [typeFilter, setTypeFilter] = useState<RepoTypeFilter>('all');
+  const [sortBy, setSortBy] = useState<RepoSortOption>('updated');
   const [refreshing, setRefreshing] = useState(false);
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -30,58 +56,94 @@ export const RepositoriesScreen: React.FC = () => {
     setRefreshing(true);
     const list = await GitHubApiService.getUserRepos();
     setRepos(list);
-    setFilteredRepos(list);
     setRefreshing(false);
   };
 
   const handleSearch = async (text: string) => {
     setSearchQuery(text);
-    if (!text.trim()) {
-      filterList('', selectedLanguage, repos);
-      return;
-    }
 
-    filterList(text, selectedLanguage, repos);
-
-    // If local repos are empty or user wants global search, query real GitHub Search API
-    if (text.length >= 3) {
+    if (text.trim().length >= 3) {
       const results = await GitHubApiService.searchRepos(text);
-      if (results.length > 0) {
-        filterList(text, selectedLanguage, results);
-      }
+      setRemoteResults(results);
+    } else {
+      setRemoteResults([]);
     }
   };
 
-  const handleLanguageFilter = (lang: string) => {
-    setSelectedLanguage(lang);
-    filterList(searchQuery, lang, repos);
-  };
+  // Base list: remote search results if searching and non-empty, otherwise user's repos
+  const sourceList = searchQuery.trim().length >= 3 && remoteResults.length > 0
+    ? remoteResults
+    : repos;
 
-  const filterList = (query: string, lang: string, list: GitHubRepo[]) => {
-    let result = list;
+  // Extract all unique languages dynamically from whatever repos exist in data
+  const dynamicLanguages = useMemo(() => {
+    const counts: Record<string, number> = {};
+    repos.forEach((r) => {
+      if (r.language) {
+        counts[r.language] = (counts[r.language] || 0) + 1;
+      }
+    });
 
-    if (query.trim()) {
-      const q = query.toLowerCase();
+    const sorted = Object.keys(counts).sort((a, b) => counts[b] - counts[a]);
+    return [
+      { name: 'All', count: repos.length },
+      ...sorted.map((lang) => ({ name: lang, count: counts[lang] })),
+    ];
+  }, [repos]);
+
+  // Dynamic Filtering & Sorting
+  const filteredRepos = useMemo(() => {
+    let result = sourceList;
+
+    // Search query filter (for local matching)
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
       result = result.filter(
         (r) =>
           r.name.toLowerCase().includes(q) ||
-          (r.description && r.description.toLowerCase().includes(q))
+          (r.description && r.description.toLowerCase().includes(q)) ||
+          (r.language && r.language.toLowerCase().includes(q))
       );
     }
 
-    if (lang !== 'All') {
-      result = result.filter((r) => r.language === lang);
+    // Language filter
+    if (selectedLanguage !== 'All') {
+      result = result.filter((r) => r.language === selectedLanguage);
     }
 
-    setFilteredRepos(result);
-  };
+    // Type / Visibility filter
+    if (typeFilter === 'public') {
+      result = result.filter((r) => !r.private);
+    } else if (typeFilter === 'private') {
+      result = result.filter((r) => r.private);
+    } else if (typeFilter === 'sources') {
+      result = result.filter((r) => !r.fork);
+    } else if (typeFilter === 'forks') {
+      result = result.filter((r) => r.fork);
+    }
+
+    // Sort order
+    return [...result].sort((a, b) => {
+      if (sortBy === 'stars') return b.stargazers_count - a.stargazers_count;
+      if (sortBy === 'forks') return b.forks_count - a.forks_count;
+      if (sortBy === 'name') return a.name.localeCompare(b.name);
+      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+    });
+  }, [sourceList, searchQuery, selectedLanguage, typeFilter, sortBy]);
 
   const openRepo = (repo: GitHubRepo) => {
     setSelectedRepo(repo);
     setModalVisible(true);
   };
 
-  const languages = ['All', 'TypeScript', 'JavaScript', 'Python'];
+  const hasActiveFilters =
+    selectedLanguage !== 'All' || typeFilter !== 'all' || sortBy !== 'updated';
+
+  const resetFilters = () => {
+    setSelectedLanguage('All');
+    setTypeFilter('all');
+    setSortBy('updated');
+  };
 
   const renderRepoItem = ({ item }: { item: GitHubRepo }) => {
     return (
@@ -91,11 +153,20 @@ export const RepositoriesScreen: React.FC = () => {
         activeOpacity={0.7}
       >
         <View style={styles.repoTopRow}>
-          <Text style={styles.repoTitle}>{item.name}</Text>
-          <View style={styles.visibilityBadge}>
-            <Text style={styles.visibilityText}>
-              {item.private ? '🔒 Private' : 'Public'}
-            </Text>
+          <Text style={styles.repoTitle} numberOfLines={1}>
+            {item.name}
+          </Text>
+          <View style={styles.badgesGroup}>
+            {item.fork && (
+              <View style={styles.forkBadge}>
+                <Text style={styles.forkBadgeText}>🍴 Fork</Text>
+              </View>
+            )}
+            <View style={styles.visibilityBadge}>
+              <Text style={styles.visibilityText}>
+                {item.private ? '🔒 Private' : 'Public'}
+              </Text>
+            </View>
           </View>
         </View>
 
@@ -113,11 +184,7 @@ export const RepositoriesScreen: React.FC = () => {
                   styles.langDot,
                   {
                     backgroundColor:
-                      item.language === 'TypeScript'
-                        ? '#3178C6'
-                        : item.language === 'JavaScript'
-                        ? '#F7DF1E'
-                        : '#3572A5',
+                      LANGUAGE_COLORS[item.language] || Colors.primary,
                   },
                 ]}
               />
@@ -164,27 +231,109 @@ export const RepositoriesScreen: React.FC = () => {
         )}
       </View>
 
-      {/* Language Filter Chips */}
-      <View style={styles.filterRow}>
-        {languages.map((lang) => (
+      {/* Type / Visibility Filter Row */}
+      <View style={styles.typeFilterRow}>
+        {(['all', 'sources', 'forks', 'public', 'private'] as RepoTypeFilter[]).map((t) => (
           <TouchableOpacity
-            key={lang}
+            key={t}
             style={[
-              styles.filterPill,
-              selectedLanguage === lang && styles.filterPillActive,
+              styles.typeChip,
+              typeFilter === t && styles.typeChipActive,
             ]}
-            onPress={() => handleLanguageFilter(lang)}
+            onPress={() => setTypeFilter(t)}
           >
             <Text
               style={[
-                styles.filterPillText,
-                selectedLanguage === lang && styles.filterPillTextActive,
+                styles.typeChipText,
+                typeFilter === t && styles.typeChipTextActive,
               ]}
             >
-              {lang}
+              {t.charAt(0).toUpperCase() + t.slice(1)}
             </Text>
           </TouchableOpacity>
         ))}
+      </View>
+
+      {/* Dynamic Languages Scrollable Bar */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.langScroll}
+        contentContainerStyle={styles.langScrollContent}
+      >
+        {dynamicLanguages.map((l) => {
+          const isSelected = selectedLanguage === l.name;
+          const color = LANGUAGE_COLORS[l.name];
+          return (
+            <TouchableOpacity
+              key={l.name}
+              style={[
+                styles.langPill,
+                isSelected && styles.langPillActive,
+              ]}
+              onPress={() => setSelectedLanguage(l.name)}
+            >
+              {color && (
+                <View
+                  style={[
+                    styles.langPillDot,
+                    { backgroundColor: isSelected ? '#FFFFFF' : color },
+                  ]}
+                />
+              )}
+              <Text
+                style={[
+                  styles.langPillText,
+                  isSelected && styles.langPillTextActive,
+                ]}
+              >
+                {l.name}
+              </Text>
+              <Text
+                style={[
+                  styles.langPillCount,
+                  isSelected && styles.langPillCountActive,
+                ]}
+              >
+                {l.count}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </ScrollView>
+
+      {/* Meta Bar: Counts & Sort Switcher */}
+      <View style={styles.metaBar}>
+        <Text style={styles.metaBarCount}>
+          {filteredRepos.length}{' '}
+          {filteredRepos.length === 1 ? 'repository' : 'repositories'}
+        </Text>
+
+        <View style={styles.sortGroup}>
+          <Text style={styles.sortLabel}>Sort:</Text>
+          {(['updated', 'stars', 'forks', 'name'] as RepoSortOption[]).map((s) => (
+            <TouchableOpacity
+              key={s}
+              onPress={() => setSortBy(s)}
+              style={[styles.sortChip, sortBy === s && styles.sortChipActive]}
+            >
+              <Text
+                style={[
+                  styles.sortChipText,
+                  sortBy === s && styles.sortChipTextActive,
+                ]}
+              >
+                {s.charAt(0).toUpperCase() + s.slice(1)}
+              </Text>
+            </TouchableOpacity>
+          ))}
+        </View>
+
+        {hasActiveFilters && (
+          <TouchableOpacity onPress={resetFilters} style={styles.resetFiltersBtn}>
+            <Text style={styles.resetFiltersText}>Reset</Text>
+          </TouchableOpacity>
+        )}
       </View>
 
       {/* Repositories List */}
@@ -215,7 +364,7 @@ export const RepositoriesScreen: React.FC = () => {
                 <Text style={styles.emptyIcon}>📂</Text>
                 <Text style={styles.emptyTitle}>No Repositories Found</Text>
                 <Text style={styles.emptySubtitle}>
-                  No repositories match your search or account.
+                  No repositories match your active search or filter criteria.
                 </Text>
               </View>
             )
@@ -244,7 +393,7 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.cardElevated,
     marginHorizontal: Spacing.lg,
     marginTop: Spacing.md,
-    marginBottom: Spacing.sm,
+    marginBottom: Spacing.xs,
     paddingHorizontal: Spacing.md,
     borderRadius: 14,
     borderWidth: 1,
@@ -265,32 +414,127 @@ const styles = StyleSheet.create({
     fontSize: 14,
     padding: 4,
   },
-  filterRow: {
+  typeFilterRow: {
     flexDirection: 'row',
     paddingHorizontal: Spacing.lg,
-    paddingVertical: Spacing.xs,
-    gap: 8,
-    marginBottom: Spacing.sm,
+    paddingTop: Spacing.xs,
+    gap: 6,
   },
-  filterPill: {
-    paddingHorizontal: 12,
+  typeChip: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 10,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  typeChipActive: {
+    backgroundColor: Colors.cardElevated,
+    borderColor: Colors.primary,
+  },
+  typeChipText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+  typeChipTextActive: {
+    color: Colors.primary,
+  },
+  langScroll: {
+    flexGrow: 0,
+    marginTop: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  langScrollContent: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.lg,
+    gap: 8,
+    alignItems: 'center',
+  },
+  langPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: 12,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
-  filterPillActive: {
+  langPillActive: {
     backgroundColor: Colors.primary,
     borderColor: Colors.primary,
   },
-  filterPillText: {
+  langPillDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    marginRight: 6,
+  },
+  langPillText: {
     fontSize: 12,
     fontWeight: '600',
     color: Colors.textSecondary,
+    marginRight: 4,
   },
-  filterPillTextActive: {
+  langPillTextActive: {
     color: '#FFFFFF',
+  },
+  langPillCount: {
+    fontSize: 10,
+    color: Colors.textMuted,
+    fontFamily: 'monospace',
+  },
+  langPillCountActive: {
+    color: 'rgba(255,255,255,0.7)',
+  },
+  metaBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
+  metaBarCount: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '600',
+  },
+  sortGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  sortLabel: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginRight: 2,
+  },
+  sortChip: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  sortChipActive: {
+    backgroundColor: Colors.cardElevated,
+  },
+  sortChipText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  sortChipTextActive: {
+    color: Colors.cyan,
+    fontWeight: '700',
+  },
+  resetFiltersBtn: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+  },
+  resetFiltersText: {
+    fontSize: 11,
+    color: Colors.ruby,
+    fontWeight: '600',
   },
   listContent: {
     paddingHorizontal: Spacing.lg,
@@ -315,6 +559,24 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: Colors.textPrimary,
     flex: 1,
+  },
+  badgesGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginLeft: 8,
+  },
+  forkBadge: {
+    backgroundColor: Colors.cardElevated,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  forkBadgeText: {
+    fontSize: 10,
+    color: Colors.textMuted,
   },
   visibilityBadge: {
     backgroundColor: Colors.cardElevated,
@@ -382,6 +644,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textSecondary,
     textAlign: 'center',
+    maxWidth: 280,
   },
 });
-
