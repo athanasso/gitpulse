@@ -14,6 +14,30 @@ export interface GitHubUser {
   html_url: string;
   company: string | null;
   location: string | null;
+  blog: string | null;
+  twitter_username: string | null;
+  email: string | null;
+}
+
+export interface GitHubSocialAccount {
+  provider: string;
+  url: string;
+}
+
+export interface GitHubPinnedItem {
+  id: string;
+  name: string;
+  nameWithOwner: string;
+  description: string | null;
+  isPrivate: boolean;
+  isFork: boolean;
+  stargazerCount: number;
+  forkCount: number;
+  url: string;
+  primaryLanguage: {
+    name: string;
+    color: string;
+  } | null;
 }
 
 export interface GitHubRepo {

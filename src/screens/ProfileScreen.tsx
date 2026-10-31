@@ -21,6 +21,8 @@ import {
   GitHubOrg,
   GitHubFollower,
   GitHubEvent,
+  GitHubSocialAccount,
+  GitHubPinnedItem,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
@@ -145,6 +147,12 @@ export const ProfileScreen: React.FC = () => {
   const [gistFileContent, setGistFileContent] = useState<string>('');
   const [gistLoading, setGistLoading] = useState(false);
 
+  // Profile Extras: Links, Pinned, Readme
+  const [socialAccounts, setSocialAccounts] = useState<GitHubSocialAccount[]>([]);
+  const [pinnedItems, setPinnedItems] = useState<GitHubPinnedItem[]>([]);
+  const [profileReadme, setProfileReadme] = useState<string>('');
+  const [readmeExpanded, setReadmeExpanded] = useState<boolean>(false);
+
   useEffect(() => {
     loadProfile();
   }, []);
@@ -162,14 +170,20 @@ export const ProfileScreen: React.FC = () => {
         setTokenScopes(GitHubApiService.getTokenScopes());
 
         if (u) {
-          const [c, rList] = await Promise.all([
+          const [c, rList, socials, pinned, readme] = await Promise.all([
             GitHubApiService.getContributions(),
             GitHubApiService.getUserRepos(1, PAGE_SIZE),
+            GitHubApiService.getSocialAccounts(u.login),
+            GitHubApiService.getPinnedItems(u.login),
+            GitHubApiService.getProfileReadme(u.login),
           ]);
           setContributions(c);
           setRepos(rList);
           setHasMoreRepos(rList.length >= PAGE_SIZE);
           setPageRepos(1);
+          setSocialAccounts(socials);
+          setPinnedItems(pinned);
+          setProfileReadme(readme);
         }
       } else {
         setUser(null);
@@ -307,14 +321,20 @@ export const ProfileScreen: React.FC = () => {
         setTokenScopes(GitHubApiService.getTokenScopes());
         setTokenInput('');
 
-        const [c, rList] = await Promise.all([
+        const [c, rList, socials, pinned, readme] = await Promise.all([
           GitHubApiService.getContributions(),
           GitHubApiService.getUserRepos(1, PAGE_SIZE),
+          GitHubApiService.getSocialAccounts(u.login),
+          GitHubApiService.getPinnedItems(u.login),
+          GitHubApiService.getProfileReadme(u.login),
         ]);
         setContributions(c);
         setRepos(rList);
         setHasMoreRepos(rList.length >= PAGE_SIZE);
         setPageRepos(1);
+        setSocialAccounts(socials);
+        setPinnedItems(pinned);
+        setProfileReadme(readme);
 
         Alert.alert('Connected', `Signed in as @${u.login}`);
       }
@@ -347,6 +367,9 @@ export const ProfileScreen: React.FC = () => {
             setOrs([]);
             setFollowers([]);
             setFollowing([]);
+            setSocialAccounts([]);
+            setPinnedItems([]);
+            setProfileReadme('');
           },
         },
       ]
@@ -574,6 +597,73 @@ export const ProfileScreen: React.FC = () => {
                 ) : null}
               </View>
 
+              {/* Profile Links & Social Accounts */}
+              {(user.blog ||
+                user.twitter_username ||
+                user.email ||
+                socialAccounts.length > 0) && (
+                <View style={styles.profileLinksRow}>
+                  {user.blog ? (
+                    <TouchableOpacity
+                      style={styles.profileLinkPill}
+                      onPress={() =>
+                        Linking.openURL(
+                          user.blog!.startsWith('http')
+                            ? user.blog!
+                            : `https://${user.blog!}`
+                        )
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.profileLinkIcon}>🔗</Text>
+                      <Text style={styles.profileLinkText} numberOfLines={1}>
+                        {user.blog.replace(/^https?:\/\//, '')}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {user.twitter_username ? (
+                    <TouchableOpacity
+                      style={styles.profileLinkPill}
+                      onPress={() =>
+                        Linking.openURL(`https://x.com/${user.twitter_username}`)
+                      }
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.profileLinkIcon}>𝕏</Text>
+                      <Text style={styles.profileLinkText}>
+                        @{user.twitter_username}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {user.email ? (
+                    <TouchableOpacity
+                      style={styles.profileLinkPill}
+                      onPress={() => Linking.openURL(`mailto:${user.email}`)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.profileLinkIcon}>✉️</Text>
+                      <Text style={styles.profileLinkText} numberOfLines={1}>
+                        {user.email}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : null}
+
+                  {socialAccounts.map((s, idx) => (
+                    <TouchableOpacity
+                      key={`${s.provider}-${idx}`}
+                      style={styles.profileLinkPill}
+                      onPress={() => Linking.openURL(s.url)}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.profileLinkIcon}>🌐</Text>
+                      <Text style={styles.profileLinkText}>{s.provider}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              )}
+
               {/* Stats Row */}
               <View style={styles.statsRow}>
                 <TouchableOpacity
@@ -684,6 +774,105 @@ export const ProfileScreen: React.FC = () => {
                   Disconnect API Key
                 </Text>
               </TouchableOpacity>
+            </View>
+          )}
+
+          {/* Profile README Card ({username}/{username}/README.md) */}
+          {profileReadme ? (
+            <View style={styles.profileReadmeCard}>
+              <View style={styles.profileReadmeHeader}>
+                <View style={styles.profileReadmeTitleRow}>
+                  <Text style={styles.profileReadmeIcon}>📖</Text>
+                  <Text style={styles.profileReadmeTitle}>
+                    {user?.login} / README.md
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setReadmeExpanded(!readmeExpanded)}
+                  style={styles.readmeToggleBtn}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.readmeToggleBtnText}>
+                    {readmeExpanded ? 'Collapse ▴' : 'Expand ▾'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              <Text
+                style={styles.profileReadmeBody}
+                numberOfLines={readmeExpanded ? undefined : 8}
+              >
+                {profileReadme}
+              </Text>
+            </View>
+          ) : null}
+
+          {/* Pinned Repositories (Official GraphQL API) */}
+          {pinnedItems.length > 0 && (
+            <View style={styles.pinnedContainer}>
+              <Text style={styles.sectionHeader}>📌 Pinned Repositories</Text>
+              <View style={styles.pinnedGrid}>
+                {pinnedItems.map((pin) => (
+                  <TouchableOpacity
+                    key={pin.id}
+                    style={styles.pinnedCard}
+                    onPress={async () => {
+                      const [owner, name] = pin.nameWithOwner.split('/');
+                      const fullRepo = await GitHubApiService.getRepo(owner, name);
+                      if (fullRepo) {
+                        setSelectedRepo(fullRepo);
+                        setRepoModalVisible(true);
+                      } else {
+                        Linking.openURL(pin.url);
+                      }
+                    }}
+                    activeOpacity={0.7}
+                  >
+                    <View style={styles.pinnedHeaderRow}>
+                      <Text style={styles.pinnedName} numberOfLines={1}>
+                        {pin.name}
+                      </Text>
+                      <View style={styles.repoVisibilityBadge}>
+                        <Text style={styles.repoVisibilityText}>
+                          {pin.isPrivate ? '🔒 Private' : 'Public'}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {pin.description ? (
+                      <Text style={styles.pinnedDesc} numberOfLines={2}>
+                        {pin.description}
+                      </Text>
+                    ) : null}
+
+                    <View style={styles.pinnedFooter}>
+                      {pin.primaryLanguage && (
+                        <View style={styles.pinnedMetaItem}>
+                          <View
+                            style={[
+                              styles.langDot,
+                              {
+                                backgroundColor:
+                                  pin.primaryLanguage.color || Colors.primary,
+                              },
+                            ]}
+                          />
+                          <Text style={styles.pinnedMetaText}>
+                            {pin.primaryLanguage.name}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={styles.pinnedMetaItem}>
+                        <Text style={styles.pinnedMetaIcon}>⭐</Text>
+                        <Text style={styles.pinnedMetaText}>{pin.stargazerCount}</Text>
+                      </View>
+                      <View style={styles.pinnedMetaItem}>
+                        <Text style={styles.pinnedMetaIcon}>🍴</Text>
+                        <Text style={styles.pinnedMetaText}>{pin.forkCount}</Text>
+                      </View>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
           )}
 
@@ -1576,6 +1765,32 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: Colors.textMuted,
   },
+  profileLinksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginBottom: Spacing.lg,
+  },
+  profileLinkPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.cardElevated,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    maxWidth: '100%',
+  },
+  profileLinkIcon: {
+    fontSize: 12,
+    marginRight: 6,
+  },
+  profileLinkText: {
+    fontSize: 12,
+    color: Colors.cyan,
+    fontWeight: '600',
+  },
   statsRow: {
     flexDirection: 'row',
     backgroundColor: Colors.cardElevated,
@@ -1688,6 +1903,121 @@ const styles = StyleSheet.create({
     color: Colors.ruby,
     fontSize: 13,
     fontWeight: '700',
+  },
+  profileReadmeCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.lg,
+    marginBottom: Spacing.xl,
+  },
+  profileReadmeHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingBottom: Spacing.md,
+    marginBottom: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+  },
+  profileReadmeTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  profileReadmeIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  profileReadmeTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    fontFamily: 'monospace',
+  },
+  readmeToggleBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    backgroundColor: Colors.cardElevated,
+    borderRadius: 6,
+  },
+  readmeToggleBtnText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '600',
+  },
+  profileReadmeBody: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    lineHeight: 20,
+    fontFamily: 'monospace',
+  },
+  pinnedContainer: {
+    marginBottom: Spacing.xl,
+  },
+  pinnedGrid: {
+    gap: 10,
+  },
+  pinnedCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.md,
+  },
+  pinnedHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 6,
+  },
+  pinnedName: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.cyan,
+    flex: 1,
+    marginRight: 8,
+  },
+  pinnedDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 17,
+    marginBottom: 10,
+  },
+  pinnedFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    flexWrap: 'wrap',
+  },
+  pinnedMetaItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pinnedMetaIcon: {
+    fontSize: 11,
+  },
+  pinnedMetaText: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  pinnedLangBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  pinnedLangText: {
+    fontSize: 11,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  langDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   sectionHeader: {
     fontSize: 15,

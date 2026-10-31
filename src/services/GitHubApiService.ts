@@ -16,6 +16,8 @@ import {
   GitHubEvent,
   GitHubContributor,
   GitHubFollower,
+  GitHubSocialAccount,
+  GitHubPinnedItem,
 } from '../types/github';
 
 const PAT_STORAGE_KEY = '@gitpulse_pat_token';
@@ -303,6 +305,118 @@ class GitHubApiServiceClass {
     }
 
     return '';
+  }
+
+  /**
+   * Fetch full repository data by owner and name
+   */
+  async getRepo(owner: string, repo: string): Promise<GitHubRepo | null> {
+    await this.ensureInit();
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        headers: this.getHeaders(),
+      });
+      if (!res.ok) return null;
+      return await res.json();
+    } catch (e) {
+      console.warn('Failed to fetch repo', e);
+      return null;
+    }
+  }
+
+  /**
+   * Fetch Profile README ({username}/{username}/README.md)
+   */
+  async getProfileReadme(username: string): Promise<string> {
+    if (!username) return '';
+    return this.getRepoReadme(username, username);
+  }
+
+  /**
+   * Fetch user's social accounts links
+   */
+  async getSocialAccounts(username?: string): Promise<GitHubSocialAccount[]> {
+    await this.ensureInit();
+    try {
+      const endpoint = this.token
+        ? 'https://api.github.com/user/social_accounts'
+        : username
+        ? `https://api.github.com/users/${username}/social_accounts`
+        : null;
+
+      if (!endpoint) return [];
+
+      const res = await fetch(endpoint, {
+        headers: this.getHeaders(),
+      });
+
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch (e) {
+      console.warn('Failed to fetch social accounts', e);
+      return [];
+    }
+  }
+
+  /**
+   * Fetch user's pinned repositories using GraphQL API
+   */
+  async getPinnedItems(username?: string): Promise<GitHubPinnedItem[]> {
+    await this.ensureInit();
+    if (!this.token) return [];
+
+    try {
+      const targetLogin = username || this.cachedUser?.login;
+      if (!targetLogin) return [];
+
+      const query = `
+        query($login: String!) {
+          user(login: $login) {
+            pinnedItems(first: 6, types: [REPOSITORY]) {
+              nodes {
+                ... on Repository {
+                  id
+                  name
+                  nameWithOwner
+                  description
+                  isPrivate
+                  isFork
+                  stargazerCount
+                  forkCount
+                  url
+                  primaryLanguage {
+                    name
+                    color
+                  }
+                }
+              }
+            }
+          }
+        }
+      `;
+
+      const res = await fetch('https://api.github.com/graphql', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.token}`,
+          'Content-Type': 'application/json',
+          'User-Agent': 'GitPulse-Mobile-App',
+        },
+        body: JSON.stringify({
+          query,
+          variables: { login: targetLogin },
+        }),
+      });
+
+      if (!res.ok) return [];
+      const result = await res.json();
+      const nodes = result?.data?.user?.pinnedItems?.nodes;
+      return Array.isArray(nodes) ? nodes : [];
+    } catch (e) {
+      console.warn('Failed to fetch pinned items', e);
+      return [];
+    }
   }
 
   /**
