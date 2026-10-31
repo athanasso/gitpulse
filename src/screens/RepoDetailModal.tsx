@@ -26,11 +26,13 @@ import {
 import { GitHubApiService } from '../services/GitHubApiService';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
+import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
 
 interface RepoDetailModalProps {
   visible: boolean;
   repo: GitHubRepo | null;
   onClose: () => void;
+  onRepoDeleted?: (deletedRepoId: number) => void;
 }
 
 type RepoTab =
@@ -71,9 +73,101 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   visible,
   repo,
   onClose,
+  onRepoDeleted,
 }) => {
   const [activeTab, setActiveTab] = useState<RepoTab>('readme');
   const [loading, setLoading] = useState(false);
+
+  // App-themed Dialog state
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }>({
+    visible: false,
+    title: '',
+  });
+
+  const showDialog = (config: {
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }) => {
+    setDialogConfig({
+      visible: true,
+      ...config,
+    });
+  };
+
+  const hideDialog = () => {
+    setDialogConfig((prev) => ({ ...prev, visible: false }));
+  };
+
+  const currentUser = GitHubApiService.getCachedUser();
+  const isOwner =
+    Boolean(repo && currentUser && currentUser.login === repo.owner.login);
+
+  const handlePromptDelete = () => {
+    if (!repo) return;
+    showDialog({
+      title: 'Delete Repository',
+      message: `Are you sure you want to permanently delete "${repo.full_name}"? This action cannot be undone and will delete all files, commits, branches, issues, and pull requests.`,
+      icon: '🗑️',
+      type: 'danger',
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: hideDialog },
+        {
+          text: 'Delete Repo',
+          style: 'destructive',
+          onPress: async () => {
+            const [owner, name] = repo.full_name.split('/');
+            showDialog({
+              title: 'Deleting...',
+              message: `Deleting ${repo.full_name} from GitHub...`,
+              icon: '⏳',
+              type: 'info',
+              buttons: [],
+            });
+            const res = await GitHubApiService.deleteRepo(owner, name);
+            if (res.success) {
+              showDialog({
+                title: 'Repository Deleted',
+                message: `"${repo.full_name}" was permanently deleted from GitHub.`,
+                icon: '✅',
+                type: 'success',
+                buttons: [
+                  {
+                    text: 'Done',
+                    style: 'success',
+                    onPress: () => {
+                      hideDialog();
+                      onClose();
+                      onRepoDeleted?.(repo.id);
+                    },
+                  },
+                ],
+              });
+            } else {
+              showDialog({
+                title: 'Deletion Failed',
+                message:
+                  res.error ||
+                  'Could not delete repository. Verify that your Personal Access Token has the "delete_repo" scope enabled.',
+                icon: '⚠️',
+                type: 'danger',
+                buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
+              });
+            }
+          },
+        },
+      ],
+    });
+  };
 
   // Branch switcher state
   const [selectedBranch, setSelectedBranch] = useState<string>('main');
@@ -431,7 +525,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         {/* Header Bar */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Text style={styles.closeButtonText}>âœ•</Text>
           </TouchableOpacity>
 
           <View style={styles.headerTitleBox}>
@@ -454,12 +548,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               {starLoading ? (
                 <ActivityIndicator size="small" color={Colors.primary} />
               ) : (
-                <Text style={styles.actionIcon}>{isStarred ? '⭐' : '☆'}</Text>
+                <Text style={styles.actionIcon}>{isStarred ? 'â­' : 'â˜†'}</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
-              <Text style={styles.actionIcon}>🔗</Text>
+              <Text style={styles.actionIcon}>ðŸ”—</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -471,12 +565,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             onPress={handleToggleStar}
             activeOpacity={0.7}
           >
-            <Text style={styles.statIcon}>{isStarred ? '⭐' : '☆'}</Text>
+            <Text style={styles.statIcon}>{isStarred ? 'â­' : 'â˜†'}</Text>
             <Text style={styles.statValue}>{starsCount}</Text>
           </TouchableOpacity>
 
           <View style={styles.statPill}>
-            <Text style={styles.statIcon}>🍴</Text>
+            <Text style={styles.statIcon}>ðŸ´</Text>
             <Text style={styles.statValue}>{repo.forks_count}</Text>
           </View>
 
@@ -486,11 +580,11 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             onPress={() => setBranchModalVisible(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.statIcon}>🌿</Text>
+            <Text style={styles.statIcon}>ðŸŒ¿</Text>
             <Text style={styles.branchPillText} numberOfLines={1}>
               {selectedBranch}
             </Text>
-            <Text style={styles.dropdownCaret}>▾</Text>
+            <Text style={styles.dropdownCaret}>â–¾</Text>
           </TouchableOpacity>
 
           {repo.language && (
@@ -512,11 +606,11 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         {/* Local Time Meta Row */}
         <View style={styles.repoMetaTimeRow}>
           <Text style={styles.repoMetaTimeText}>
-            🕒 Updated {formatRepoTimestamp(repo.updated_at)}
+            ðŸ•’ Updated {formatRepoTimestamp(repo.updated_at)}
           </Text>
           {repo.pushed_at ? (
             <Text style={styles.repoMetaTimeText}>
-              🚀 Pushed {formatRepoTimestamp(repo.pushed_at)}
+              ðŸš€ Pushed {formatRepoTimestamp(repo.pushed_at)}
             </Text>
           ) : null}
         </View>
@@ -639,14 +733,42 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           >
             {/* README TAB */}
             {activeTab === 'readme' && (
-              <View style={styles.readmeCard}>
-                <View style={styles.readmeHeader}>
-                  <Text style={styles.readmeHeaderTitle}>📖 README.md</Text>
+              <>
+                <View style={styles.readmeCard}>
+                  <View style={styles.readmeHeader}>
+                    <Text style={styles.readmeHeaderTitle}>📖 README.md</Text>
+                  </View>
+                  <Text style={styles.readmeBody}>
+                    {readmeContent || 'No README.md found in this repository.'}
+                  </Text>
                 </View>
-                <Text style={styles.readmeBody}>
-                  {readmeContent || 'No README.md found in this repository.'}
-                </Text>
-              </View>
+
+                {/* Danger Zone: Delete Repository (if owner / admin) */}
+                {isOwner && (
+                  <View style={styles.dangerZoneCard}>
+                    <View style={styles.dangerZoneHeader}>
+                      <Text style={styles.dangerZoneTitle}>⚠️ Danger Zone</Text>
+                    </View>
+                    <View style={styles.dangerZoneContent}>
+                      <View style={styles.dangerZoneTextWrap}>
+                        <Text style={styles.dangerActionTitle}>
+                          Delete this repository
+                        </Text>
+                        <Text style={styles.dangerActionDesc}>
+                          Permanently delete {repo?.name} and all associated data from GitHub.
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        style={styles.deleteRepoBtn}
+                        onPress={handlePromptDelete}
+                        activeOpacity={0.7}
+                      >
+                        <Text style={styles.deleteRepoBtnText}>Delete</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+              </>
             )}
 
             {/* CODE TAB */}
@@ -661,7 +783,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         style={styles.backButton}
                       >
                         <Text style={styles.backButtonText}>
-                          ← {viewingFile.name}
+                          â† {viewingFile.name}
                         </Text>
                       </TouchableOpacity>
                       <Text style={styles.fileSizeText}>
@@ -702,7 +824,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         style={styles.treeUpRow}
                         onPress={navigateUp}
                       >
-                        <Text style={styles.treeIcon}>📁</Text>
+                        <Text style={styles.treeIcon}>ðŸ“</Text>
                         <Text style={styles.treeUpText}>.. (Up one level)</Text>
                       </TouchableOpacity>
                     )}
@@ -718,7 +840,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         }
                       >
                         <Text style={styles.treeIcon}>
-                          {item.type === 'dir' ? '📁' : '📄'}
+                          {item.type === 'dir' ? 'ðŸ“' : 'ðŸ“„'}
                         </Text>
                         <Text style={styles.treeItemName}>{item.name}</Text>
                         {item.type === 'file' && (
@@ -750,7 +872,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       onPress={() => setSelectedCommit(null)}
                       style={styles.backButton}
                     >
-                      <Text style={styles.backButtonText}>← Back to commits</Text>
+                      <Text style={styles.backButtonText}>â† Back to commits</Text>
                     </TouchableOpacity>
 
                     <Text style={styles.commitDetailMsg}>
@@ -762,7 +884,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         {selectedCommit.sha.substring(0, 7)}
                       </Text>
                       <Text style={styles.commitAuthor}>
-                        {selectedCommit.commit.author.name} ·{' '}
+                        {selectedCommit.commit.author.name} Â·{' '}
                         {formatLocalDateTime(selectedCommit.commit.author.date)}
                       </Text>
                     </View>
@@ -895,7 +1017,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       <View key={p.id} style={styles.issueCard}>
                         <View style={styles.issueHeaderRow}>
                           <View style={styles.stateBadgePR}>
-                            <Text style={styles.stateBadgeText}>🔀 #{p.number}</Text>
+                            <Text style={styles.stateBadgeText}>ðŸ”€ #{p.number}</Text>
                           </View>
                           <Text style={styles.issueDate}>
                             {formatRepoTimestamp(p.created_at)}
@@ -936,7 +1058,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             ]}
                           >
                             <Text style={styles.stateBadgeText}>
-                              {i.state === 'open' ? '🟢' : '🟣'} #{i.number}
+                              {i.state === 'open' ? 'ðŸŸ¢' : 'ðŸŸ£'} #{i.number}
                             </Text>
                           </View>
                           <Text style={styles.issueDate}>
@@ -979,10 +1101,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           <View style={styles.conclusionBadge}>
                             <Text style={styles.conclusionIcon}>
                               {r.conclusion === 'success'
-                                ? '✅'
+                                ? 'âœ…'
                                 : r.conclusion === 'failure'
-                                ? '❌'
-                                : '⏳'}
+                                ? 'âŒ'
+                                : 'â³'}
                             </Text>
                             <Text style={styles.workflowName}>{r.name}</Text>
                           </View>
@@ -990,7 +1112,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         </View>
 
                         <View style={styles.workflowMetaRow}>
-                          <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
+                          <Text style={styles.workflowBranch}>ðŸŒ¿ {r.head_branch}</Text>
                           <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
                           <Text style={styles.workflowDate}>
                             {formatRepoTimestamp(r.created_at)}
@@ -1028,7 +1150,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       <View key={rel.id} style={styles.releaseCard}>
                         <View style={styles.releaseHeader}>
                           <View style={styles.tagBadge}>
-                            <Text style={styles.tagBadgeText}>🏷️ {rel.tag_name}</Text>
+                            <Text style={styles.tagBadgeText}>ðŸ·ï¸ {rel.tag_name}</Text>
                           </View>
                           {rel.prerelease && (
                             <View style={styles.prereleaseBadge}>
@@ -1054,7 +1176,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         {rel.assets && rel.assets.length > 0 && (
                           <View style={styles.assetsSection}>
                             <Text style={styles.assetsTitle}>
-                              📦 Assets ({rel.assets.length})
+                              ðŸ“¦ Assets ({rel.assets.length})
                             </Text>
                             {rel.assets.map((asset) => (
                               <TouchableOpacity
@@ -1063,7 +1185,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                                 onPress={() => Linking.openURL(asset.browser_download_url)}
                                 activeOpacity={0.7}
                               >
-                                <Text style={styles.assetIcon}>💾</Text>
+                                <Text style={styles.assetIcon}>ðŸ’¾</Text>
                                 <Text style={styles.assetName} numberOfLines={1}>
                                   {asset.name}
                                 </Text>
@@ -1193,7 +1315,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   onPress={() => setBranchModalVisible(false)}
                   style={styles.branchModalClose}
                 >
-                  <Text style={styles.branchModalCloseText}>✕</Text>
+                  <Text style={styles.branchModalCloseText}>âœ•</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1211,7 +1333,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       ]}
                       onPress={() => handleSelectBranch(item.name)}
                     >
-                      <Text style={styles.branchItemIcon}>🌿</Text>
+                      <Text style={styles.branchItemIcon}>ðŸŒ¿</Text>
                       <Text
                         style={[
                           styles.branchItemText,
@@ -1225,7 +1347,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           <Text style={styles.protectedText}>protected</Text>
                         </View>
                       )}
-                      {isCurrent && <Text style={styles.checkIcon}>✓</Text>}
+                      {isCurrent && <Text style={styles.checkIcon}>âœ“</Text>}
                     </TouchableOpacity>
                   );
                 }}
@@ -1240,6 +1362,17 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             </View>
           </View>
         </Modal>
+
+        {/* App-Themed Pop-Up Dialog */}
+        <ThemedDialog
+          visible={dialogConfig.visible}
+          title={dialogConfig.title}
+          message={dialogConfig.message}
+          icon={dialogConfig.icon}
+          type={dialogConfig.type}
+          buttons={dialogConfig.buttons}
+          onClose={hideDialog}
+        />
       </View>
     </Modal>
   );
@@ -2057,5 +2190,59 @@ const styles = StyleSheet.create({
     color: Colors.primary,
     fontWeight: '800',
     fontSize: 14,
+  },
+  dangerZoneCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(239, 68, 68, 0.4)',
+    marginTop: Spacing.lg,
+    overflow: 'hidden',
+  },
+  dangerZoneHeader: {
+    backgroundColor: 'rgba(239, 68, 68, 0.08)',
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  dangerZoneTitle: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.ruby,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  dangerZoneContent: {
+    padding: Spacing.lg,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 12,
+  },
+  dangerZoneTextWrap: {
+    flex: 1,
+  },
+  dangerActionTitle: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  dangerActionDesc: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 16,
+  },
+  deleteRepoBtn: {
+    backgroundColor: Colors.ruby,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+  },
+  deleteRepoBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
 });

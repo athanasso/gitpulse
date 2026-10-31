@@ -230,12 +230,12 @@ export const RepositoriesScreen: React.FC = () => {
           <View style={styles.badgesGroup}>
             {item.fork && (
               <View style={styles.forkBadge}>
-                <Text style={styles.forkBadgeText}>🍴 Fork</Text>
+                <Text style={styles.forkBadgeText}>ðŸ´ Fork</Text>
               </View>
             )}
             <View style={styles.visibilityBadge}>
               <Text style={styles.visibilityText}>
-                {item.private ? '🔒 Private' : 'Public'}
+                {item.private ? 'ðŸ”’ Private' : 'Public'}
               </Text>
             </View>
           </View>
@@ -264,12 +264,12 @@ export const RepositoriesScreen: React.FC = () => {
           )}
 
           <View style={styles.metaItem}>
-            <Text style={styles.metaIcon}>⭐</Text>
+            <Text style={styles.metaIcon}>â­</Text>
             <Text style={styles.metaText}>{item.stargazers_count}</Text>
           </View>
 
           <View style={styles.metaItem}>
-            <Text style={styles.metaIcon}>🍴</Text>
+            <Text style={styles.metaIcon}>ðŸ´</Text>
             <Text style={styles.metaText}>{item.forks_count}</Text>
           </View>
 
@@ -285,7 +285,7 @@ export const RepositoriesScreen: React.FC = () => {
     <View style={styles.container}>
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Text style={styles.searchIcon}>ðŸ”</Text>
         <TextInput
           style={styles.searchInput}
           placeholder="Search repositories, code, topics..."
@@ -297,7 +297,7 @@ export const RepositoriesScreen: React.FC = () => {
         />
         {searchQuery.length > 0 && (
           <TouchableOpacity onPress={() => handleSearch('')}>
-            <Text style={styles.clearSearch}>✕</Text>
+            <Text style={styles.clearSearch}>âœ•</Text>
           </TouchableOpacity>
         )}
       </View>
@@ -465,7 +465,7 @@ export const RepositoriesScreen: React.FC = () => {
           !refreshing ? (
             !GitHubApiService.isAuthenticated() && !searchQuery.trim() ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🔑</Text>
+                <Text style={styles.emptyIcon}>ðŸ”‘</Text>
                 <Text style={styles.emptyTitle}>GitHub Token Required</Text>
                 <Text style={styles.emptySubtitle}>
                   Connect your Personal Access Token in Profile to view your repositories, or search public repositories above.
@@ -473,7 +473,7 @@ export const RepositoriesScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>📂</Text>
+                <Text style={styles.emptyIcon}>ðŸ“‚</Text>
                 <Text style={styles.emptyTitle}>No Repositories Found</Text>
                 <Text style={styles.emptySubtitle}>
                   No repositories match your active search or filter criteria.
@@ -489,6 +489,10 @@ export const RepositoriesScreen: React.FC = () => {
         visible={modalVisible}
         repo={selectedRepo}
         onClose={() => setModalVisible(false)}
+        onRepoDeleted={(deletedId) => {
+          setRepos((prev) => prev.filter((r) => r.id !== deletedId));
+          setRemoteResults((prev) => prev.filter((r) => r.id !== deletedId));
+        }}
       />
     </View>
   );

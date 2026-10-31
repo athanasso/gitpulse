@@ -15,6 +15,7 @@ import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
+import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
 
 type FilterType = 'unread' | 'all' | 'PullRequest' | 'Issue' | 'Release';
 
@@ -31,6 +32,36 @@ export const NotificationsScreen: React.FC = () => {
   const [isAuth, setIsAuth] = useState(false);
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+
+  // App-themed Dialog state
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }>({
+    visible: false,
+    title: '',
+  });
+
+  const showDialog = (config: {
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }) => {
+    setDialogConfig({
+      visible: true,
+      ...config,
+    });
+  };
+
+  const hideDialog = () => {
+    setDialogConfig((prev) => ({ ...prev, visible: false }));
+  };
 
   const flatListRef = React.useRef<FlatList<GitHubNotification>>(null);
 
@@ -83,14 +114,30 @@ export const NotificationsScreen: React.FC = () => {
     await GitHubApiService.markNotificationRead(id);
   };
 
-  const markAllAsRead = async () => {
-    if (markingAll) return;
-    setMarkingAll(true);
-    // Optimistic UI update
-    setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
-    // Remote GitHub API update
-    await GitHubApiService.markAllNotificationsRead();
-    setMarkingAll(false);
+  const markAllAsRead = () => {
+    if (markingAll || notifications.length === 0) return;
+    showDialog({
+      title: 'Mark All as Read',
+      message: 'Are you sure you want to mark all inbox notifications as read on GitHub?',
+      icon: '📬',
+      type: 'info',
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: hideDialog },
+        {
+          text: 'Mark All Read',
+          style: 'primary',
+          onPress: async () => {
+            hideDialog();
+            setMarkingAll(true);
+            // Optimistic UI update
+            setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+            // Remote GitHub API update
+            await GitHubApiService.markAllNotificationsRead();
+            setMarkingAll(false);
+          },
+        },
+      ],
+    });
   };
 
   const getWebUrl = (notif: GitHubNotification): string => {
@@ -119,17 +166,17 @@ export const NotificationsScreen: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'PullRequest':
-        return '🔀';
+        return 'ðŸ”€';
       case 'Issue':
-        return '🟢';
+        return 'ðŸŸ¢';
       case 'Release':
-        return '🏷️';
+        return 'ðŸ·ï¸';
       case 'Commit':
-        return '💬';
+        return 'ðŸ’¬';
       case 'Discussion':
-        return '🗣️';
+        return 'ðŸ—£ï¸';
       default:
-        return '🔔';
+        return 'ðŸ””';
     }
   };
 
@@ -214,7 +261,7 @@ export const NotificationsScreen: React.FC = () => {
       {/* Scope Warning Banner if token missing 'notifications' permission */}
       {scopeError && (
         <View style={styles.scopeWarningCard}>
-          <Text style={styles.scopeWarningIcon}>⚠️</Text>
+          <Text style={styles.scopeWarningIcon}>âš ï¸</Text>
           <View style={styles.scopeWarningContent}>
             <Text style={styles.scopeWarningTitle}>Notifications Scope Needed</Text>
             <Text style={styles.scopeWarningText}>
@@ -229,7 +276,7 @@ export const NotificationsScreen: React.FC = () => {
               style={styles.scopeLinkBtn}
             >
               <Text style={styles.scopeLinkText}>
-                Edit Token Scopes on GitHub ↗
+                Edit Token Scopes on GitHub â†—
               </Text>
             </TouchableOpacity>
           </View>
@@ -293,7 +340,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'PullRequest' && styles.filterTabTextActive,
               ]}
             >
-              🔀 Pull Requests
+              ðŸ”€ Pull Requests
             </Text>
           </TouchableOpacity>
 
@@ -311,7 +358,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'Issue' && styles.filterTabTextActive,
               ]}
             >
-              🟢 Issues
+              ðŸŸ¢ Issues
             </Text>
           </TouchableOpacity>
 
@@ -329,7 +376,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'Release' && styles.filterTabTextActive,
               ]}
             >
-              🏷️ Releases
+              ðŸ·ï¸ Releases
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -366,7 +413,7 @@ export const NotificationsScreen: React.FC = () => {
           !refreshing ? (
             !isAuth ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🔒</Text>
+                <Text style={styles.emptyIcon}>ðŸ”’</Text>
                 <Text style={styles.emptyTitle}>Personal Token Required</Text>
                 <Text style={styles.emptySubtitle}>
                   Add a GitHub Personal Access Token (PAT) with notifications
@@ -375,7 +422,7 @@ export const NotificationsScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>🎉</Text>
+                <Text style={styles.emptyIcon}>ðŸŽ‰</Text>
                 <Text style={styles.emptyTitle}>All caught up!</Text>
                 <Text style={styles.emptySubtitle}>
                   No notifications matching the active filter.
@@ -384,6 +431,17 @@ export const NotificationsScreen: React.FC = () => {
             )
           ) : undefined
         }
+      />
+
+      {/* App-Themed Pop-Up Dialog */}
+      <ThemedDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        icon={dialogConfig.icon}
+        type={dialogConfig.type}
+        buttons={dialogConfig.buttons}
+        onClose={hideDialog}
       />
     </View>
   );

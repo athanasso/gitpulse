@@ -841,6 +841,41 @@ class GitHubApiServiceClass {
   }
 
   /**
+   * Delete a repository (requires delete_repo scope)
+   * DELETE /repos/{owner}/{repo}
+   */
+  async deleteRepo(
+    owner: string,
+    repo: string
+  ): Promise<{ success: boolean; error?: string }> {
+    await this.ensureInit();
+    if (!this.token) return { success: false, error: 'Authentication required.' };
+    try {
+      const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
+        method: 'DELETE',
+        headers: this.getHeaders(),
+      });
+      if (res.status === 204) {
+        return { success: true };
+      }
+      const data = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        error:
+          data.message ||
+          (res.status === 403
+            ? 'Forbidden: your Personal Access Token requires the "delete_repo" scope.'
+            : `Failed to delete repository (${res.status}).`),
+      };
+    } catch (e: any) {
+      return {
+        success: false,
+        error: e.message || 'Network error while deleting repository.',
+      };
+    }
+  }
+
+  /**
    * Fetch authenticated user's gists (public and secret) with pagination
    */
   async getGists(

@@ -7,7 +7,6 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
-  Alert,
   ActivityIndicator,
   Modal,
   Linking,
@@ -29,6 +28,7 @@ import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
+import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
 
 type ProfileSubTab =
   | 'repos'
@@ -176,6 +176,36 @@ export const ProfileScreen: React.FC = () => {
   // Inner ScrollView refs for smooth page reset
   const reposScrollRef = React.useRef<any>(null);
   const starredScrollRef = React.useRef<any>(null);
+
+  // App-themed Dialog state
+  const [dialogConfig, setDialogConfig] = useState<{
+    visible: boolean;
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }>({
+    visible: false,
+    title: '',
+  });
+
+  const showDialog = (config: {
+    title: string;
+    message?: string;
+    icon?: string;
+    type?: 'info' | 'success' | 'warning' | 'danger';
+    buttons?: DialogButton[];
+  }) => {
+    setDialogConfig({
+      visible: true,
+      ...config,
+    });
+  };
+
+  const hideDialog = () => {
+    setDialogConfig((prev) => ({ ...prev, visible: false }));
+  };
 
   useEffect(() => {
     loadProfile();
@@ -334,7 +364,13 @@ export const ProfileScreen: React.FC = () => {
   const handleConnectToken = async () => {
     const token = tokenInput.trim();
     if (!token) {
-      Alert.alert('API Key Required', 'Please enter your GitHub Personal Access Token.');
+      showDialog({
+        title: 'Token Required',
+        message: 'Please enter your GitHub Personal Access Token to authenticate.',
+        icon: '🔑',
+        type: 'warning',
+        buttons: [{ text: 'OK', style: 'primary', onPress: hideDialog }],
+      });
       return;
     }
 
@@ -362,25 +398,40 @@ export const ProfileScreen: React.FC = () => {
         setPinnedItems(pinned);
         setProfileReadme(readme);
 
-        Alert.alert('Connected', `Signed in as @${u.login}`);
+        showDialog({
+          title: 'Connected',
+          message: `Signed in as @${u.login}. Your repositories and activity are now live.`,
+          icon: '✅',
+          type: 'success',
+          buttons: [{ text: 'Great!', style: 'success', onPress: hideDialog }],
+        });
       }
     } catch (err: any) {
-      Alert.alert('Connection Failed', err.message || 'Could not validate GitHub token.');
+      showDialog({
+        title: 'Connection Failed',
+        message: err.message || 'Could not validate GitHub token. Check permissions and try again.',
+        icon: '⚠️',
+        type: 'danger',
+        buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
+      });
     } finally {
       setValidating(false);
     }
   };
 
   const handleDisconnect = async () => {
-    Alert.alert(
-      'Disconnect API Key',
-      'Are you sure you want to remove your GitHub API key from this device?',
-      [
-        { text: 'Cancel', style: 'cancel' },
+    showDialog({
+      title: 'Disconnect API Key',
+      message: 'Are you sure you want to remove your GitHub API key from this device? You will need to re-authenticate to browse your profile.',
+      icon: '🔌',
+      type: 'danger',
+      buttons: [
+        { text: 'Cancel', style: 'cancel', onPress: hideDialog },
         {
           text: 'Disconnect',
           style: 'destructive',
           onPress: async () => {
+            hideDialog();
             await GitHubApiService.setToken(null);
             setUser(null);
             setIsAuth(false);
@@ -398,8 +449,8 @@ export const ProfileScreen: React.FC = () => {
             setProfileReadme('');
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const openGist = async (gist: GitHubGist) => {
@@ -450,21 +501,21 @@ export const ProfileScreen: React.FC = () => {
   const getEventIcon = (type: string) => {
     switch (type) {
       case 'PushEvent':
-        return '🚀';
+        return 'ðŸš€';
       case 'WatchEvent':
-        return '⭐';
+        return 'â­';
       case 'ForkEvent':
-        return '🍴';
+        return 'ðŸ´';
       case 'CreateEvent':
-        return '✨';
+        return 'âœ¨';
       case 'PullRequestEvent':
-        return '🔀';
+        return 'ðŸ”€';
       case 'IssuesEvent':
-        return '🟢';
+        return 'ðŸŸ¢';
       case 'IssueCommentEvent':
-        return '💬';
+        return 'ðŸ’¬';
       default:
-        return '📌';
+        return 'ðŸ“Œ';
     }
   };
 
@@ -485,12 +536,12 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.profileBadgesGroup}>
           {repo.fork && (
             <View style={styles.profileForkBadge}>
-              <Text style={styles.profileForkBadgeText}>🍴 Fork</Text>
+              <Text style={styles.profileForkBadgeText}>ðŸ´ Fork</Text>
             </View>
           )}
           <View style={styles.profileVisibilityBadge}>
             <Text style={styles.profileVisibilityText}>
-              {repo.private ? '🔒 Private' : 'Public'}
+              {repo.private ? 'ðŸ”’ Private' : 'Public'}
             </Text>
           </View>
         </View>
@@ -519,12 +570,12 @@ export const ProfileScreen: React.FC = () => {
         ) : null}
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>⭐</Text>
+          <Text style={styles.profileMetaIcon}>â­</Text>
           <Text style={styles.profileMetaText}>{repo.stargazers_count}</Text>
         </View>
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>🍴</Text>
+          <Text style={styles.profileMetaIcon}>ðŸ´</Text>
           <Text style={styles.profileMetaText}>{repo.forks_count}</Text>
         </View>
 
@@ -554,7 +605,7 @@ export const ProfileScreen: React.FC = () => {
             resizeMode="cover"
           />
           <View style={styles.authGateIconBox}>
-            <Text style={styles.authGateIcon}>🔑</Text>
+            <Text style={styles.authGateIcon}>ðŸ”‘</Text>
           </View>
           <Text style={styles.authGateTitle}>Connect GitHub Account</Text>
           <Text style={styles.authGateDesc}>
@@ -567,9 +618,9 @@ export const ProfileScreen: React.FC = () => {
             onPress={() => Linking.openURL(GITHUB_NEW_TOKEN_URL)}
             activeOpacity={0.8}
           >
-            <Text style={styles.oneClickTokenIcon}>⚡</Text>
+            <Text style={styles.oneClickTokenIcon}>âš¡</Text>
             <View style={styles.oneClickTokenTextWrap}>
-              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub ↗</Text>
+              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub â†—</Text>
               <Text style={styles.oneClickTokenSub}>
                 Opens GitHub with all 5 required scopes pre-checked automatically
               </Text>
@@ -672,7 +723,7 @@ export const ProfileScreen: React.FC = () => {
                   <View style={styles.badgeRow}>
                     <View style={styles.authBadge}>
                       <Text style={styles.authBadgeText}>
-                        ● Live Authenticated API
+                        â— Live Authenticated API
                       </Text>
                     </View>
                   </View>
@@ -683,10 +734,10 @@ export const ProfileScreen: React.FC = () => {
 
               <View style={styles.detailsRow}>
                 {user.company ? (
-                  <Text style={styles.detailText}>🏢 {user.company}</Text>
+                  <Text style={styles.detailText}>ðŸ¢ {user.company}</Text>
                 ) : null}
                 {user.location ? (
-                  <Text style={styles.detailText}>📍 {user.location}</Text>
+                  <Text style={styles.detailText}>ðŸ“ {user.location}</Text>
                 ) : null}
               </View>
 
@@ -708,7 +759,7 @@ export const ProfileScreen: React.FC = () => {
                       }
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.profileLinkIcon}>🔗</Text>
+                      <Text style={styles.profileLinkIcon}>ðŸ”—</Text>
                       <Text style={styles.profileLinkText} numberOfLines={1}>
                         {user.blog.replace(/^https?:\/\//, '')}
                       </Text>
@@ -723,7 +774,7 @@ export const ProfileScreen: React.FC = () => {
                       }
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.profileLinkIcon}>𝕏</Text>
+                      <Text style={styles.profileLinkIcon}>ð•</Text>
                       <Text style={styles.profileLinkText}>
                         @{user.twitter_username}
                       </Text>
@@ -736,7 +787,7 @@ export const ProfileScreen: React.FC = () => {
                       onPress={() => Linking.openURL(`mailto:${user.email}`)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.profileLinkIcon}>✉️</Text>
+                      <Text style={styles.profileLinkIcon}>âœ‰ï¸</Text>
                       <Text style={styles.profileLinkText} numberOfLines={1}>
                         {user.email}
                       </Text>
@@ -750,7 +801,7 @@ export const ProfileScreen: React.FC = () => {
                       onPress={() => Linking.openURL(s.url)}
                       activeOpacity={0.7}
                     >
-                      <Text style={styles.profileLinkIcon}>🌐</Text>
+                      <Text style={styles.profileLinkIcon}>ðŸŒ</Text>
                       <Text style={styles.profileLinkText}>{s.provider}</Text>
                     </TouchableOpacity>
                   ))}
@@ -801,18 +852,18 @@ export const ProfileScreen: React.FC = () => {
               <View style={styles.activeScopesCard}>
                 <View style={styles.activeScopesHeaderRow}>
                   <Text style={styles.activeScopesHeaderTitle}>
-                    🔑 Token Permissions
+                    ðŸ”‘ Token Permissions
                   </Text>
                   <TouchableOpacity
                     onPress={() => Linking.openURL('https://github.com/settings/tokens')}
                   >
-                    <Text style={styles.editScopesLink}>Manage on GitHub ↗</Text>
+                    <Text style={styles.editScopesLink}>Manage on GitHub â†—</Text>
                   </TouchableOpacity>
                 </View>
 
                 {tokenScopes.length === 0 ? (
                   <Text style={styles.fineGrainedNote}>
-                    ● Active Personal Access Token (Resource-scoped / Fine-Grained)
+                    â— Active Personal Access Token (Resource-scoped / Fine-Grained)
                   </Text>
                 ) : (
                   <>
@@ -839,7 +890,7 @@ export const ProfileScreen: React.FC = () => {
                                   : styles.scopePillTextMissing,
                               ]}
                             >
-                              {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
+                              {hasThis ? 'âœ“' : spec.level === 'Required' ? 'âœ•' : 'âš ï¸'}{' '}
                               {spec.scope}
                             </Text>
                           </View>
@@ -850,7 +901,7 @@ export const ProfileScreen: React.FC = () => {
                     {!tokenScopes.includes('notifications') && (
                       <View style={styles.scopeWarningInline}>
                         <Text style={styles.scopeWarningInlineText}>
-                          ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
+                          âš ï¸ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
                         </Text>
                       </View>
                     )}
@@ -875,7 +926,7 @@ export const ProfileScreen: React.FC = () => {
             <View style={styles.profileReadmeCard}>
               <View style={styles.profileReadmeHeader}>
                 <View style={styles.profileReadmeTitleRow}>
-                  <Text style={styles.profileReadmeIcon}>📖</Text>
+                  <Text style={styles.profileReadmeIcon}>ðŸ“–</Text>
                   <Text style={styles.profileReadmeTitle}>
                     {user?.login} / README.md
                   </Text>
@@ -886,7 +937,7 @@ export const ProfileScreen: React.FC = () => {
                   activeOpacity={0.7}
                 >
                   <Text style={styles.readmeToggleBtnText}>
-                    {readmeExpanded ? 'Collapse ▴' : 'Expand ▾'}
+                    {readmeExpanded ? 'Collapse â–´' : 'Expand â–¾'}
                   </Text>
                 </TouchableOpacity>
               </View>
@@ -902,7 +953,7 @@ export const ProfileScreen: React.FC = () => {
           {/* Pinned Repositories (Official GraphQL API) */}
           {pinnedItems.length > 0 && (
             <View style={styles.pinnedContainer}>
-              <Text style={styles.sectionHeader}>📌 Pinned Repositories</Text>
+              <Text style={styles.sectionHeader}>ðŸ“Œ Pinned Repositories</Text>
               <View style={styles.pinnedGrid}>
                 {pinnedItems.map((pin) => (
                   <TouchableOpacity
@@ -926,7 +977,7 @@ export const ProfileScreen: React.FC = () => {
                       </Text>
                       <View style={styles.repoVisibilityBadge}>
                         <Text style={styles.repoVisibilityText}>
-                          {pin.isPrivate ? '🔒 Private' : 'Public'}
+                          {pin.isPrivate ? 'ðŸ”’ Private' : 'Public'}
                         </Text>
                       </View>
                     </View>
@@ -955,11 +1006,11 @@ export const ProfileScreen: React.FC = () => {
                         </View>
                       )}
                       <View style={styles.pinnedMetaItem}>
-                        <Text style={styles.pinnedMetaIcon}>⭐</Text>
+                        <Text style={styles.pinnedMetaIcon}>â­</Text>
                         <Text style={styles.pinnedMetaText}>{pin.stargazerCount}</Text>
                       </View>
                       <View style={styles.pinnedMetaItem}>
-                        <Text style={styles.pinnedMetaIcon}>🍴</Text>
+                        <Text style={styles.pinnedMetaIcon}>ðŸ´</Text>
                         <Text style={styles.pinnedMetaText}>{pin.forkCount}</Text>
                       </View>
                     </View>
@@ -1112,7 +1163,7 @@ export const ProfileScreen: React.FC = () => {
                         repos.length}
                       )
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>â†• Scroll inside card</Text>
                   </View>
 
                   {repos.length > 0 ? (
@@ -1169,7 +1220,7 @@ export const ProfileScreen: React.FC = () => {
                     <Text style={styles.reposCardTopTitle}>
                       Starred Repositories ({starredRepos.length})
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>â†• Scroll inside card</Text>
                   </View>
 
                   {starredRepos.length > 0 ? (
@@ -1238,7 +1289,7 @@ export const ProfileScreen: React.FC = () => {
 
                             <View style={styles.gistFooter}>
                               <Text style={styles.gistFilesCount}>
-                                📄 {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
+                                ðŸ“„ {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
                               </Text>
                               {firstFile?.language && (
                                 <Text style={styles.gistLang}>
@@ -1246,7 +1297,7 @@ export const ProfileScreen: React.FC = () => {
                                 </Text>
                               )}
                               <Text style={styles.gistComments}>
-                                💬 {g.comments}
+                                ðŸ’¬ {g.comments}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -1425,7 +1476,7 @@ export const ProfileScreen: React.FC = () => {
                             </View>
                           )}
                           <Text style={styles.userCardLogin}>@{u.login}</Text>
-                          <Text style={styles.userCardArrow}>↗</Text>
+                          <Text style={styles.userCardArrow}>â†—</Text>
                         </TouchableOpacity>
                       ))}
 
@@ -1481,6 +1532,11 @@ export const ProfileScreen: React.FC = () => {
         visible={repoModalVisible}
         repo={selectedRepo}
         onClose={() => setRepoModalVisible(false)}
+        onRepoDeleted={(deletedId) => {
+          setRepos((prev) => prev.filter((r) => r.id !== deletedId));
+          setStarredRepos((prev) => prev.filter((r) => r.id !== deletedId));
+          setPinnedItems((prev) => prev.filter((p) => p.name !== selectedRepo?.name));
+        }}
       />
 
       {/* Gist Detail Modal */}
@@ -1495,7 +1551,7 @@ export const ProfileScreen: React.FC = () => {
               onPress={() => setGistModalVisible(false)}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>✕</Text>
+              <Text style={styles.closeBtnText}>âœ•</Text>
             </TouchableOpacity>
             <View style={styles.gistModalTitleBox}>
               <Text style={styles.gistModalTitle} numberOfLines={1}>
@@ -1511,7 +1567,7 @@ export const ProfileScreen: React.FC = () => {
               }}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>↗</Text>
+              <Text style={styles.closeBtnText}>â†—</Text>
             </TouchableOpacity>
           </View>
 
@@ -1537,6 +1593,17 @@ export const ProfileScreen: React.FC = () => {
           )}
         </View>
       </Modal>
+
+      {/* App-Themed Pop-Up Dialog */}
+      <ThemedDialog
+        visible={dialogConfig.visible}
+        title={dialogConfig.title}
+        message={dialogConfig.message}
+        icon={dialogConfig.icon}
+        type={dialogConfig.type}
+        buttons={dialogConfig.buttons}
+        onClose={hideDialog}
+      />
     </ScrollView>
   );
 };
