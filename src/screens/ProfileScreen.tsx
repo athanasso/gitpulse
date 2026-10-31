@@ -75,7 +75,7 @@ export const ProfileScreen: React.FC = () => {
   const loadProfile = async () => {
     setLoading(true);
     try {
-      const auth = GitHubApiService.isAuthenticated();
+      const auth = await GitHubApiService.init();
       setIsAuth(auth);
 
       if (auth) {

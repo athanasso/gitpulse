@@ -23,7 +23,7 @@ export const NotificationsScreen: React.FC = () => {
 
   const loadNotifications = async () => {
     setRefreshing(true);
-    const auth = GitHubApiService.isAuthenticated();
+    const auth = await GitHubApiService.init();
     setIsAuth(auth);
 
     if (auth) {

@@ -24,24 +24,47 @@ const USER_CACHE_KEY = '@gitpulse_cached_user';
 class GitHubApiServiceClass {
   private token: string | null = null;
   private cachedUser: GitHubUser | null = null;
+  private initialized: boolean = false;
+  private initPromise: Promise<boolean> | null = null;
 
   async init(): Promise<boolean> {
-    try {
-      const [storedToken, storedUser] = await Promise.all([
-        AsyncStorage.getItem(PAT_STORAGE_KEY),
-        AsyncStorage.getItem(USER_CACHE_KEY),
-      ]);
+    if (this.initialized) return !!this.token;
+    if (this.initPromise) return this.initPromise;
 
-      if (storedToken) {
-        this.token = storedToken;
-      }
-      if (storedUser) {
-        this.cachedUser = JSON.parse(storedUser);
-      }
+    this.initPromise = (async () => {
+      try {
+        const [storedToken, storedUser] = await Promise.all([
+          AsyncStorage.getItem(PAT_STORAGE_KEY),
+          AsyncStorage.getItem(USER_CACHE_KEY),
+        ]);
 
-      return !!this.token;
-    } catch {
-      return false;
+        if (storedToken) {
+          this.token = storedToken;
+        }
+        if (storedUser) {
+          try {
+            this.cachedUser = JSON.parse(storedUser);
+          } catch {
+            this.cachedUser = null;
+          }
+        }
+
+        this.initialized = true;
+        return !!this.token;
+      } catch {
+        this.initialized = true;
+        return false;
+      } finally {
+        this.initPromise = null;
+      }
+    })();
+
+    return this.initPromise;
+  }
+
+  private async ensureInit(): Promise<void> {
+    if (!this.initialized) {
+      await this.init();
     }
   }
 
@@ -114,6 +137,7 @@ class GitHubApiServiceClass {
    * Fetch authenticated user profile using API key
    */
   async getCurrentUser(): Promise<GitHubUser | null> {
+    await this.ensureInit();
     if (!this.token) {
       return null;
     }
@@ -145,6 +169,7 @@ class GitHubApiServiceClass {
    * Fetch authenticated user's repositories using API key
    */
   async getUserRepos(): Promise<GitHubRepo[]> {
+    await this.ensureInit();
     if (!this.token) {
       return [];
     }
@@ -171,6 +196,7 @@ class GitHubApiServiceClass {
    * Search repositories via official GitHub Search API
    */
   async searchRepos(query: string): Promise<GitHubRepo[]> {
+    await this.ensureInit();
     if (!query.trim()) return [];
 
     try {
@@ -374,6 +400,7 @@ class GitHubApiServiceClass {
    * Fetch user notifications using API key
    */
   async getNotifications(): Promise<GitHubNotification[]> {
+    await this.ensureInit();
     if (!this.token) {
       return [];
     }
@@ -400,6 +427,7 @@ class GitHubApiServiceClass {
    * Uses the viewer's token to fetch their exact official contribution calendar
    */
   async getContributions(): Promise<{ total: number; days: ContributionDay[] }> {
+    await this.ensureInit();
     if (!this.token) {
       return { total: 0, days: [] };
     }
@@ -491,6 +519,7 @@ class GitHubApiServiceClass {
    * Fetch authenticated user's starred repositories
    */
   async getUserStarredRepos(): Promise<GitHubRepo[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const res = await fetch(
@@ -511,6 +540,7 @@ class GitHubApiServiceClass {
    * Check if a repo is starred by authenticated user
    */
   async isRepoStarred(owner: string, repo: string): Promise<boolean> {
+    await this.ensureInit();
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -527,6 +557,7 @@ class GitHubApiServiceClass {
    * Star a repository
    */
   async starRepo(owner: string, repo: string): Promise<boolean> {
+    await this.ensureInit();
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -549,6 +580,7 @@ class GitHubApiServiceClass {
    * Unstar a repository
    */
   async unstarRepo(owner: string, repo: string): Promise<boolean> {
+    await this.ensureInit();
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -568,6 +600,7 @@ class GitHubApiServiceClass {
    * Fetch authenticated user's gists (public and secret)
    */
   async getGists(): Promise<GitHubGist[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const res = await fetch('https://api.github.com/gists?per_page=50', {
@@ -587,6 +620,7 @@ class GitHubApiServiceClass {
    * Fetch authenticated user's organizations
    */
   async getOrgs(): Promise<GitHubOrg[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const res = await fetch('https://api.github.com/user/orgs?per_page=50', {
@@ -606,6 +640,7 @@ class GitHubApiServiceClass {
    * Fetch followers
    */
   async getFollowers(username?: string): Promise<GitHubFollower[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const endpoint = username
@@ -626,6 +661,7 @@ class GitHubApiServiceClass {
    * Fetch users following
    */
   async getFollowing(username?: string): Promise<GitHubFollower[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const endpoint = username
@@ -646,6 +682,7 @@ class GitHubApiServiceClass {
    * Fetch public user event stream
    */
   async getUserEvents(username?: string): Promise<GitHubEvent[]> {
+    await this.ensureInit();
     if (!this.token) return [];
     try {
       const user = username || this.cachedUser?.login;
