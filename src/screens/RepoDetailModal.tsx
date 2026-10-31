@@ -530,7 +530,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         {/* Header Bar */}
         <View style={styles.header}>
           <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>âœ•</Text>
+            <Text style={styles.closeButtonText}>✕</Text>
           </TouchableOpacity>
 
           <View style={styles.headerTitleBox}>
@@ -553,12 +553,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               {starLoading ? (
                 <ActivityIndicator size="small" color={Colors.primary} />
               ) : (
-                <Text style={styles.actionIcon}>{isStarred ? 'â­' : 'â˜†'}</Text>
+                <Text style={styles.actionIcon}>{isStarred ? '⭐' : '☆'}</Text>
               )}
             </TouchableOpacity>
 
             <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
-              <Text style={styles.actionIcon}>ðŸ”—</Text>
+              <Text style={styles.actionIcon}>🔗</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -570,12 +570,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             onPress={handleToggleStar}
             activeOpacity={0.7}
           >
-            <Text style={styles.statIcon}>{isStarred ? 'â­' : 'â˜†'}</Text>
+            <Text style={styles.statIcon}>{isStarred ? '⭐' : '☆'}</Text>
             <Text style={styles.statValue}>{starsCount}</Text>
           </TouchableOpacity>
 
           <View style={styles.statPill}>
-            <Text style={styles.statIcon}>ðŸ´</Text>
+            <Text style={styles.statIcon}>🍴</Text>
             <Text style={styles.statValue}>{repo.forks_count}</Text>
           </View>
 
@@ -585,11 +585,11 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             onPress={() => setBranchModalVisible(true)}
             activeOpacity={0.7}
           >
-            <Text style={styles.statIcon}>ðŸŒ¿</Text>
+            <Text style={styles.statIcon}>🌿</Text>
             <Text style={styles.branchPillText} numberOfLines={1}>
               {selectedBranch}
             </Text>
-            <Text style={styles.dropdownCaret}>â–¾</Text>
+            <Text style={styles.dropdownCaret}>▾</Text>
           </TouchableOpacity>
 
           {repo.language && (
@@ -611,11 +611,11 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         {/* Local Time Meta Row */}
         <View style={styles.repoMetaTimeRow}>
           <Text style={styles.repoMetaTimeText}>
-            ðŸ•’ Updated {formatRepoTimestamp(repo.updated_at)}
+🕒 Updated {formatRepoTimestamp(repo.updated_at)}
           </Text>
           {repo.pushed_at ? (
             <Text style={styles.repoMetaTimeText}>
-              ðŸš€ Pushed {formatRepoTimestamp(repo.pushed_at)}
+🚀 Pushed {formatRepoTimestamp(repo.pushed_at)}
             </Text>
           ) : null}
         </View>
@@ -788,7 +788,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         style={styles.backButton}
                       >
                         <Text style={styles.backButtonText}>
-                          â† {viewingFile.name}
+← {viewingFile.name}
                         </Text>
                       </TouchableOpacity>
                       <Text style={styles.fileSizeText}>
@@ -829,7 +829,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         style={styles.treeUpRow}
                         onPress={navigateUp}
                       >
-                        <Text style={styles.treeIcon}>ðŸ“</Text>
+                        <Text style={styles.treeIcon}>📁</Text>
                         <Text style={styles.treeUpText}>.. (Up one level)</Text>
                       </TouchableOpacity>
                     )}
@@ -845,7 +845,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         }
                       >
                         <Text style={styles.treeIcon}>
-                          {item.type === 'dir' ? 'ðŸ“' : 'ðŸ“„'}
+                          {item.type === 'dir' ? '📁' : '📄'}
                         </Text>
                         <Text style={styles.treeItemName}>{item.name}</Text>
                         {item.type === 'file' && (
@@ -877,7 +877,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       onPress={() => setSelectedCommit(null)}
                       style={styles.backButton}
                     >
-                      <Text style={styles.backButtonText}>â† Back to commits</Text>
+                      <Text style={styles.backButtonText}>← Back to commits</Text>
                     </TouchableOpacity>
 
                     <Text style={styles.commitDetailMsg}>
@@ -1022,7 +1022,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       <View key={p.id} style={styles.issueCard}>
                         <View style={styles.issueHeaderRow}>
                           <View style={styles.stateBadgePR}>
-                            <Text style={styles.stateBadgeText}>ðŸ”€ #{p.number}</Text>
+                            <Text style={styles.stateBadgeText}>🔀 #{p.number}</Text>
                           </View>
                           <Text style={styles.issueDate}>
                             {formatRepoTimestamp(p.created_at)}
@@ -1063,7 +1063,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             ]}
                           >
                             <Text style={styles.stateBadgeText}>
-                              {i.state === 'open' ? 'ðŸŸ¢' : 'ðŸŸ£'} #{i.number}
+                              {i.state === 'open' ? '🟢' : '🟣'} #{i.number}
                             </Text>
                           </View>
                           <Text style={styles.issueDate}>
@@ -1106,10 +1106,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           <View style={styles.conclusionBadge}>
                             <Text style={styles.conclusionIcon}>
                               {r.conclusion === 'success'
-                                ? 'âœ…'
+                                ? '✅'
                                 : r.conclusion === 'failure'
-                                ? 'âŒ'
-                                : 'â³'}
+                                ? '❌'
+                                : '⏳'}
                             </Text>
                             <Text style={styles.workflowName}>{r.name}</Text>
                           </View>
@@ -1117,7 +1117,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         </View>
 
                         <View style={styles.workflowMetaRow}>
-                          <Text style={styles.workflowBranch}>ðŸŒ¿ {r.head_branch}</Text>
+                          <Text style={styles.workflowBranch}>🌿 {r.head_branch}</Text>
                           <Text style={styles.workflowSha}>{r.head_sha.substring(0, 7)}</Text>
                           <Text style={styles.workflowDate}>
                             {formatRepoTimestamp(r.created_at)}
@@ -1155,7 +1155,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       <View key={rel.id} style={styles.releaseCard}>
                         <View style={styles.releaseHeader}>
                           <View style={styles.tagBadge}>
-                            <Text style={styles.tagBadgeText}>ðŸ·ï¸ {rel.tag_name}</Text>
+                            <Text style={styles.tagBadgeText}>🏷️ {rel.tag_name}</Text>
                           </View>
                           {rel.prerelease && (
                             <View style={styles.prereleaseBadge}>
@@ -1181,7 +1181,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         {rel.assets && rel.assets.length > 0 && (
                           <View style={styles.assetsSection}>
                             <Text style={styles.assetsTitle}>
-                              ðŸ“¦ Assets ({rel.assets.length})
+📦 Assets ({rel.assets.length})
                             </Text>
                             {rel.assets.map((asset) => (
                               <TouchableOpacity
@@ -1190,7 +1190,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                                 onPress={() => Linking.openURL(asset.browser_download_url)}
                                 activeOpacity={0.7}
                               >
-                                <Text style={styles.assetIcon}>ðŸ’¾</Text>
+                                <Text style={styles.assetIcon}>💾</Text>
                                 <Text style={styles.assetName} numberOfLines={1}>
                                   {asset.name}
                                 </Text>
@@ -1320,7 +1320,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   onPress={() => setBranchModalVisible(false)}
                   style={styles.branchModalClose}
                 >
-                  <Text style={styles.branchModalCloseText}>âœ•</Text>
+                  <Text style={styles.branchModalCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
 
@@ -1338,7 +1338,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       ]}
                       onPress={() => handleSelectBranch(item.name)}
                     >
-                      <Text style={styles.branchItemIcon}>ðŸŒ¿</Text>
+                      <Text style={styles.branchItemIcon}>🌿</Text>
                       <Text
                         style={[
                           styles.branchItemText,
@@ -1352,7 +1352,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           <Text style={styles.protectedText}>protected</Text>
                         </View>
                       )}
-                      {isCurrent && <Text style={styles.checkIcon}>âœ“</Text>}
+                      {isCurrent && <Text style={styles.checkIcon}>✓</Text>}
                     </TouchableOpacity>
                   );
                 }}

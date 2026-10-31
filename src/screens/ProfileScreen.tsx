@@ -389,7 +389,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       showDialog({
         title: 'Token Required',
         message: 'Please enter your GitHub Personal Access Token to authenticate.',
-        icon: 'ðŸ”‘',
+        icon: '🔑',
         type: 'warning',
         buttons: [{ text: 'OK', style: 'primary', onPress: hideDialog }],
       });
@@ -423,7 +423,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         showDialog({
           title: 'Connected',
           message: `Signed in as @${u.login}. Your repositories and activity are now live.`,
-          icon: 'âœ…',
+          icon: '✅',
           type: 'success',
           buttons: [{ text: 'Great!', style: 'success', onPress: hideDialog }],
         });
@@ -432,7 +432,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       showDialog({
         title: 'Connection Failed',
         message: err.message || 'Could not validate GitHub token. Check permissions and try again.',
-        icon: 'âš ï¸',
+        icon: '⚠️',
         type: 'danger',
         buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
       });
@@ -445,7 +445,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     showDialog({
       title: 'Disconnect API Key',
       message: 'Are you sure you want to remove your GitHub API key from this device? You will need to re-authenticate to browse your profile.',
-      icon: 'ðŸ”Œ',
+      icon: '🔌',
       type: 'danger',
       buttons: [
         { text: 'Cancel', style: 'cancel', onPress: hideDialog },
@@ -504,7 +504,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         const msg = ev.payload?.commits?.[0]?.message || 'Pushed commit';
         return `Pushed ${commitCount} commit(s): "${msg.split('\n')[0]}"`;
       case 'WatchEvent':
-        return 'Starred repository';
+        return '⭐';
       case 'ForkEvent':
         return `Forked to ${ev.payload?.forkee?.full_name || 'new repo'}`;
       case 'CreateEvent':
@@ -523,21 +523,21 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const getEventIcon = (type: string) => {
     switch (type) {
       case 'PushEvent':
-        return 'Ã°Å¸Å¡â‚¬';
+        return '🚀';
       case 'WatchEvent':
-        return 'Ã¢Â­Â';
+        return '⭐';
       case 'ForkEvent':
-        return 'Ã°Å¸ÂÂ´';
+        return '🍴';
       case 'CreateEvent':
-        return 'Ã¢Å“Â¨';
+        return '✨';
       case 'PullRequestEvent':
-        return 'Ã°Å¸â€â‚¬';
+        return '🔀';
       case 'IssuesEvent':
-        return 'Ã°Å¸Å¸Â¢';
+        return '🟢';
       case 'IssueCommentEvent':
-        return 'Ã°Å¸â€™Â¬';
+        return '💬';
       default:
-        return 'Ã°Å¸â€œÅ’';
+        return '📌';
     }
   };
 
@@ -558,12 +558,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         <View style={styles.profileBadgesGroup}>
           {repo.fork && (
             <View style={styles.profileForkBadge}>
-              <Text style={styles.profileForkBadgeText}>Ã°Å¸ÂÂ´ Fork</Text>
+              <Text style={styles.profileForkBadgeText}>🍴 Fork</Text>
             </View>
           )}
           <View style={styles.profileVisibilityBadge}>
             <Text style={styles.profileVisibilityText}>
-              {repo.private ? 'Ã°Å¸â€â€™ Private' : 'Public'}
+              {repo.private ? '🔒 Private' : 'Public'}
             </Text>
           </View>
         </View>
@@ -592,12 +592,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
         ) : null}
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>Ã¢Â­Â</Text>
+          <Text style={styles.profileMetaIcon}>⭐</Text>
           <Text style={styles.profileMetaText}>{repo.stargazers_count}</Text>
         </View>
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>Ã°Å¸ÂÂ´</Text>
+          <Text style={styles.profileMetaIcon}>🍴</Text>
           <Text style={styles.profileMetaText}>{repo.forks_count}</Text>
         </View>
 
@@ -990,7 +990,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                         repos.length}
                       )
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>Ã¢â€ â€¢ Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
                   </View>
 
                   {repos.length > 0 ? (
@@ -1047,7 +1047,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                     <Text style={styles.reposCardTopTitle}>
                       Starred Repositories ({starredRepos.length})
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>Ã¢â€ â€¢ Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
                   </View>
 
                   {starredRepos.length > 0 ? (
@@ -1116,7 +1116,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
                             <View style={styles.gistFooter}>
                               <Text style={styles.gistFilesCount}>
-                                Ã°Å¸â€œâ€ž {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
+📄 {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
                               </Text>
                               {firstFile?.language && (
                                 <Text style={styles.gistLang}>
@@ -1124,7 +1124,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                                 </Text>
                               )}
                               <Text style={styles.gistComments}>
-                                Ã°Å¸â€™Â¬ {g.comments}
+💬 {g.comments}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -1303,7 +1303,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             </View>
                           )}
                           <Text style={styles.userCardLogin}>@{u.login}</Text>
-                          <Text style={styles.userCardArrow}>Ã¢â€ â€”</Text>
+                          <Text style={styles.userCardArrow}>↗</Text>
                         </TouchableOpacity>
                       ))}
 
@@ -1394,7 +1394,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             resizeMode="cover"
           />
           <View style={styles.authGateIconBox}>
-            <Text style={styles.authGateIcon}>Ã°Å¸â€â€˜</Text>
+            <Text style={styles.authGateIcon}>🔑</Text>
           </View>
           <Text style={styles.authGateTitle}>Connect GitHub Account</Text>
           <Text style={styles.authGateDesc}>
@@ -1407,9 +1407,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             onPress={() => Linking.openURL(GITHUB_NEW_TOKEN_URL)}
             activeOpacity={0.8}
           >
-            <Text style={styles.oneClickTokenIcon}>Ã¢Å¡Â¡</Text>
+            <Text style={styles.oneClickTokenIcon}>⚡</Text>
             <View style={styles.oneClickTokenTextWrap}>
-              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub Ã¢â€ â€”</Text>
+              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub ↗</Text>
               <Text style={styles.oneClickTokenSub}>
                 Opens GitHub with all 5 required scopes pre-checked automatically
               </Text>
@@ -1512,7 +1512,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                   <View style={styles.badgeRow}>
                     <View style={styles.authBadge}>
                       <Text style={styles.authBadgeText}>
-                        Ã¢â€”Â Live Authenticated API
+● Live Authenticated API
                       </Text>
                     </View>
                   </View>
@@ -1523,10 +1523,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
               <View style={styles.detailsRow}>
                 {user.company ? (
-                  <Text style={styles.detailText}>Ã°Å¸ÂÂ¢ {user.company}</Text>
+                  <Text style={styles.detailText}>🏢 {user.company}</Text>
                 ) : null}
                 {user.location ? (
-                  <Text style={styles.detailText}>Ã°Å¸â€œÂ {user.location}</Text>
+                  <Text style={styles.detailText}>📍 {user.location}</Text>
                 ) : null}
               </View>
 
@@ -1590,7 +1590,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               onPress={() => setGistModalVisible(false)}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>Ã¢Å“â€¢</Text>
+              <Text style={styles.closeBtnText}>✕</Text>
             </TouchableOpacity>
             <View style={styles.gistModalTitleBox}>
               <Text style={styles.gistModalTitle} numberOfLines={1}>
@@ -1606,7 +1606,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               }}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>Ã¢â€ â€”</Text>
+              <Text style={styles.closeBtnText}>↗</Text>
             </TouchableOpacity>
           </View>
 

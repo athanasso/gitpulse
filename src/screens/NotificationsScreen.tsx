@@ -166,17 +166,17 @@ export const NotificationsScreen: React.FC = () => {
   const getTypeIcon = (type: string) => {
     switch (type) {
       case 'PullRequest':
-        return 'ðŸ”€';
+        return '🔀';
       case 'Issue':
-        return 'ðŸŸ¢';
+        return '🟢';
       case 'Release':
-        return 'ðŸ·ï¸';
+        return '🏷️';
       case 'Commit':
-        return 'ðŸ’¬';
+        return '💬';
       case 'Discussion':
-        return 'ðŸ—£ï¸';
+        return '🗣️';
       default:
-        return 'ðŸ””';
+        return '🔔';
     }
   };
 
@@ -261,7 +261,7 @@ export const NotificationsScreen: React.FC = () => {
       {/* Scope Warning Banner if token missing 'notifications' permission */}
       {scopeError && (
         <View style={styles.scopeWarningCard}>
-          <Text style={styles.scopeWarningIcon}>âš ï¸</Text>
+          <Text style={styles.scopeWarningIcon}>⚠️</Text>
           <View style={styles.scopeWarningContent}>
             <Text style={styles.scopeWarningTitle}>Notifications Scope Needed</Text>
             <Text style={styles.scopeWarningText}>
@@ -276,7 +276,7 @@ export const NotificationsScreen: React.FC = () => {
               style={styles.scopeLinkBtn}
             >
               <Text style={styles.scopeLinkText}>
-                Edit Token Scopes on GitHub â†—
+                Edit Token Scopes on GitHub ↗
               </Text>
             </TouchableOpacity>
           </View>
@@ -340,7 +340,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'PullRequest' && styles.filterTabTextActive,
               ]}
             >
-              ðŸ”€ Pull Requests
+🔀 Pull Requests
             </Text>
           </TouchableOpacity>
 
@@ -358,7 +358,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'Issue' && styles.filterTabTextActive,
               ]}
             >
-              ðŸŸ¢ Issues
+🟢 Issues
             </Text>
           </TouchableOpacity>
 
@@ -376,7 +376,7 @@ export const NotificationsScreen: React.FC = () => {
                 activeFilter === 'Release' && styles.filterTabTextActive,
               ]}
             >
-              ðŸ·ï¸ Releases
+🏷️ Releases
             </Text>
           </TouchableOpacity>
         </ScrollView>
@@ -413,7 +413,7 @@ export const NotificationsScreen: React.FC = () => {
           !refreshing ? (
             !isAuth ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>ðŸ”’</Text>
+                <Text style={styles.emptyIcon}>🔒</Text>
                 <Text style={styles.emptyTitle}>Personal Token Required</Text>
                 <Text style={styles.emptySubtitle}>
                   Add a GitHub Personal Access Token (PAT) with notifications
@@ -422,7 +422,7 @@ export const NotificationsScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>ðŸŽ‰</Text>
+                <Text style={styles.emptyIcon}>🎉</Text>
                 <Text style={styles.emptyTitle}>All caught up!</Text>
                 <Text style={styles.emptySubtitle}>
                   No notifications matching the active filter.
