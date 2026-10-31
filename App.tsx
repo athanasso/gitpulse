@@ -10,7 +10,10 @@ import {
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
-import { Colors, Spacing } from './src/constants/theme';
+import { Spacing } from './src/constants/theme';
+import { ThemeProvider, useTheme } from './src/context/ThemeContext';
+import { CustomizationProvider } from './src/context/CustomizationContext';
+import { CustomizationModal } from './src/components/CustomizationModal';
 import { RepositoriesScreen } from './src/screens/RepositoriesScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
@@ -18,12 +21,15 @@ import { GitHubApiService } from './src/services/GitHubApiService';
 
 type Tab = 'repos' | 'inbox' | 'profile';
 
-export default function App() {
+function AppContent() {
+  const { colors, theme } = useTheme();
+
   // Prevent screen sleep during reading sessions / code reviews
   useKeepAwake();
 
   const [activeTab, setActiveTab] = useState<Tab>('repos');
   const [unreadCount, setUnreadCount] = useState<number>(0);
+  const [customizationVisible, setCustomizationVisible] = useState(false);
 
   useEffect(() => {
     GitHubApiService.init().then((isAuth) => {
@@ -50,89 +56,182 @@ export default function App() {
   }, [activeTab]);
 
   return (
-    <SafeAreaProvider>
-      <SafeAreaView style={styles.container} edges={['top', 'left', 'right']}>
-        <StatusBar style="light" />
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={['top', 'left', 'right']}
+    >
+      <StatusBar style={theme.isDark ? 'light' : 'dark'} />
 
-        {/* Top App Header */}
-        <View style={styles.topNav}>
-          <View style={styles.brandRow}>
-            <Image
-              source={require('./assets/favicon.png')}
-              style={styles.brandIcon}
-            />
-            <Text style={styles.brandTitle}>GitPulse</Text>
-            <View style={styles.versionBadge}>
-              <Text style={styles.versionText}>v1.0</Text>
-            </View>
+      {/* Top App Header */}
+      <View
+        style={[
+          styles.topNav,
+          {
+            borderBottomColor: colors.cardBorder,
+            backgroundColor: colors.background,
+          },
+        ]}
+      >
+        <View style={styles.brandRow}>
+          <Image
+            source={require('./assets/favicon.png')}
+            style={styles.brandIcon}
+          />
+          <Text style={[styles.brandTitle, { color: colors.textPrimary }]}>
+            GitPulse
+          </Text>
+          <View
+            style={[
+              styles.versionBadge,
+              {
+                backgroundColor: colors.primaryMuted,
+                borderColor: colors.primary,
+              },
+            ]}
+          >
+            <Text style={[styles.versionText, { color: colors.primary }]}>
+              v1.0
+            </Text>
           </View>
         </View>
 
-        {/* Screen Switcher */}
-        <View style={styles.content}>
-          {activeTab === 'repos' && <RepositoriesScreen />}
-          {activeTab === 'inbox' && <NotificationsScreen />}
-          {activeTab === 'profile' && <ProfileScreen />}
-        </View>
+        {/* Global Customization & Settings Trigger */}
+        <TouchableOpacity
+          style={[
+            styles.headerSettingsBtn,
+            {
+              backgroundColor: colors.cardElevated,
+              borderColor: colors.cardBorder,
+            },
+          ]}
+          onPress={() => setCustomizationVisible(true)}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.headerSettingsIcon}>⚙️</Text>
+        </TouchableOpacity>
+      </View>
 
-        {/* Bottom Navigation Bar */}
-        <View style={styles.tabBar}>
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'repos' && styles.tabItemActive]}
-            onPress={() => setActiveTab('repos')}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.tabIcon}>⚡</Text>
-            <Text
-              style={[
-                styles.tabLabel,
-                activeTab === 'repos' && styles.tabLabelActive,
-              ]}
-            >
-              Repositories
-            </Text>
-          </TouchableOpacity>
+      {/* Screen Switcher */}
+      <View style={styles.content}>
+        {activeTab === 'repos' && <RepositoriesScreen />}
+        {activeTab === 'inbox' && <NotificationsScreen />}
+        {activeTab === 'profile' && (
+          <ProfileScreen onOpenCustomization={() => setCustomizationVisible(true)} />
+        )}
+      </View>
 
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'inbox' && styles.tabItemActive]}
-            onPress={() => setActiveTab('inbox')}
-            activeOpacity={0.7}
+      {/* Bottom Navigation Bar */}
+      <View
+        style={[
+          styles.tabBar,
+          {
+            backgroundColor: colors.backgroundElevated,
+            borderTopColor: colors.cardBorder,
+          },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === 'repos' && {
+              backgroundColor: colors.cardElevated,
+            },
+          ]}
+          onPress={() => setActiveTab('repos')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>⚡</Text>
+          <Text
+            style={[
+              styles.tabLabel,
+              {
+                color:
+                  activeTab === 'repos' ? colors.primary : colors.textMuted,
+              },
+            ]}
           >
-            <View style={styles.iconWithBadge}>
-              <Text style={styles.tabIcon}>🔔</Text>
-              {unreadCount > 0 && (
-                <View style={styles.unreadBadge}>
-                  <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
-                </View>
-              )}
-            </View>
-            <Text
-              style={[
-                styles.tabLabel,
-                activeTab === 'inbox' && styles.tabLabelActive,
-              ]}
-            >
-              Inbox
-            </Text>
-          </TouchableOpacity>
+            Repositories
+          </Text>
+        </TouchableOpacity>
 
-          <TouchableOpacity
-            style={[styles.tabItem, activeTab === 'profile' && styles.tabItemActive]}
-            onPress={() => setActiveTab('profile')}
-            activeOpacity={0.7}
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === 'inbox' && {
+              backgroundColor: colors.cardElevated,
+            },
+          ]}
+          onPress={() => setActiveTab('inbox')}
+          activeOpacity={0.7}
+        >
+          <View style={styles.iconWithBadge}>
+            <Text style={styles.tabIcon}>🔔</Text>
+            {unreadCount > 0 && (
+              <View
+                style={[
+                  styles.unreadBadge,
+                  { backgroundColor: colors.ruby },
+                ]}
+              >
+                <Text style={styles.unreadBadgeText}>{unreadCount}</Text>
+              </View>
+            )}
+          </View>
+          <Text
+            style={[
+              styles.tabLabel,
+              {
+                color:
+                  activeTab === 'inbox' ? colors.primary : colors.textMuted,
+              },
+            ]}
           >
-            <Text style={styles.tabIcon}>👤</Text>
-            <Text
-              style={[
-                styles.tabLabel,
-                activeTab === 'profile' && styles.tabLabelActive,
-              ]}
-            >
-              Profile
-            </Text>
-          </TouchableOpacity>
-        </View>
-      </SafeAreaView>
+            Inbox
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === 'profile' && {
+              backgroundColor: colors.cardElevated,
+            },
+          ]}
+          onPress={() => setActiveTab('profile')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>👤</Text>
+          <Text
+            style={[
+              styles.tabLabel,
+              {
+                color:
+                  activeTab === 'profile' ? colors.primary : colors.textMuted,
+              },
+            ]}
+          >
+            Profile
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Customization & Themes Modal */}
+      <CustomizationModal
+        visible={customizationVisible}
+        onClose={() => setCustomizationVisible(false)}
+      />
+    </SafeAreaView>
+  );
+}
+
+export default function App() {
+  return (
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <CustomizationProvider>
+          <AppContent />
+        </CustomizationProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
@@ -140,7 +239,6 @@ export default function App() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: Colors.background,
   },
   topNav: {
     flexDirection: 'row',
@@ -149,7 +247,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: Colors.cardBorder,
   },
   brandRow: {
     flexDirection: 'row',
@@ -164,30 +261,35 @@ const styles = StyleSheet.create({
   brandTitle: {
     fontSize: 20,
     fontWeight: '900',
-    color: Colors.textPrimary,
     letterSpacing: 0.5,
   },
   versionBadge: {
-    backgroundColor: Colors.primaryMuted,
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: 6,
     borderWidth: 1,
-    borderColor: Colors.primary,
   },
   versionText: {
     fontSize: 10,
     fontWeight: '700',
-    color: Colors.primary,
+  },
+  headerSettingsBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerSettingsIcon: {
+    fontSize: 16,
   },
   content: {
     flex: 1,
   },
   tabBar: {
     flexDirection: 'row',
-    backgroundColor: Colors.backgroundElevated,
     borderTopWidth: 1,
-    borderTopColor: Colors.cardBorder,
     paddingVertical: Spacing.sm,
     paddingBottom: 20,
     justifyContent: 'space-around',
@@ -197,9 +299,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 6,
     borderRadius: 12,
-  },
-  tabItemActive: {
-    backgroundColor: Colors.cardElevated,
   },
   tabIcon: {
     fontSize: 18,
@@ -212,7 +311,6 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: -4,
     right: -8,
-    backgroundColor: Colors.ruby,
     borderRadius: 8,
     minWidth: 16,
     height: 16,
@@ -228,10 +326,5 @@ const styles = StyleSheet.create({
   tabLabel: {
     fontSize: 11,
     fontWeight: '600',
-    color: Colors.textMuted,
-  },
-  tabLabelActive: {
-    color: Colors.primary,
   },
 });
-

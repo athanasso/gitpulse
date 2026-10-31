@@ -29,6 +29,15 @@ import { RepoDetailModal } from './RepoDetailModal';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
+import { useTheme } from '../context/ThemeContext';
+import {
+  useCustomization,
+  ProfileSectionId,
+} from '../context/CustomizationContext';
+
+interface ProfileScreenProps {
+  onOpenCustomization?: () => void;
+}
 
 type ProfileSubTab =
   | 'repos'
@@ -103,13 +112,26 @@ const SCOPES_SPECS: ScopeSpec[] = [
   },
 ];
 
-export const ProfileScreen: React.FC = () => {
+export const ProfileScreen: React.FC<ProfileScreenProps> = ({
+  onOpenCustomization,
+}) => {
+  const { colors } = useTheme();
+  const { settings } = useCustomization();
+
   const [user, setUser] = useState<GitHubUser | null>(null);
   const [tokenScopes, setTokenScopes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
   const [subLoading, setSubLoading] = useState(false);
-  const [activeSubTab, setActiveSubTab] = useState<ProfileSubTab>('repos');
+  const [activeSubTab, setActiveSubTab] = useState<ProfileSubTab>(
+    settings.defaultProfileSubTab || 'repos'
+  );
+
+  useEffect(() => {
+    if (settings.defaultProfileSubTab) {
+      setActiveSubTab(settings.defaultProfileSubTab);
+    }
+  }, [settings.defaultProfileSubTab]);
 
   // Heatmap Data
   const [contributions, setContributions] = useState<{
@@ -367,7 +389,7 @@ export const ProfileScreen: React.FC = () => {
       showDialog({
         title: 'Token Required',
         message: 'Please enter your GitHub Personal Access Token to authenticate.',
-        icon: '🔑',
+        icon: 'ðŸ”‘',
         type: 'warning',
         buttons: [{ text: 'OK', style: 'primary', onPress: hideDialog }],
       });
@@ -401,7 +423,7 @@ export const ProfileScreen: React.FC = () => {
         showDialog({
           title: 'Connected',
           message: `Signed in as @${u.login}. Your repositories and activity are now live.`,
-          icon: '✅',
+          icon: 'âœ…',
           type: 'success',
           buttons: [{ text: 'Great!', style: 'success', onPress: hideDialog }],
         });
@@ -410,7 +432,7 @@ export const ProfileScreen: React.FC = () => {
       showDialog({
         title: 'Connection Failed',
         message: err.message || 'Could not validate GitHub token. Check permissions and try again.',
-        icon: '⚠️',
+        icon: 'âš ï¸',
         type: 'danger',
         buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
       });
@@ -423,7 +445,7 @@ export const ProfileScreen: React.FC = () => {
     showDialog({
       title: 'Disconnect API Key',
       message: 'Are you sure you want to remove your GitHub API key from this device? You will need to re-authenticate to browse your profile.',
-      icon: '🔌',
+      icon: 'ðŸ”Œ',
       type: 'danger',
       buttons: [
         { text: 'Cancel', style: 'cancel', onPress: hideDialog },
@@ -501,21 +523,21 @@ export const ProfileScreen: React.FC = () => {
   const getEventIcon = (type: string) => {
     switch (type) {
       case 'PushEvent':
-        return 'ðŸš€';
+        return 'Ã°Å¸Å¡â‚¬';
       case 'WatchEvent':
-        return 'â­';
+        return 'Ã¢Â­Â';
       case 'ForkEvent':
-        return 'ðŸ´';
+        return 'Ã°Å¸ÂÂ´';
       case 'CreateEvent':
-        return 'âœ¨';
+        return 'Ã¢Å“Â¨';
       case 'PullRequestEvent':
-        return 'ðŸ”€';
+        return 'Ã°Å¸â€â‚¬';
       case 'IssuesEvent':
-        return 'ðŸŸ¢';
+        return 'Ã°Å¸Å¸Â¢';
       case 'IssueCommentEvent':
-        return 'ðŸ’¬';
+        return 'Ã°Å¸â€™Â¬';
       default:
-        return 'ðŸ“Œ';
+        return 'Ã°Å¸â€œÅ’';
     }
   };
 
@@ -536,12 +558,12 @@ export const ProfileScreen: React.FC = () => {
         <View style={styles.profileBadgesGroup}>
           {repo.fork && (
             <View style={styles.profileForkBadge}>
-              <Text style={styles.profileForkBadgeText}>ðŸ´ Fork</Text>
+              <Text style={styles.profileForkBadgeText}>Ã°Å¸ÂÂ´ Fork</Text>
             </View>
           )}
           <View style={styles.profileVisibilityBadge}>
             <Text style={styles.profileVisibilityText}>
-              {repo.private ? 'ðŸ”’ Private' : 'Public'}
+              {repo.private ? 'Ã°Å¸â€â€™ Private' : 'Public'}
             </Text>
           </View>
         </View>
@@ -570,12 +592,12 @@ export const ProfileScreen: React.FC = () => {
         ) : null}
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>â­</Text>
+          <Text style={styles.profileMetaIcon}>Ã¢Â­Â</Text>
           <Text style={styles.profileMetaText}>{repo.stargazers_count}</Text>
         </View>
 
         <View style={styles.profileMetaItem}>
-          <Text style={styles.profileMetaIcon}>ðŸ´</Text>
+          <Text style={styles.profileMetaIcon}>Ã°Å¸ÂÂ´</Text>
           <Text style={styles.profileMetaText}>{repo.forks_count}</Text>
         </View>
 
@@ -586,448 +608,253 @@ export const ProfileScreen: React.FC = () => {
     </TouchableOpacity>
   );
 
-  if (loading) {
+
+  const renderSocialLinks = () => {
+    if (!user) return null;
+    const hasAny = Boolean(user.blog || user.twitter_username || user.email || socialAccounts.length > 0);
+    if (!hasAny) return null;
     return (
-      <View style={[styles.container, styles.centered]}>
-        <ActivityIndicator size="large" color={Colors.primary} />
+      <View key="socialLinks" style={styles.profileLinksRow}>
+        {user.blog ? (
+          <TouchableOpacity
+            style={styles.profileLinkPill}
+            onPress={() =>
+              Linking.openURL(
+                user.blog!.startsWith('http')
+                  ? user.blog!
+                  : `https://${user.blog!}`
+              )
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.profileLinkIcon}>🔗</Text>
+            <Text style={styles.profileLinkText} numberOfLines={1}>
+              {user.blog.replace(/^https?:\/\//, '')}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {user.twitter_username ? (
+          <TouchableOpacity
+            style={styles.profileLinkPill}
+            onPress={() =>
+              Linking.openURL(`https://x.com/${user.twitter_username}`)
+            }
+            activeOpacity={0.7}
+          >
+            <Text style={styles.profileLinkIcon}>𝕏</Text>
+            <Text style={styles.profileLinkText}>
+              @{user.twitter_username}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {user.email ? (
+          <TouchableOpacity
+            style={styles.profileLinkPill}
+            onPress={() => Linking.openURL(`mailto:${user.email}`)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.profileLinkIcon}>✉️</Text>
+            <Text style={styles.profileLinkText} numberOfLines={1}>
+              {user.email}
+            </Text>
+          </TouchableOpacity>
+        ) : null}
+
+        {socialAccounts.map((s, idx) => (
+          <TouchableOpacity
+            key={`${s.provider}-${idx}`}
+            style={styles.profileLinkPill}
+            onPress={() => Linking.openURL(s.url)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.profileLinkIcon}>🌐</Text>
+            <Text style={styles.profileLinkText}>{s.provider}</Text>
+          </TouchableOpacity>
+        ))}
       </View>
     );
-  }
+  };
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {!isAuth ? (
-        // Unauthenticated: API Key Entry Gate
-        <View style={styles.authGateCard}>
-          <Image
-            source={require('../../assets/hero-banner.png')}
-            style={styles.heroBanner}
-            resizeMode="cover"
-          />
-          <View style={styles.authGateIconBox}>
-            <Text style={styles.authGateIcon}>ðŸ”‘</Text>
-          </View>
-          <Text style={styles.authGateTitle}>Connect GitHub Account</Text>
-          <Text style={styles.authGateDesc}>
-            GitPulse accesses GitHub exclusively through official authenticated APIs with zero third-party proxies. Your Personal Access Token (PAT) stays on your device.
-          </Text>
+  const renderTokenPermissions = () => (
+    <View key="tokenPermissions" style={styles.activeScopesCard}>
+      <View style={styles.activeScopesHeaderRow}>
+        <Text style={styles.activeScopesHeaderTitle}>
+          🔑 Token Permissions
+        </Text>
+        <TouchableOpacity
+          onPress={() => Linking.openURL('https://github.com/settings/tokens')}
+        >
+          <Text style={styles.editScopesLink}>Manage on GitHub ↗</Text>
+        </TouchableOpacity>
+      </View>
 
-          {/* Quick Setup Shortcut */}
-          <TouchableOpacity
-            style={styles.oneClickTokenBtn}
-            onPress={() => Linking.openURL(GITHUB_NEW_TOKEN_URL)}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.oneClickTokenIcon}>âš¡</Text>
-            <View style={styles.oneClickTokenTextWrap}>
-              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub â†—</Text>
-              <Text style={styles.oneClickTokenSub}>
-                Opens GitHub with all 5 required scopes pre-checked automatically
-              </Text>
-            </View>
-          </TouchableOpacity>
+      {tokenScopes.length === 0 ? (
+        <Text style={styles.fineGrainedNote}>
+          ● Active Personal Access Token (Resource-scoped / Fine-Grained)
+        </Text>
+      ) : (
+        <>
+          <View style={styles.scopesPillsWrap}>
+            {SCOPES_SPECS.map((spec) => {
+              const hasThis =
+                tokenScopes.includes(spec.scope) ||
+                (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
+                (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
 
-          {/* Permissions Checklist */}
-          <View style={styles.scopesGuideBox}>
-            <Text style={styles.scopesGuideHeader}>TOKEN PERMISSIONS NEEDED</Text>
-            <Text style={styles.scopesGuideHint}>
-              Select these scopes on GitHub (or use the shortcut button above):
-            </Text>
-
-            {SCOPES_SPECS.map((item) => (
-              <View key={item.scope} style={styles.scopeItemRow}>
-                <View style={styles.scopeItemTop}>
-                  <Text style={styles.scopeCodeText}>{item.scope}</Text>
-                  <View
+              return (
+                <View
+                  key={spec.scope}
+                  style={[
+                    styles.scopePill,
+                    hasThis ? styles.scopePillActive : styles.scopePillMissing,
+                  ]}
+                >
+                  <Text
                     style={[
-                      styles.scopeBadge,
-                      item.level === 'Required'
-                        ? styles.badgeRequired
-                        : item.level === 'Recommended'
-                        ? styles.badgeRecommended
-                        : styles.badgeOptional,
+                      styles.scopePillText,
+                      hasThis
+                        ? styles.scopePillTextActive
+                        : styles.scopePillTextMissing,
                     ]}
                   >
-                    <Text
-                      style={[
-                        styles.scopeBadgeText,
-                        item.level === 'Required'
-                          ? styles.badgeTextRequired
-                          : item.level === 'Recommended'
-                          ? styles.badgeTextRecommended
-                          : styles.badgeTextOptional,
-                      ]}
-                    >
-                      {item.level.toUpperCase()}
-                    </Text>
-                  </View>
+                    {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
+                    {spec.scope}
+                  </Text>
                 </View>
-                <Text style={styles.scopeItemDesc}>{item.desc}</Text>
-              </View>
-            ))}
+              );
+            })}
           </View>
 
-          <View style={styles.tokenBox}>
-            <Text style={styles.inputLabel}>Personal Access Token (PAT)</Text>
-            <TextInput
-              style={styles.tokenInput}
-              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
-              placeholderTextColor={Colors.textMuted}
-              value={tokenInput}
-              onChangeText={setTokenInput}
-              secureTextEntry
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            <Text style={styles.tokenHint}>
-              Classic token starting with <Text style={styles.tokenHintBold}>ghp_</Text> recommended. Stored encrypted on-device.
-            </Text>
-
-            <TouchableOpacity
-              style={styles.connectButton}
-              onPress={handleConnectToken}
-              disabled={validating}
-              activeOpacity={0.8}
-            >
-              {validating ? (
-                <ActivityIndicator color="#FFFFFF" size="small" />
-              ) : (
-                <Text style={styles.connectButtonText}>Connect & Authenticate</Text>
-              )}
-            </TouchableOpacity>
-          </View>
-        </View>
-      ) : (
-        // Authenticated Profile
-        <>
-          {user && (
-            <View style={styles.profileCard}>
-              <Image
-                source={require('../../assets/hero-banner.png')}
-                style={styles.profileBanner}
-                resizeMode="cover"
-              />
-              <View style={styles.avatarRow}>
-                {user.avatar_url ? (
-                  <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
-                ) : (
-                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
-                    <Text style={styles.avatarLetter}>
-                      {user.login.charAt(0).toUpperCase()}
-                    </Text>
-                  </View>
-                )}
-                <View style={styles.nameBlock}>
-                  <Text style={styles.name}>{user.name || user.login}</Text>
-                  <Text style={styles.username}>@{user.login}</Text>
-                  <View style={styles.badgeRow}>
-                    <View style={styles.authBadge}>
-                      <Text style={styles.authBadgeText}>
-                        â— Live Authenticated API
-                      </Text>
-                    </View>
-                  </View>
-                </View>
-              </View>
-
-              {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
-
-              <View style={styles.detailsRow}>
-                {user.company ? (
-                  <Text style={styles.detailText}>ðŸ¢ {user.company}</Text>
-                ) : null}
-                {user.location ? (
-                  <Text style={styles.detailText}>ðŸ“ {user.location}</Text>
-                ) : null}
-              </View>
-
-              {/* Profile Links & Social Accounts */}
-              {(user.blog ||
-                user.twitter_username ||
-                user.email ||
-                socialAccounts.length > 0) && (
-                <View style={styles.profileLinksRow}>
-                  {user.blog ? (
-                    <TouchableOpacity
-                      style={styles.profileLinkPill}
-                      onPress={() =>
-                        Linking.openURL(
-                          user.blog!.startsWith('http')
-                            ? user.blog!
-                            : `https://${user.blog!}`
-                        )
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.profileLinkIcon}>ðŸ”—</Text>
-                      <Text style={styles.profileLinkText} numberOfLines={1}>
-                        {user.blog.replace(/^https?:\/\//, '')}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-
-                  {user.twitter_username ? (
-                    <TouchableOpacity
-                      style={styles.profileLinkPill}
-                      onPress={() =>
-                        Linking.openURL(`https://x.com/${user.twitter_username}`)
-                      }
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.profileLinkIcon}>ð•</Text>
-                      <Text style={styles.profileLinkText}>
-                        @{user.twitter_username}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-
-                  {user.email ? (
-                    <TouchableOpacity
-                      style={styles.profileLinkPill}
-                      onPress={() => Linking.openURL(`mailto:${user.email}`)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.profileLinkIcon}>âœ‰ï¸</Text>
-                      <Text style={styles.profileLinkText} numberOfLines={1}>
-                        {user.email}
-                      </Text>
-                    </TouchableOpacity>
-                  ) : null}
-
-                  {socialAccounts.map((s, idx) => (
-                    <TouchableOpacity
-                      key={`${s.provider}-${idx}`}
-                      style={styles.profileLinkPill}
-                      onPress={() => Linking.openURL(s.url)}
-                      activeOpacity={0.7}
-                    >
-                      <Text style={styles.profileLinkIcon}>ðŸŒ</Text>
-                      <Text style={styles.profileLinkText}>{s.provider}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              )}
-
-              {/* Stats Row */}
-              <View style={styles.statsRow}>
-                <TouchableOpacity
-                  style={styles.statBox}
-                  onPress={() => handleSubTabChange('repos')}
-                >
-                  <Text style={styles.statNumber}>
-                    {(user.public_repos || 0) + (user.total_private_repos || 0)}
-                  </Text>
-                  <Text style={styles.statLabel}>Repositories</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.statBox}
-                  onPress={() => {
-                    setSocialTab('followers');
-                    handleSubTabChange('social');
-                  }}
-                >
-                  <Text style={styles.statNumber}>{user.followers}</Text>
-                  <Text style={styles.statLabel}>Followers</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.statBox}
-                  onPress={() => {
-                    setSocialTab('following');
-                    handleSubTabChange('social');
-                  }}
-                >
-                  <Text style={styles.statNumber}>{user.following}</Text>
-                  <Text style={styles.statLabel}>Following</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.statBox}
-                  onPress={() => handleSubTabChange('gists')}
-                >
-                  <Text style={styles.statNumber}>{user.public_gists}</Text>
-                  <Text style={styles.statLabel}>Gists</Text>
-                </TouchableOpacity>
-              </View>
-
-              {/* Active Token Scopes Card */}
-              <View style={styles.activeScopesCard}>
-                <View style={styles.activeScopesHeaderRow}>
-                  <Text style={styles.activeScopesHeaderTitle}>
-                    ðŸ”‘ Token Permissions
-                  </Text>
-                  <TouchableOpacity
-                    onPress={() => Linking.openURL('https://github.com/settings/tokens')}
-                  >
-                    <Text style={styles.editScopesLink}>Manage on GitHub â†—</Text>
-                  </TouchableOpacity>
-                </View>
-
-                {tokenScopes.length === 0 ? (
-                  <Text style={styles.fineGrainedNote}>
-                    â— Active Personal Access Token (Resource-scoped / Fine-Grained)
-                  </Text>
-                ) : (
-                  <>
-                    <View style={styles.scopesPillsWrap}>
-                      {SCOPES_SPECS.map((spec) => {
-                        const hasThis =
-                          tokenScopes.includes(spec.scope) ||
-                          (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
-                          (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
-
-                        return (
-                          <View
-                            key={spec.scope}
-                            style={[
-                              styles.scopePill,
-                              hasThis ? styles.scopePillActive : styles.scopePillMissing,
-                            ]}
-                          >
-                            <Text
-                              style={[
-                                styles.scopePillText,
-                                hasThis
-                                  ? styles.scopePillTextActive
-                                  : styles.scopePillTextMissing,
-                              ]}
-                            >
-                              {hasThis ? 'âœ“' : spec.level === 'Required' ? 'âœ•' : 'âš ï¸'}{' '}
-                              {spec.scope}
-                            </Text>
-                          </View>
-                        );
-                      })}
-                    </View>
-
-                    {!tokenScopes.includes('notifications') && (
-                      <View style={styles.scopeWarningInline}>
-                        <Text style={styles.scopeWarningInlineText}>
-                          âš ï¸ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
-                        </Text>
-                      </View>
-                    )}
-                  </>
-                )}
-              </View>
-
-              <TouchableOpacity
-                style={styles.disconnectButton}
-                onPress={handleDisconnect}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.disconnectButtonText}>
-                  Disconnect API Key
-                </Text>
-              </TouchableOpacity>
-            </View>
-          )}
-
-          {/* Profile README Card ({username}/{username}/README.md) */}
-          {profileReadme ? (
-            <View style={styles.profileReadmeCard}>
-              <View style={styles.profileReadmeHeader}>
-                <View style={styles.profileReadmeTitleRow}>
-                  <Text style={styles.profileReadmeIcon}>ðŸ“–</Text>
-                  <Text style={styles.profileReadmeTitle}>
-                    {user?.login} / README.md
-                  </Text>
-                </View>
-                <TouchableOpacity
-                  onPress={() => setReadmeExpanded(!readmeExpanded)}
-                  style={styles.readmeToggleBtn}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles.readmeToggleBtnText}>
-                    {readmeExpanded ? 'Collapse â–´' : 'Expand â–¾'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              <Text
-                style={styles.profileReadmeBody}
-                numberOfLines={readmeExpanded ? undefined : 8}
-              >
-                {profileReadme}
+          {!tokenScopes.includes('notifications') && (
+            <View style={styles.scopeWarningInline}>
+              <Text style={styles.scopeWarningInlineText}>
+                ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
               </Text>
             </View>
-          ) : null}
-
-          {/* Pinned Repositories (Official GraphQL API) */}
-          {pinnedItems.length > 0 && (
-            <View style={styles.pinnedContainer}>
-              <Text style={styles.sectionHeader}>ðŸ“Œ Pinned Repositories</Text>
-              <View style={styles.pinnedGrid}>
-                {pinnedItems.map((pin) => (
-                  <TouchableOpacity
-                    key={pin.id}
-                    style={styles.pinnedCard}
-                    onPress={async () => {
-                      const [owner, name] = pin.nameWithOwner.split('/');
-                      const fullRepo = await GitHubApiService.getRepo(owner, name);
-                      if (fullRepo) {
-                        setSelectedRepo(fullRepo);
-                        setRepoModalVisible(true);
-                      } else {
-                        Linking.openURL(pin.url);
-                      }
-                    }}
-                    activeOpacity={0.7}
-                  >
-                    <View style={styles.pinnedHeaderRow}>
-                      <Text style={styles.pinnedName} numberOfLines={1}>
-                        {pin.name}
-                      </Text>
-                      <View style={styles.repoVisibilityBadge}>
-                        <Text style={styles.repoVisibilityText}>
-                          {pin.isPrivate ? 'ðŸ”’ Private' : 'Public'}
-                        </Text>
-                      </View>
-                    </View>
-
-                    {pin.description ? (
-                      <Text style={styles.pinnedDesc} numberOfLines={2}>
-                        {pin.description}
-                      </Text>
-                    ) : null}
-
-                    <View style={styles.pinnedFooter}>
-                      {pin.primaryLanguage && (
-                        <View style={styles.pinnedMetaItem}>
-                          <View
-                            style={[
-                              styles.langDot,
-                              {
-                                backgroundColor:
-                                  pin.primaryLanguage.color || Colors.primary,
-                              },
-                            ]}
-                          />
-                          <Text style={styles.pinnedMetaText}>
-                            {pin.primaryLanguage.name}
-                          </Text>
-                        </View>
-                      )}
-                      <View style={styles.pinnedMetaItem}>
-                        <Text style={styles.pinnedMetaIcon}>â­</Text>
-                        <Text style={styles.pinnedMetaText}>{pin.stargazerCount}</Text>
-                      </View>
-                      <View style={styles.pinnedMetaItem}>
-                        <Text style={styles.pinnedMetaIcon}>ðŸ´</Text>
-                        <Text style={styles.pinnedMetaText}>{pin.forkCount}</Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            </View>
           )}
+        </>
+      )}
+    </View>
+  );
 
-          {/* Official GraphQL Contribution Heatmap */}
-          <Text style={styles.sectionHeader}>Contribution Activity (Official API)</Text>
-          <ContributionHeatmap
-            days={contributions.days}
-            total={contributions.total}
-          />
+  const renderReadme = () => {
+    if (!profileReadme) return null;
+    return (
+      <View key="readme" style={styles.profileReadmeCard}>
+        <View style={styles.profileReadmeHeader}>
+          <View style={styles.profileReadmeTitleRow}>
+            <Text style={styles.profileReadmeIcon}>📖</Text>
+            <Text style={styles.profileReadmeTitle}>
+              {user?.login} / README.md
+            </Text>
+          </View>
+          <TouchableOpacity
+            onPress={() => setReadmeExpanded(!readmeExpanded)}
+            style={styles.readmeToggleBtn}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.readmeToggleBtnText}>
+              {readmeExpanded ? 'Collapse ▲' : 'Expand ▼'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+        <Text
+          style={styles.profileReadmeBody}
+          numberOfLines={readmeExpanded ? undefined : 8}
+        >
+          {profileReadme}
+        </Text>
+      </View>
+    );
+  };
 
-          {/* Sub-Tab Navigation Bar (Fully scrollable, never clipped) */}
+  const renderPinned = () => {
+    if (pinnedItems.length === 0) return null;
+    return (
+      <View key="pinned" style={styles.pinnedContainer}>
+        <Text style={styles.sectionHeader}>📌 Pinned Repositories</Text>
+        <View style={styles.pinnedGrid}>
+          {pinnedItems.map((pin) => (
+            <TouchableOpacity
+              key={pin.id}
+              style={styles.pinnedCard}
+              onPress={async () => {
+                const [owner, name] = pin.nameWithOwner.split('/');
+                const fullRepo = await GitHubApiService.getRepo(owner, name);
+                if (fullRepo) {
+                  setSelectedRepo(fullRepo);
+                  setRepoModalVisible(true);
+                } else {
+                  Linking.openURL(pin.url);
+                }
+              }}
+              activeOpacity={0.7}
+            >
+              <View style={styles.pinnedHeaderRow}>
+                <Text style={styles.pinnedName} numberOfLines={1}>
+                  {pin.name}
+                </Text>
+                <View style={styles.repoVisibilityBadge}>
+                  <Text style={styles.repoVisibilityText}>
+                    {pin.isPrivate ? '🔒 Private' : 'Public'}
+                  </Text>
+                </View>
+              </View>
+
+              {pin.description ? (
+                <Text style={styles.pinnedDesc} numberOfLines={2}>
+                  {pin.description}
+                </Text>
+              ) : null}
+
+              <View style={styles.pinnedFooter}>
+                {pin.primaryLanguage && (
+                  <View style={styles.pinnedMetaItem}>
+                    <View
+                      style={[
+                        styles.langDot,
+                        {
+                          backgroundColor:
+                            pin.primaryLanguage.color || Colors.primary,
+                        },
+                      ]}
+                    />
+                    <Text style={styles.pinnedMetaText}>
+                      {pin.primaryLanguage.name}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.pinnedMetaItem}>
+                  <Text style={styles.pinnedMetaIcon}>⭐</Text>
+                  <Text style={styles.pinnedMetaText}>{pin.stargazerCount}</Text>
+                </View>
+                <View style={styles.pinnedMetaItem}>
+                  <Text style={styles.pinnedMetaIcon}>🍴</Text>
+                  <Text style={styles.pinnedMetaText}>{pin.forkCount}</Text>
+                </View>
+              </View>
+            </TouchableOpacity>
+          ))}
+        </View>
+      </View>
+    );
+  };
+
+  const renderHeatmap = () => (
+    <View key="heatmap" style={styles.heatmapCardWrapper}>
+      <Text style={styles.sectionHeader}>Contribution Activity (Official API)</Text>
+      <ContributionHeatmap
+        days={contributions.days}
+        total={contributions.total}
+      />
+    </View>
+  );
+
+  const renderSubtabs = () => (
+    <View key="subtabs" style={styles.subtabsSectionWrapper}>
+      {/* Sub-Tab Navigation Bar (Fully scrollable, never clipped) */}
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
@@ -1163,7 +990,7 @@ export const ProfileScreen: React.FC = () => {
                         repos.length}
                       )
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>â†• Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>Ã¢â€ â€¢ Scroll inside card</Text>
                   </View>
 
                   {repos.length > 0 ? (
@@ -1220,7 +1047,7 @@ export const ProfileScreen: React.FC = () => {
                     <Text style={styles.reposCardTopTitle}>
                       Starred Repositories ({starredRepos.length})
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>â†• Scroll inside card</Text>
+                    <Text style={styles.reposCardScrollHint}>Ã¢â€ â€¢ Scroll inside card</Text>
                   </View>
 
                   {starredRepos.length > 0 ? (
@@ -1289,7 +1116,7 @@ export const ProfileScreen: React.FC = () => {
 
                             <View style={styles.gistFooter}>
                               <Text style={styles.gistFilesCount}>
-                                ðŸ“„ {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
+                                Ã°Å¸â€œâ€ž {fileNames.length} {fileNames.length === 1 ? 'file' : 'files'}
                               </Text>
                               {firstFile?.language && (
                                 <Text style={styles.gistLang}>
@@ -1297,7 +1124,7 @@ export const ProfileScreen: React.FC = () => {
                                 </Text>
                               )}
                               <Text style={styles.gistComments}>
-                                ðŸ’¬ {g.comments}
+                                Ã°Å¸â€™Â¬ {g.comments}
                               </Text>
                             </View>
                           </TouchableOpacity>
@@ -1476,7 +1303,7 @@ export const ProfileScreen: React.FC = () => {
                             </View>
                           )}
                           <Text style={styles.userCardLogin}>@{u.login}</Text>
-                          <Text style={styles.userCardArrow}>â†—</Text>
+                          <Text style={styles.userCardArrow}>Ã¢â€ â€”</Text>
                         </TouchableOpacity>
                       ))}
 
@@ -1524,6 +1351,218 @@ export const ProfileScreen: React.FC = () => {
               )}
             </>
           )}
+    </View>
+  );
+
+  const renderModularSection = (secId: ProfileSectionId) => {
+    if (!settings.profileSectionVisibility[secId]) return null;
+
+    switch (secId) {
+      case 'socialLinks':
+        return renderSocialLinks();
+      case 'tokenPermissions':
+        return renderTokenPermissions();
+      case 'readme':
+        return renderReadme();
+      case 'pinned':
+        return renderPinned();
+      case 'heatmap':
+        return renderHeatmap();
+      case 'subtabs':
+        return renderSubtabs();
+      default:
+        return null;
+    }
+  };
+
+  if (loading) {
+    return (
+      <View style={[styles.container, styles.centered]}>
+        <ActivityIndicator size="large" color={Colors.primary} />
+      </View>
+    );
+  }
+
+  return (
+    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
+      {!isAuth ? (
+        // Unauthenticated: API Key Entry Gate
+        <View style={styles.authGateCard}>
+          <Image
+            source={require('../../assets/hero-banner.png')}
+            style={styles.heroBanner}
+            resizeMode="cover"
+          />
+          <View style={styles.authGateIconBox}>
+            <Text style={styles.authGateIcon}>Ã°Å¸â€â€˜</Text>
+          </View>
+          <Text style={styles.authGateTitle}>Connect GitHub Account</Text>
+          <Text style={styles.authGateDesc}>
+            GitPulse accesses GitHub exclusively through official authenticated APIs with zero third-party proxies. Your Personal Access Token (PAT) stays on your device.
+          </Text>
+
+          {/* Quick Setup Shortcut */}
+          <TouchableOpacity
+            style={styles.oneClickTokenBtn}
+            onPress={() => Linking.openURL(GITHUB_NEW_TOKEN_URL)}
+            activeOpacity={0.8}
+          >
+            <Text style={styles.oneClickTokenIcon}>Ã¢Å¡Â¡</Text>
+            <View style={styles.oneClickTokenTextWrap}>
+              <Text style={styles.oneClickTokenTitle}>Generate Token on GitHub Ã¢â€ â€”</Text>
+              <Text style={styles.oneClickTokenSub}>
+                Opens GitHub with all 5 required scopes pre-checked automatically
+              </Text>
+            </View>
+          </TouchableOpacity>
+
+          {/* Permissions Checklist */}
+          <View style={styles.scopesGuideBox}>
+            <Text style={styles.scopesGuideHeader}>TOKEN PERMISSIONS NEEDED</Text>
+            <Text style={styles.scopesGuideHint}>
+              Select these scopes on GitHub (or use the shortcut button above):
+            </Text>
+
+            {SCOPES_SPECS.map((item) => (
+              <View key={item.scope} style={styles.scopeItemRow}>
+                <View style={styles.scopeItemTop}>
+                  <Text style={styles.scopeCodeText}>{item.scope}</Text>
+                  <View
+                    style={[
+                      styles.scopeBadge,
+                      item.level === 'Required'
+                        ? styles.badgeRequired
+                        : item.level === 'Recommended'
+                        ? styles.badgeRecommended
+                        : styles.badgeOptional,
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.scopeBadgeText,
+                        item.level === 'Required'
+                          ? styles.badgeTextRequired
+                          : item.level === 'Recommended'
+                          ? styles.badgeTextRecommended
+                          : styles.badgeTextOptional,
+                      ]}
+                    >
+                      {item.level.toUpperCase()}
+                    </Text>
+                  </View>
+                </View>
+                <Text style={styles.scopeItemDesc}>{item.desc}</Text>
+              </View>
+            ))}
+          </View>
+
+          <View style={styles.tokenBox}>
+            <Text style={styles.inputLabel}>Personal Access Token (PAT)</Text>
+            <TextInput
+              style={styles.tokenInput}
+              placeholder="ghp_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+              placeholderTextColor={Colors.textMuted}
+              value={tokenInput}
+              onChangeText={setTokenInput}
+              secureTextEntry
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+            <Text style={styles.tokenHint}>
+              Classic token starting with <Text style={styles.tokenHintBold}>ghp_</Text> recommended. Stored encrypted on-device.
+            </Text>
+
+            <TouchableOpacity
+              style={styles.connectButton}
+              onPress={handleConnectToken}
+              disabled={validating}
+              activeOpacity={0.8}
+            >
+              {validating ? (
+                <ActivityIndicator color="#FFFFFF" size="small" />
+              ) : (
+                <Text style={styles.connectButtonText}>Connect & Authenticate</Text>
+              )}
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        // Authenticated Profile
+        <>
+          {user && (
+            <View style={styles.profileCard}>
+              <Image
+                source={require('../../assets/hero-banner.png')}
+                style={styles.profileBanner}
+                resizeMode="cover"
+              />
+              <View style={styles.avatarRow}>
+                {user.avatar_url ? (
+                  <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
+                ) : (
+                  <View style={[styles.avatar, styles.avatarPlaceholder]}>
+                    <Text style={styles.avatarLetter}>
+                      {user.login.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                )}
+                <View style={styles.nameBlock}>
+                  <Text style={styles.name}>{user.name || user.login}</Text>
+                  <Text style={styles.username}>@{user.login}</Text>
+                  <View style={styles.badgeRow}>
+                    <View style={styles.authBadge}>
+                      <Text style={styles.authBadgeText}>
+                        Ã¢â€”Â Live Authenticated API
+                      </Text>
+                    </View>
+                  </View>
+                </View>
+              </View>
+
+              {user.bio ? <Text style={styles.bio}>{user.bio}</Text> : null}
+
+              <View style={styles.detailsRow}>
+                {user.company ? (
+                  <Text style={styles.detailText}>Ã°Å¸ÂÂ¢ {user.company}</Text>
+                ) : null}
+                {user.location ? (
+                  <Text style={styles.detailText}>Ã°Å¸â€œÂ {user.location}</Text>
+                ) : null}
+              </View>
+
+              {/* Action Buttons Row: Customize & Disconnect */}
+              <View style={styles.profileActionBtnsRow}>
+                {onOpenCustomization && (
+                  <TouchableOpacity
+                    style={styles.customizeProfileBtn}
+                    onPress={onOpenCustomization}
+                    activeOpacity={0.7}
+                  >
+                    <Text style={styles.customizeProfileBtnText}>
+                      ⚙️ Customize Screens & Themes
+                    </Text>
+                  </TouchableOpacity>
+                )}
+                <TouchableOpacity
+                  style={styles.disconnectButton}
+                  onPress={handleDisconnect}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.disconnectButtonText}>
+                    Disconnect API Key
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+          )}
+
+          {/* Modular Custom Layout Sections */}
+          {user &&
+            settings.profileSectionOrder.map((secId) => (
+              <React.Fragment key={secId}>
+                {renderModularSection(secId)}
+              </React.Fragment>
+            ))}
         </>
       )}
 
@@ -1551,7 +1590,7 @@ export const ProfileScreen: React.FC = () => {
               onPress={() => setGistModalVisible(false)}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>âœ•</Text>
+              <Text style={styles.closeBtnText}>Ã¢Å“â€¢</Text>
             </TouchableOpacity>
             <View style={styles.gistModalTitleBox}>
               <Text style={styles.gistModalTitle} numberOfLines={1}>
@@ -1567,7 +1606,7 @@ export const ProfileScreen: React.FC = () => {
               }}
               style={styles.closeBtn}
             >
-              <Text style={styles.closeBtnText}>â†—</Text>
+              <Text style={styles.closeBtnText}>Ã¢â€ â€”</Text>
             </TouchableOpacity>
           </View>
 
@@ -2582,5 +2621,29 @@ const styles = StyleSheet.create({
     color: Colors.textPrimary,
     fontSize: 12,
     fontFamily: 'monospace',
+  },
+
+  profileActionBtnsRow: {
+    gap: 10,
+    marginTop: Spacing.sm,
+  },
+  customizeProfileBtn: {
+    backgroundColor: Colors.cardElevated,
+    paddingVertical: 12,
+    borderRadius: 12,
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  customizeProfileBtnText: {
+    color: Colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
+  },
+  heatmapCardWrapper: {
+    marginBottom: Spacing.md,
+  },
+  subtabsSectionWrapper: {
+    marginBottom: Spacing.md,
   },
 });

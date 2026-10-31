@@ -8,7 +8,8 @@ import {
   TouchableWithoutFeedback,
   ActivityIndicator,
 } from 'react-native';
-import { Colors, Spacing } from '../constants/theme';
+import { Spacing } from '../constants/theme';
+import { useTheme } from '../context/ThemeContext';
 
 export interface DialogButton {
   text: string;
@@ -38,30 +39,32 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
   onClose,
   dismissable = true,
 }) => {
+  const { colors } = useTheme();
+
   const getBadgeStyle = () => {
     switch (type) {
       case 'danger':
         return {
-          bg: Colors.rubyMuted,
-          border: Colors.ruby,
+          bg: colors.rubyMuted,
+          border: colors.ruby,
           defaultIcon: '🛑',
         };
       case 'warning':
         return {
-          bg: Colors.goldMuted,
-          border: Colors.gold,
+          bg: colors.goldMuted,
+          border: colors.gold,
           defaultIcon: '⚠️',
         };
       case 'success':
         return {
-          bg: Colors.emeraldMuted,
-          border: Colors.emerald,
+          bg: colors.emeraldMuted,
+          border: colors.emerald,
           defaultIcon: '✅',
         };
       default:
         return {
-          bg: Colors.primaryMuted,
-          border: Colors.primary,
+          bg: colors.primaryMuted,
+          border: colors.primary,
           defaultIcon: 'ℹ️',
         };
     }
@@ -86,7 +89,15 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
       >
         <View style={styles.overlay}>
           <TouchableWithoutFeedback onPress={(e) => e.stopPropagation()}>
-            <View style={styles.card}>
+            <View
+              style={[
+                styles.card,
+                {
+                  backgroundColor: colors.card,
+                  borderColor: colors.cardBorder,
+                },
+              ]}
+            >
               {/* Type Icon Badge */}
               <View
                 style={[
@@ -98,8 +109,14 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
               </View>
 
               {/* Title & Message */}
-              <Text style={styles.title}>{title}</Text>
-              {message ? <Text style={styles.message}>{message}</Text> : null}
+              <Text style={[styles.title, { color: colors.textPrimary }]}>
+                {title}
+              </Text>
+              {message ? (
+                <Text style={[styles.message, { color: colors.textSecondary }]}>
+                  {message}
+                </Text>
+              ) : null}
 
               {/* Action Buttons */}
               <View
@@ -113,18 +130,22 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
                   const isDestructive = btn.style === 'destructive';
                   const isSuccess = btn.style === 'success';
 
-                  let btnStyle = styles.btnPrimary;
-                  let textStyle = styles.btnTextPrimary;
+                  let btnBg = colors.primary;
+                  let textColor = '#FFFFFF';
+                  let borderWidth = 0;
+                  let borderColor = 'transparent';
 
                   if (isCancel) {
-                    btnStyle = styles.btnCancel;
-                    textStyle = styles.btnTextCancel;
+                    btnBg = colors.cardElevated;
+                    textColor = colors.textSecondary;
+                    borderWidth = 1;
+                    borderColor = colors.cardBorder;
                   } else if (isDestructive) {
-                    btnStyle = styles.btnDestructive;
-                    textStyle = styles.btnTextDestructive;
+                    btnBg = colors.ruby;
+                    textColor = '#FFFFFF';
                   } else if (isSuccess) {
-                    btnStyle = styles.btnSuccess;
-                    textStyle = styles.btnTextSuccess;
+                    btnBg = colors.emerald;
+                    textColor = '#FFFFFF';
                   }
 
                   return (
@@ -132,7 +153,11 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
                       key={`dialog-btn-${idx}`}
                       style={[
                         styles.btnBase,
-                        btnStyle,
+                        {
+                          backgroundColor: btnBg,
+                          borderWidth,
+                          borderColor,
+                        },
                         buttons.length === 2 && styles.btnHalf,
                       ]}
                       onPress={() => {
@@ -148,7 +173,7 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
                       {btn.loading ? (
                         <ActivityIndicator color="#FFFFFF" size="small" />
                       ) : (
-                        <Text style={[styles.btnTextBase, textStyle]}>
+                        <Text style={[styles.btnTextBase, { color: textColor }]}>
                           {btn.text}
                         </Text>
                       )}
@@ -175,10 +200,8 @@ const styles = StyleSheet.create({
   card: {
     width: '100%',
     maxWidth: 360,
-    backgroundColor: Colors.card,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.cardBorder,
     paddingHorizontal: Spacing.xl,
     paddingTop: Spacing.xl,
     paddingBottom: Spacing.lg,
@@ -204,14 +227,12 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 17,
     fontWeight: '800',
-    color: Colors.textPrimary,
     textAlign: 'center',
     marginBottom: Spacing.xs,
   },
   message: {
     fontSize: 13,
     lineHeight: 19,
-    color: Colors.textSecondary,
     textAlign: 'center',
     marginBottom: Spacing.lg,
   },
@@ -234,35 +255,8 @@ const styles = StyleSheet.create({
   btnHalf: {
     flex: 1,
   },
-  btnPrimary: {
-    backgroundColor: Colors.primary,
-  },
-  btnCancel: {
-    backgroundColor: Colors.cardElevated,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  btnDestructive: {
-    backgroundColor: Colors.ruby,
-  },
-  btnSuccess: {
-    backgroundColor: Colors.emerald,
-  },
   btnTextBase: {
     fontSize: 14,
     fontWeight: '700',
   },
-  btnTextPrimary: {
-    color: '#FFFFFF',
-  },
-  btnTextCancel: {
-    color: Colors.textSecondary,
-  },
-  btnTextDestructive: {
-    color: '#FFFFFF',
-  },
-  btnTextSuccess: {
-    color: '#FFFFFF',
-  },
 });
-

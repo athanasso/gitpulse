@@ -27,6 +27,7 @@ import { GitHubApiService } from '../services/GitHubApiService';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
+import { useCustomization } from '../context/CustomizationContext';
 
 interface RepoDetailModalProps {
   visible: boolean;
@@ -75,7 +76,8 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   onClose,
   onRepoDeleted,
 }) => {
-  const [activeTab, setActiveTab] = useState<RepoTab>('readme');
+  const { settings } = useCustomization();
+  const [activeTab, setActiveTab] = useState<RepoTab>(settings.defaultRepoDetailTab || 'readme');
   const [loading, setLoading] = useState(false);
 
   // App-themed Dialog state
@@ -242,6 +244,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       setCurrentPath('');
       setViewingFile(null);
       setSelectedCommit(null);
+      if (settings.defaultRepoDetailTab) {
+        setActiveTab(settings.defaultRepoDetailTab);
+      }
 
       const [owner, name] = repo.full_name.split('/');
       GitHubApiService.isRepoStarred(owner, name).then((starred) => {

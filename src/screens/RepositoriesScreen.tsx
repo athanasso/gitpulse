@@ -16,6 +16,8 @@ import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
+import { useTheme } from '../context/ThemeContext';
+import { useCustomization } from '../context/CustomizationContext';
 
 type RepoTypeFilter = 'all' | 'sources' | 'forks' | 'public' | 'private';
 type RepoSortOption = 'updated' | 'stars' | 'forks' | 'name';
@@ -56,10 +58,25 @@ export const RepositoriesScreen: React.FC = () => {
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
   const [searchingRemote, setSearchingRemote] = useState(false);
 
+  const { colors } = useTheme();
+  const { settings } = useCustomization();
+
   // Filters
   const [selectedLanguage, setSelectedLanguage] = useState<string>('All');
-  const [typeFilter, setTypeFilter] = useState<RepoTypeFilter>('all');
-  const [sortBy, setSortBy] = useState<RepoSortOption>('updated');
+  const [typeFilter, setTypeFilter] = useState<RepoTypeFilter>(
+    settings.defaultRepoFilter || 'all'
+  );
+  const [sortBy, setSortBy] = useState<RepoSortOption>(
+    settings.defaultRepoSort || 'updated'
+  );
+
+  useEffect(() => {
+    if (settings.defaultRepoFilter) setTypeFilter(settings.defaultRepoFilter);
+  }, [settings.defaultRepoFilter]);
+
+  useEffect(() => {
+    if (settings.defaultRepoSort) setSortBy(settings.defaultRepoSort);
+  }, [settings.defaultRepoSort]);
 
   // Detail Modal
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
@@ -217,9 +234,10 @@ export const RepositoriesScreen: React.FC = () => {
   };
 
   const renderRepoItem = ({ item }: { item: GitHubRepo }) => {
+    const isCompact = settings.repoCardDensity === 'compact';
     return (
       <TouchableOpacity
-        style={styles.repoCard}
+        style={[styles.repoCard, isCompact && { paddingVertical: 10, paddingHorizontal: 12 }]}
         onPress={() => openRepo(item)}
         activeOpacity={0.7}
       >
@@ -228,7 +246,7 @@ export const RepositoriesScreen: React.FC = () => {
             {item.name}
           </Text>
           <View style={styles.badgesGroup}>
-            {item.fork && (
+            {item.fork && settings.repoShowForkBadge !== false && (
               <View style={styles.forkBadge}>
                 <Text style={styles.forkBadgeText}>ðŸ´ Fork</Text>
               </View>
@@ -241,7 +259,7 @@ export const RepositoriesScreen: React.FC = () => {
           </View>
         </View>
 
-        {item.description && (
+        {item.description && !isCompact && (
           <Text style={styles.repoDesc} numberOfLines={2}>
             {item.description}
           </Text>
@@ -250,6 +268,7 @@ export const RepositoriesScreen: React.FC = () => {
         <View style={styles.repoFooter}>
           {item.language && (
             <View style={styles.metaItem}>
+              {settings.repoShowLanguageDot !== false && (
               <View
                 style={[
                   styles.langDot,
@@ -259,6 +278,7 @@ export const RepositoriesScreen: React.FC = () => {
                   },
                 ]}
               />
+              )}
               <Text style={styles.metaText}>{item.language}</Text>
             </View>
           )}
