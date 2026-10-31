@@ -34,6 +34,7 @@ import {
   useCustomization,
   ProfileSectionId,
 } from '../context/CustomizationContext';
+import { MarkdownWebView } from '../components/MarkdownWebView';
 
 interface ProfileScreenProps {
   onOpenCustomization?: () => void;
@@ -812,12 +813,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-        <Text
-          style={styles.profileReadmeBody}
-          numberOfLines={readmeExpanded ? undefined : 8}
-        >
-          {profileReadme}
-        </Text>
+        <MarkdownWebView
+          htmlContent={profileReadme}
+          colors={colors}
+          isExpanded={readmeExpanded}
+          maxCollapsedHeight={260}
+        />
       </View>
     );
   };

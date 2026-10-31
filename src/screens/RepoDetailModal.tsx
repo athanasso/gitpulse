@@ -30,6 +30,7 @@ import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
 import { useCustomization } from '../context/CustomizationContext';
+import { MarkdownWebView } from '../components/MarkdownWebView';
 
 interface RepoDetailModalProps {
   visible: boolean;
@@ -801,9 +802,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   <View style={styles.readmeHeader}>
                     <Text style={styles.readmeHeaderTitle}>📖 README.md</Text>
                   </View>
-                  <Text style={styles.readmeBody}>
-                    {readmeContent || 'No README.md found in this repository.'}
-                  </Text>
+                  <MarkdownWebView
+                    htmlContent={readmeContent}
+                    colors={colors}
+                    isLoading={loading && !readmeContent}
+                    emptyMessage="No README.md found in this repository."
+                  />
                 </View>
 
                 {/* Danger Zone: Delete Repository (if owner / admin) */}

@@ -283,16 +283,25 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch repository README raw markdown
+   * Fetch repository README (GitHub rendered HTML or raw markdown)
    */
-  async getRepoReadme(owner: string, repo: string): Promise<string> {
+  async getRepoReadme(
+    owner: string,
+    repo: string,
+    format: 'html' | 'raw' = 'html'
+  ): Promise<string> {
     try {
+      const acceptHeader =
+        format === 'raw'
+          ? 'application/vnd.github.v3.raw'
+          : 'application/vnd.github.v3.html';
+
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/readme`,
         {
           headers: {
             ...this.getHeaders(),
-            Accept: 'application/vnd.github.v3.raw',
+            Accept: acceptHeader,
           },
         }
       );
@@ -327,9 +336,12 @@ class GitHubApiServiceClass {
   /**
    * Fetch Profile README ({username}/{username}/README.md)
    */
-  async getProfileReadme(username: string): Promise<string> {
+  async getProfileReadme(
+    username: string,
+    format: 'html' | 'raw' = 'html'
+  ): Promise<string> {
     if (!username) return '';
-    return this.getRepoReadme(username, username);
+    return this.getRepoReadme(username, username, format);
   }
 
   /**
