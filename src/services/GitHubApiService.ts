@@ -9,6 +9,13 @@ import {
   GitHubWorkflowRun,
   GitHubNotification,
   ContributionDay,
+  GitHubGist,
+  GitHubOrg,
+  GitHubRelease,
+  GitHubBranch,
+  GitHubEvent,
+  GitHubContributor,
+  GitHubFollower,
 } from '../types/github';
 
 const PAT_STORAGE_KEY = '@gitpulse_pat_token';
@@ -478,6 +485,265 @@ class GitHubApiServiceClass {
       console.warn('Failed to fetch official GraphQL contributions', e);
       return { total: 0, days: [] };
     }
+  }
+
+  /**
+   * Fetch authenticated user's starred repositories
+   */
+  async getUserStarredRepos(): Promise<GitHubRepo[]> {
+    if (!this.token) return [];
+    try {
+      const res = await fetch(
+        'https://api.github.com/user/starred?per_page=100&sort=updated',
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch starred repos', e);
+    }
+    return [];
+  }
+
+  /**
+   * Check if a repo is starred by authenticated user
+   */
+  async isRepoStarred(owner: string, repo: string): Promise<boolean> {
+    if (!this.token) return false;
+    try {
+      const res = await fetch(
+        `https://api.github.com/user/starred/${owner}/${repo}`,
+        { headers: this.getHeaders() }
+      );
+      return res.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Star a repository
+   */
+  async starRepo(owner: string, repo: string): Promise<boolean> {
+    if (!this.token) return false;
+    try {
+      const res = await fetch(
+        `https://api.github.com/user/starred/${owner}/${repo}`,
+        {
+          method: 'PUT',
+          headers: {
+            ...this.getHeaders(),
+            'Content-Length': '0',
+          },
+        }
+      );
+      return res.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Unstar a repository
+   */
+  async unstarRepo(owner: string, repo: string): Promise<boolean> {
+    if (!this.token) return false;
+    try {
+      const res = await fetch(
+        `https://api.github.com/user/starred/${owner}/${repo}`,
+        {
+          method: 'DELETE',
+          headers: this.getHeaders(),
+        }
+      );
+      return res.status === 204;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Fetch authenticated user's gists (public and secret)
+   */
+  async getGists(): Promise<GitHubGist[]> {
+    if (!this.token) return [];
+    try {
+      const res = await fetch('https://api.github.com/gists?per_page=50', {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch gists', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch authenticated user's organizations
+   */
+  async getOrgs(): Promise<GitHubOrg[]> {
+    if (!this.token) return [];
+    try {
+      const res = await fetch('https://api.github.com/user/orgs?per_page=50', {
+        headers: this.getHeaders(),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user orgs', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch followers
+   */
+  async getFollowers(username?: string): Promise<GitHubFollower[]> {
+    if (!this.token) return [];
+    try {
+      const endpoint = username
+        ? `https://api.github.com/users/${encodeURIComponent(username)}/followers?per_page=50`
+        : 'https://api.github.com/user/followers?per_page=50';
+      const res = await fetch(endpoint, { headers: this.getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch followers', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch users following
+   */
+  async getFollowing(username?: string): Promise<GitHubFollower[]> {
+    if (!this.token) return [];
+    try {
+      const endpoint = username
+        ? `https://api.github.com/users/${encodeURIComponent(username)}/following?per_page=50`
+        : 'https://api.github.com/user/following?per_page=50';
+      const res = await fetch(endpoint, { headers: this.getHeaders() });
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch following', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch public user event stream
+   */
+  async getUserEvents(username?: string): Promise<GitHubEvent[]> {
+    if (!this.token) return [];
+    try {
+      const user = username || this.cachedUser?.login;
+      if (!user) return [];
+      const res = await fetch(
+        `https://api.github.com/users/${encodeURIComponent(user)}/events?per_page=50`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch user events', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch repository releases & binary assets
+   */
+  async getRepoReleases(owner: string, repo: string): Promise<GitHubRelease[]> {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/releases?per_page=30`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch repo releases', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch repository branch list
+   */
+  async getRepoBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch repo branches', e);
+    }
+    return [];
+  }
+
+  /**
+   * Fetch repository language byte breakdown
+   */
+  async getRepoLanguages(
+    owner: string,
+    repo: string
+  ): Promise<Record<string, number>> {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/languages`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return data && typeof data === 'object' ? data : {};
+      }
+    } catch (e) {
+      console.warn('Failed to fetch repo languages', e);
+    }
+    return {};
+  }
+
+  /**
+   * Fetch repository contributor leaderboards
+   */
+  async getRepoContributors(
+    owner: string,
+    repo: string
+  ): Promise<GitHubContributor[]> {
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=30`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch repo contributors', e);
+    }
+    return [];
   }
 }
 

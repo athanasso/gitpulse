@@ -158,3 +158,91 @@ export interface ContributionDay {
   level: 0 | 1 | 2 | 3 | 4;
 }
 
+export interface GitHubGist {
+  id: string;
+  description: string | null;
+  public: boolean;
+  created_at: string;
+  updated_at: string;
+  comments: number;
+  html_url: string;
+  files: Record<
+    string,
+    {
+      filename: string;
+      type: string;
+      language: string | null;
+      raw_url: string;
+      size: number;
+    }
+  >;
+}
+
+export interface GitHubOrg {
+  id: number;
+  login: string;
+  avatar_url: string;
+  description: string | null;
+}
+
+export interface GitHubRelease {
+  id: number;
+  tag_name: string;
+  name: string | null;
+  body: string | null;
+  prerelease: boolean;
+  published_at: string;
+  html_url: string;
+  author: {
+    login: string;
+    avatar_url: string;
+  };
+  assets: Array<{
+    id: number;
+    name: string;
+    size: number;
+    download_count: number;
+    browser_download_url: string;
+  }>;
+}
+
+export interface GitHubBranch {
+  name: string;
+  commit: {
+    sha: string;
+    url: string;
+  };
+  protected: boolean;
+}
+
+export interface GitHubEvent {
+  id: string;
+  type: string;
+  actor: {
+    login: string;
+    avatar_url: string;
+  };
+  repo: {
+    name: string;
+    url: string;
+  };
+  created_at: string;
+  payload?: any;
+}
+
+export interface GitHubContributor {
+  id: number;
+  login: string;
+  avatar_url: string;
+  contributions: number;
+  html_url: string;
+}
+
+export interface GitHubFollower {
+  id: number;
+  login: string;
+  avatar_url: string;
+  html_url: string;
+}
+
+

@@ -8,6 +8,8 @@ import {
   ScrollView,
   ActivityIndicator,
   Share,
+  Linking,
+  FlatList,
 } from 'react-native';
 import { Colors, Spacing } from '../constants/theme';
 import {
@@ -17,6 +19,9 @@ import {
   GitHubIssue,
   GitHubPullRequest,
   GitHubWorkflowRun,
+  GitHubBranch,
+  GitHubRelease,
+  GitHubContributor,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 
@@ -26,7 +31,34 @@ interface RepoDetailModalProps {
   onClose: () => void;
 }
 
-type RepoTab = 'readme' | 'code' | 'commits' | 'issues' | 'actions';
+type RepoTab =
+  | 'readme'
+  | 'code'
+  | 'commits'
+  | 'issues'
+  | 'actions'
+  | 'releases'
+  | 'insights';
+
+const LANGUAGE_COLORS: Record<string, string> = {
+  TypeScript: '#3178C6',
+  JavaScript: '#F7DF1E',
+  Python: '#3572A5',
+  Rust: '#DEA584',
+  Go: '#00ADD8',
+  Java: '#B07219',
+  'C++': '#F34B7D',
+  C: '#555555',
+  'C#': '#178600',
+  Ruby: '#701516',
+  PHP: '#4F5D95',
+  HTML: '#E34C26',
+  CSS: '#563D7C',
+  Shell: '#89E051',
+  Swift: '#F05138',
+  Kotlin: '#A97BFF',
+  Dart: '#00B4AB',
+};
 
 export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   visible,
@@ -35,6 +67,16 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
 }) => {
   const [activeTab, setActiveTab] = useState<RepoTab>('readme');
   const [loading, setLoading] = useState(false);
+
+  // Branch switcher state
+  const [selectedBranch, setSelectedBranch] = useState<string>('main');
+  const [branches, setBranches] = useState<GitHubBranch[]>([]);
+  const [branchModalVisible, setBranchModalVisible] = useState(false);
+
+  // Star state
+  const [isStarred, setIsStarred] = useState(false);
+  const [starsCount, setStarsCount] = useState<number>(0);
+  const [starLoading, setStarLoading] = useState(false);
 
   // Tab Data
   const [readmeContent, setReadmeContent] = useState<string>('');
@@ -49,15 +91,49 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [workflowRuns, setWorkflowRuns] = useState<GitHubWorkflowRun[]>([]);
   const [issueFilter, setIssueFilter] = useState<'all' | 'open' | 'closed'>('open');
 
+  // Extended Data: Releases & Insights
+  const [releases, setReleases] = useState<GitHubRelease[]>([]);
+  const [languages, setLanguages] = useState<Record<string, number>>({});
+  const [contributors, setContributors] = useState<GitHubContributor[]>([]);
+
+  useEffect(() => {
+    if (visible && repo) {
+      const defBranch = repo.default_branch || 'main';
+      setSelectedBranch(defBranch);
+      setStarsCount(repo.stargazers_count);
+      setReadmeContent('');
+      setFileTree([]);
+      setCommits([]);
+      setIssues([]);
+      setPrs([]);
+      setWorkflowRuns([]);
+      setReleases([]);
+      setLanguages({});
+      setContributors([]);
+      setCurrentPath('');
+      setViewingFile(null);
+      setSelectedCommit(null);
+
+      const [owner, name] = repo.full_name.split('/');
+      GitHubApiService.isRepoStarred(owner, name).then((starred) => {
+        setIsStarred(starred);
+      });
+      GitHubApiService.getRepoBranches(owner, name).then((bList) => {
+        if (bList.length > 0) setBranches(bList);
+      });
+    }
+  }, [visible, repo]);
+
   useEffect(() => {
     if (visible && repo) {
       loadTabData();
     }
   }, [visible, repo, activeTab]);
 
-  const loadTabData = async () => {
+  const loadTabData = async (branchRef?: string) => {
     if (!repo) return;
     setLoading(true);
+    const branch = branchRef || selectedBranch;
 
     try {
       const [owner, name] = repo.full_name.split('/');
@@ -66,10 +142,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         const md = await GitHubApiService.getRepoReadme(owner, name);
         setReadmeContent(md);
       } else if (activeTab === 'code' && fileTree.length === 0) {
-        const tree = await GitHubApiService.getRepoTree(owner, name, currentPath);
+        const tree = await GitHubApiService.getRepoTree(owner, name, currentPath, branch);
         setFileTree(tree);
       } else if (activeTab === 'commits' && commits.length === 0) {
-        const cList = await GitHubApiService.getRepoCommits(owner, name);
+        const cList = await GitHubApiService.getRepoCommits(owner, name, branch);
         setCommits(cList);
       } else if (activeTab === 'issues' && issues.length === 0) {
         const { issues: iList, prs: pList } =
@@ -79,11 +155,69 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       } else if (activeTab === 'actions' && workflowRuns.length === 0) {
         const runs = await GitHubApiService.getWorkflowRuns(owner, name);
         setWorkflowRuns(runs);
+      } else if (activeTab === 'releases' && releases.length === 0) {
+        const rels = await GitHubApiService.getRepoReleases(owner, name);
+        setReleases(rels);
+      } else if (activeTab === 'insights' && Object.keys(languages).length === 0) {
+        const [langMap, contribList] = await Promise.all([
+          GitHubApiService.getRepoLanguages(owner, name),
+          GitHubApiService.getRepoContributors(owner, name),
+        ]);
+        setLanguages(langMap);
+        setContributors(contribList);
       }
     } catch (e) {
       console.warn('Error loading repo tab', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleSelectBranch = async (branchName: string) => {
+    setSelectedBranch(branchName);
+    setBranchModalVisible(false);
+    if (!repo) return;
+
+    const [owner, name] = repo.full_name.split('/');
+    if (activeTab === 'code') {
+      setLoading(true);
+      setCurrentPath('');
+      setViewingFile(null);
+      const tree = await GitHubApiService.getRepoTree(owner, name, '', branchName);
+      setFileTree(tree);
+      setLoading(false);
+    } else if (activeTab === 'commits') {
+      setLoading(true);
+      setSelectedCommit(null);
+      const cList = await GitHubApiService.getRepoCommits(owner, name, branchName);
+      setCommits(cList);
+      setLoading(false);
+    }
+  };
+
+  const handleToggleStar = async () => {
+    if (!repo || starLoading) return;
+    setStarLoading(true);
+    const [owner, name] = repo.full_name.split('/');
+
+    try {
+      if (isStarred) {
+        const ok = await GitHubApiService.unstarRepo(owner, name);
+        if (ok) {
+          setIsStarred(false);
+          setStarsCount((prev) => Math.max(0, prev - 1));
+        }
+      } else {
+        const ok = await GitHubApiService.starRepo(owner, name);
+        if (ok) {
+          setIsStarred(true);
+          setStarsCount((prev) => prev + 1);
+        }
+      }
+    } catch (e) {
+      console.warn('Star toggle error', e);
+    } finally {
+      setStarLoading(false);
     }
   };
 
@@ -94,7 +228,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setViewingFile(null);
 
     const [owner, name] = repo.full_name.split('/');
-    const tree = await GitHubApiService.getRepoTree(owner, name, dirPath);
+    const tree = await GitHubApiService.getRepoTree(
+      owner,
+      name,
+      dirPath,
+      selectedBranch
+    );
     setFileTree(tree);
     setLoading(false);
   };
@@ -113,7 +252,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setViewingFile(item);
 
     const [owner, name] = repo.full_name.split('/');
-    const content = await GitHubApiService.getFileContent(owner, name, item.path);
+    const content = await GitHubApiService.getFileContent(
+      owner,
+      name,
+      item.path,
+      selectedBranch
+    );
     setFileContent(content);
     setLoading(false);
   };
@@ -132,6 +276,17 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
 
   if (!repo) return null;
 
+  // Language Breakdown Calculations
+  const totalBytes = Object.values(languages).reduce((sum, b) => sum + b, 0);
+  const languageList = Object.entries(languages)
+    .map(([lang, bytes]) => ({
+      name: lang,
+      bytes,
+      percentage: totalBytes > 0 ? (bytes / totalBytes) * 100 : 0,
+      color: LANGUAGE_COLORS[lang] || Colors.primary,
+    }))
+    .sort((a, b) => b.bytes - a.bytes);
+
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <View style={styles.container}>
@@ -148,25 +303,58 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             <Text style={styles.repoOwner}>{repo.owner.login}</Text>
           </View>
 
-          <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
-            <Text style={styles.actionIcon}>🔗</Text>
-          </TouchableOpacity>
+          {/* Star & Share Buttons */}
+          <View style={styles.headerActions}>
+            <TouchableOpacity
+              onPress={handleToggleStar}
+              style={[
+                styles.iconButton,
+                isStarred && styles.iconButtonStarred,
+              ]}
+              disabled={starLoading}
+            >
+              {starLoading ? (
+                <ActivityIndicator size="small" color={Colors.primary} />
+              ) : (
+                <Text style={styles.actionIcon}>{isStarred ? '⭐' : '☆'}</Text>
+              )}
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
+              <Text style={styles.actionIcon}>🔗</Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Quick Stats Pill Bar */}
+        {/* Quick Stats & Branch Switcher Bar */}
         <View style={styles.statsBar}>
-          <View style={styles.statPill}>
-            <Text style={styles.statIcon}>⭐</Text>
-            <Text style={styles.statValue}>{repo.stargazers_count}</Text>
-          </View>
+          <TouchableOpacity
+            style={styles.statPill}
+            onPress={handleToggleStar}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.statIcon}>{isStarred ? '⭐' : '☆'}</Text>
+            <Text style={styles.statValue}>{starsCount}</Text>
+          </TouchableOpacity>
+
           <View style={styles.statPill}>
             <Text style={styles.statIcon}>🍴</Text>
             <Text style={styles.statValue}>{repo.forks_count}</Text>
           </View>
-          <View style={styles.statPill}>
+
+          {/* Branch Switcher Pill */}
+          <TouchableOpacity
+            style={[styles.statPill, styles.branchPill]}
+            onPress={() => setBranchModalVisible(true)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.statIcon}>🌿</Text>
-            <Text style={styles.statValue}>{repo.default_branch}</Text>
-          </View>
+            <Text style={styles.branchPillText} numberOfLines={1}>
+              {selectedBranch}
+            </Text>
+            <Text style={styles.dropdownCaret}>▾</Text>
+          </TouchableOpacity>
+
           {repo.language && (
             <View style={styles.statPill}>
               <View
@@ -174,13 +362,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   styles.languageDot,
                   {
                     backgroundColor:
-                      repo.language === 'TypeScript'
-                        ? '#3178C6'
-                        : repo.language === 'JavaScript'
-                        ? '#F7DF1E'
-                        : repo.language === 'Python'
-                        ? '#3572A5'
-                        : Colors.primary,
+                      LANGUAGE_COLORS[repo.language] || Colors.primary,
                   },
                 ]}
               />
@@ -189,8 +371,13 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           )}
         </View>
 
-        {/* Tab Switcher */}
-        <View style={styles.tabsRow}>
+        {/* Scrollable Tab Bar */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          style={styles.tabsScrollView}
+          contentContainerStyle={styles.tabsRow}
+        >
           <TouchableOpacity
             style={[styles.tab, activeTab === 'readme' && styles.tabActive]}
             onPress={() => setActiveTab('readme')}
@@ -260,7 +447,35 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
               Actions CI
             </Text>
           </TouchableOpacity>
-        </View>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'releases' && styles.tabActive]}
+            onPress={() => setActiveTab('releases')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'releases' && styles.tabTextActive,
+              ]}
+            >
+              Releases
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'insights' && styles.tabActive]}
+            onPress={() => setActiveTab('insights')}
+          >
+            <Text
+              style={[
+                styles.tabText,
+                activeTab === 'insights' && styles.tabTextActive,
+              ]}
+            >
+              Insights
+            </Text>
+          </TouchableOpacity>
+        </ScrollView>
 
         {/* Content Body */}
         {loading ? (
@@ -295,7 +510,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         onPress={() => setViewingFile(null)}
                         style={styles.backButton}
                       >
-                        <Text style={styles.backButtonText}>← {viewingFile.name}</Text>
+                        <Text style={styles.backButtonText}>
+                          ← {viewingFile.name}
+                        </Text>
                       </TouchableOpacity>
                       <Text style={styles.fileSizeText}>
                         {Math.round(viewingFile.size / 1024)} KB
@@ -311,12 +528,18 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         {fileContent ? (
                           fileContent.split('\n').map((line, idx) => (
                             <View key={idx} style={styles.codeLineRow}>
-                              <Text style={styles.codeLineNumber}>{idx + 1}</Text>
-                              <Text style={styles.codeLineText}>{line || ' '}</Text>
+                              <Text style={styles.codeLineNumber}>
+                                {idx + 1}
+                              </Text>
+                              <Text style={styles.codeLineText}>
+                                {line || ' '}
+                              </Text>
                             </View>
                           ))
                         ) : (
-                          <Text style={styles.emptyDetailText}>Empty file or binary content.</Text>
+                          <Text style={styles.emptyDetailText}>
+                            Empty file or binary content.
+                          </Text>
                         )}
                       </View>
                     </ScrollView>
@@ -360,7 +583,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Text style={styles.emptyDetailText}>No files found in this repository branch.</Text>
+                    <Text style={styles.emptyDetailText}>
+                      No files found in branch "{selectedBranch}".
+                    </Text>
                   </View>
                 )}
               </View>
@@ -434,7 +659,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   ))
                 ) : (
                   <View style={styles.emptyCard}>
-                    <Text style={styles.emptyDetailText}>No commits found in this repository.</Text>
+                    <Text style={styles.emptyDetailText}>
+                      No commits found in branch "{selectedBranch}".
+                    </Text>
                   </View>
                 )}
               </View>
@@ -583,8 +810,216 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 )}
               </View>
             )}
+
+            {/* RELEASES & ASSETS TAB */}
+            {activeTab === 'releases' && (
+              <View style={styles.releasesContainer}>
+                {releases.length > 0 ? (
+                  releases.map((rel) => (
+                    <View key={rel.id} style={styles.releaseCard}>
+                      <View style={styles.releaseHeader}>
+                        <View style={styles.tagBadge}>
+                          <Text style={styles.tagBadgeText}>🏷️ {rel.tag_name}</Text>
+                        </View>
+                        {rel.prerelease && (
+                          <View style={styles.prereleaseBadge}>
+                            <Text style={styles.prereleaseText}>Pre-release</Text>
+                          </View>
+                        )}
+                        <Text style={styles.releaseDate}>
+                          {new Date(rel.published_at).toLocaleDateString()}
+                        </Text>
+                      </View>
+
+                      <Text style={styles.releaseTitle}>
+                        {rel.name || rel.tag_name}
+                      </Text>
+
+                      {rel.body && (
+                        <Text style={styles.releaseBody} numberOfLines={4}>
+                          {rel.body}
+                        </Text>
+                      )}
+
+                      {/* Assets Section */}
+                      {rel.assets && rel.assets.length > 0 && (
+                        <View style={styles.assetsSection}>
+                          <Text style={styles.assetsTitle}>
+                            📦 Assets ({rel.assets.length})
+                          </Text>
+                          {rel.assets.map((asset) => (
+                            <TouchableOpacity
+                              key={asset.id}
+                              style={styles.assetRow}
+                              onPress={() => Linking.openURL(asset.browser_download_url)}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.assetIcon}>💾</Text>
+                              <Text style={styles.assetName} numberOfLines={1}>
+                                {asset.name}
+                              </Text>
+                              <Text style={styles.assetSize}>
+                                {asset.size > 1048576
+                                  ? `${(asset.size / 1048576).toFixed(1)} MB`
+                                  : `${Math.round(asset.size / 1024)} KB`}
+                              </Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDetailText}>
+                      No official releases found for this repository.
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* INSIGHTS TAB: LANGUAGES & CONTRIBUTORS */}
+            {activeTab === 'insights' && (
+              <View style={styles.insightsContainer}>
+                {/* Language Breakdown */}
+                <View style={styles.insightSectionCard}>
+                  <Text style={styles.sectionHeader}>Languages Breakdown</Text>
+                  {languageList.length > 0 ? (
+                    <>
+                      {/* Proportional Multi-Segment Progress Bar */}
+                      <View style={styles.langBarContainer}>
+                        {languageList.map((l) => (
+                          <View
+                            key={l.name}
+                            style={[
+                              styles.langBarSegment,
+                              {
+                                flex: l.percentage,
+                                backgroundColor: l.color,
+                              },
+                            ]}
+                          />
+                        ))}
+                      </View>
+
+                      {/* Language Legend Grid */}
+                      <View style={styles.langLegendGrid}>
+                        {languageList.map((l) => (
+                          <View key={l.name} style={styles.langLegendItem}>
+                            <View
+                              style={[
+                                styles.langLegendDot,
+                                { backgroundColor: l.color },
+                              ]}
+                            />
+                            <Text style={styles.langLegendName}>{l.name}</Text>
+                            <Text style={styles.langLegendPercent}>
+                              {l.percentage.toFixed(1)}%
+                            </Text>
+                          </View>
+                        ))}
+                      </View>
+                    </>
+                  ) : (
+                    <Text style={styles.emptyDetailText}>
+                      No language metrics available.
+                    </Text>
+                  )}
+                </View>
+
+                {/* Contributor Leaderboard */}
+                <View style={styles.insightSectionCard}>
+                  <Text style={styles.sectionHeader}>
+                    Contributors ({contributors.length})
+                  </Text>
+                  {contributors.length > 0 ? (
+                    contributors.map((c, idx) => (
+                      <View key={c.id} style={styles.contributorRow}>
+                        <View style={styles.rankBadge}>
+                          <Text style={styles.rankText}>#{idx + 1}</Text>
+                        </View>
+                        <Text style={styles.contributorName}>@{c.login}</Text>
+                        <View style={styles.contributorCountBadge}>
+                          <Text style={styles.contributorCountText}>
+                            {c.contributions} {c.contributions === 1 ? 'commit' : 'commits'}
+                          </Text>
+                        </View>
+                      </View>
+                    ))
+                  ) : (
+                    <Text style={styles.emptyDetailText}>
+                      No contributors recorded.
+                    </Text>
+                  )}
+                </View>
+              </View>
+            )}
           </ScrollView>
         )}
+
+        {/* Branch Selector Modal */}
+        <Modal
+          visible={branchModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setBranchModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={styles.branchModalCard}>
+              <View style={styles.branchModalHeader}>
+                <Text style={styles.branchModalTitle}>Switch Branch</Text>
+                <TouchableOpacity
+                  onPress={() => setBranchModalVisible(false)}
+                  style={styles.branchModalClose}
+                >
+                  <Text style={styles.branchModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <FlatList
+                data={branches}
+                keyExtractor={(item) => item.name}
+                style={styles.branchList}
+                renderItem={({ item }) => {
+                  const isCurrent = item.name === selectedBranch;
+                  return (
+                    <TouchableOpacity
+                      style={[
+                        styles.branchItem,
+                        isCurrent && styles.branchItemActive,
+                      ]}
+                      onPress={() => handleSelectBranch(item.name)}
+                    >
+                      <Text style={styles.branchItemIcon}>🌿</Text>
+                      <Text
+                        style={[
+                          styles.branchItemText,
+                          isCurrent && styles.branchItemTextActive,
+                        ]}
+                      >
+                        {item.name}
+                      </Text>
+                      {item.protected && (
+                        <View style={styles.protectedBadge}>
+                          <Text style={styles.protectedText}>protected</Text>
+                        </View>
+                      )}
+                      {isCurrent && <Text style={styles.checkIcon}>✓</Text>}
+                    </TouchableOpacity>
+                  );
+                }}
+                ListEmptyComponent={
+                  <View style={styles.emptyCard}>
+                    <Text style={styles.emptyDetailText}>
+                      No alternate branches found.
+                    </Text>
+                  </View>
+                }
+              />
+            </View>
+          </View>
+        </Modal>
       </View>
     </Modal>
   );
@@ -633,6 +1068,11 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginTop: 2,
   },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
   iconButton: {
     width: 36,
     height: 36,
@@ -641,11 +1081,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  iconButtonStarred: {
+    backgroundColor: 'rgba(234, 179, 8, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(234, 179, 8, 0.4)',
+  },
   actionIcon: {
-    fontSize: 15,
+    fontSize: 16,
   },
   statsBar: {
     flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: 8,
@@ -662,6 +1108,20 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
   },
+  branchPill: {
+    maxWidth: 130,
+    backgroundColor: Colors.cardElevated,
+  },
+  branchPillText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.cyan,
+    marginRight: 4,
+  },
+  dropdownCaret: {
+    fontSize: 10,
+    color: Colors.cyan,
+  },
   statIcon: {
     fontSize: 12,
     marginRight: 4,
@@ -677,12 +1137,15 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     marginRight: 6,
   },
-  tabsRow: {
-    flexDirection: 'row',
-    backgroundColor: Colors.backgroundElevated,
-    paddingHorizontal: Spacing.md,
+  tabsScrollView: {
+    flexGrow: 0,
     borderBottomWidth: 1,
     borderBottomColor: Colors.cardBorder,
+    backgroundColor: Colors.backgroundElevated,
+  },
+  tabsRow: {
+    flexDirection: 'row',
+    paddingHorizontal: Spacing.md,
   },
   tab: {
     paddingVertical: 12,
@@ -957,7 +1420,7 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: '800',
     color: Colors.textPrimary,
-    marginBottom: 6,
+    marginBottom: Spacing.sm,
   },
   issueCard: {
     backgroundColor: Colors.card,
@@ -1065,6 +1528,179 @@ const styles = StyleSheet.create({
     color: Colors.textMuted,
     marginLeft: 'auto',
   },
+  releasesContainer: {
+    gap: 14,
+  },
+  releaseCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  releaseHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 8,
+  },
+  tagBadge: {
+    backgroundColor: Colors.cyanMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  tagBadgeText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.cyan,
+  },
+  prereleaseBadge: {
+    backgroundColor: Colors.rubyMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+  },
+  prereleaseText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.ruby,
+  },
+  releaseDate: {
+    fontSize: 11,
+    color: Colors.textMuted,
+    marginLeft: 'auto',
+  },
+  releaseTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 6,
+  },
+  releaseBody: {
+    fontSize: 12,
+    color: Colors.textSecondary,
+    lineHeight: 18,
+    marginBottom: Spacing.sm,
+  },
+  assetsSection: {
+    marginTop: Spacing.md,
+    paddingTop: Spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: Colors.cardBorder,
+    gap: 8,
+  },
+  assetsTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 4,
+  },
+  assetRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.cardElevated,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  assetIcon: {
+    fontSize: 13,
+    marginRight: 8,
+  },
+  assetName: {
+    flex: 1,
+    fontSize: 12,
+    color: Colors.cyan,
+    fontWeight: '600',
+  },
+  assetSize: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  insightsContainer: {
+    gap: 16,
+  },
+  insightSectionCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 14,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+  },
+  langBarContainer: {
+    flexDirection: 'row',
+    height: 10,
+    borderRadius: 5,
+    overflow: 'hidden',
+    backgroundColor: Colors.cardElevated,
+    marginVertical: Spacing.md,
+  },
+  langBarSegment: {
+    height: '100%',
+  },
+  langLegendGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 12,
+    marginTop: Spacing.sm,
+  },
+  langLegendItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 8,
+  },
+  langLegendDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginRight: 6,
+  },
+  langLegendName: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    marginRight: 4,
+  },
+  langLegendPercent: {
+    fontSize: 11,
+    color: Colors.textMuted,
+  },
+  contributorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+  },
+  rankBadge: {
+    width: 28,
+    alignItems: 'center',
+  },
+  rankText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: Colors.textMuted,
+  },
+  contributorName: {
+    flex: 1,
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  contributorCountBadge: {
+    backgroundColor: Colors.primaryMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  contributorCountText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: Colors.primary,
+  },
   emptyCard: {
     backgroundColor: Colors.card,
     borderRadius: 14,
@@ -1085,5 +1721,84 @@ const styles = StyleSheet.create({
     fontStyle: 'italic',
     paddingVertical: 8,
   },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+  },
+  branchModalCard: {
+    backgroundColor: Colors.card,
+    borderRadius: 16,
+    maxHeight: '70%',
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    overflow: 'hidden',
+  },
+  branchModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+  },
+  branchModalTitle: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+  },
+  branchModalClose: {
+    padding: 4,
+  },
+  branchModalCloseText: {
+    color: Colors.textMuted,
+    fontSize: 16,
+    fontWeight: '700',
+  },
+  branchList: {
+    padding: Spacing.md,
+  },
+  branchItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    borderRadius: 10,
+    marginBottom: 4,
+  },
+  branchItemActive: {
+    backgroundColor: Colors.cardElevated,
+  },
+  branchItemIcon: {
+    fontSize: 14,
+    marginRight: 10,
+  },
+  branchItemText: {
+    flex: 1,
+    fontSize: 14,
+    color: Colors.textSecondary,
+    fontWeight: '500',
+  },
+  branchItemTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  protectedBadge: {
+    backgroundColor: Colors.cardElevated,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    marginRight: 8,
+  },
+  protectedText: {
+    fontSize: 10,
+    color: Colors.textMuted,
+  },
+  checkIcon: {
+    color: Colors.primary,
+    fontWeight: '800',
+    fontSize: 14,
+  },
 });
-
