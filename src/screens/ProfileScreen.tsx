@@ -26,6 +26,7 @@ import { GitHubApiService } from '../services/GitHubApiService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
+import { PaginationControl } from '../components/PaginationControl';
 
 type ProfileSubTab =
   | 'repos'
@@ -168,7 +169,7 @@ export const ProfileScreen: React.FC = () => {
           setContributions(c);
           setRepos(rList);
           setHasMoreRepos(rList.length >= PAGE_SIZE);
-          setPageRepos(2);
+          setPageRepos(1);
         }
       } else {
         setUser(null);
@@ -191,21 +192,21 @@ export const ProfileScreen: React.FC = () => {
       const starred = await GitHubApiService.getUserStarredRepos(1, PAGE_SIZE);
       setStarredRepos(starred);
       setHasMoreStarred(starred.length >= PAGE_SIZE);
-      setPageStarred(2);
+      setPageStarred(1);
       setSubLoading(false);
     } else if (tab === 'gists' && gists.length === 0) {
       setSubLoading(true);
       const gList = await GitHubApiService.getGists(1, PAGE_SIZE);
       setGists(gList);
       setHasMoreGists(gList.length >= PAGE_SIZE);
-      setPageGists(2);
+      setPageGists(1);
       setSubLoading(false);
     } else if (tab === 'activity' && events.length === 0) {
       setSubLoading(true);
       const eList = await GitHubApiService.getUserEvents(user?.login, 1, PAGE_SIZE);
       setEvents(eList);
       setHasMoreEvents(eList.length >= PAGE_SIZE);
-      setPageEvents(2);
+      setPageEvents(1);
       setSubLoading(false);
     } else if (tab === 'orgs' && orgs.length === 0) {
       setSubLoading(true);
@@ -220,73 +221,73 @@ export const ProfileScreen: React.FC = () => {
       ]);
       setFollowers(fList);
       setHasMoreFollowers(fList.length >= PAGE_SIZE);
-      setPageFollowers(2);
+      setPageFollowers(1);
 
       setFollowing(folList);
       setHasMoreFollowing(folList.length >= PAGE_SIZE);
-      setPageFollowing(2);
+      setPageFollowing(1);
       setSubLoading(false);
     }
   };
 
-  // Pagination Load More Handlers
-  const loadMoreRepos = async () => {
-    if (loadingMoreRepos || !hasMoreRepos) return;
+  // True Page Navigation Handlers
+  const goToReposPage = async (newPage: number) => {
+    if (loadingMoreRepos || newPage < 1) return;
     setLoadingMoreRepos(true);
-    const more = await GitHubApiService.getUserRepos(pageRepos, PAGE_SIZE);
-    setRepos((prev) => [...prev, ...more]);
-    setHasMoreRepos(more.length >= PAGE_SIZE);
-    setPageRepos((prev) => prev + 1);
+    const list = await GitHubApiService.getUserRepos(newPage, PAGE_SIZE);
+    setRepos(list);
+    setHasMoreRepos(list.length >= PAGE_SIZE);
+    setPageRepos(newPage);
     setLoadingMoreRepos(false);
   };
 
-  const loadMoreStarred = async () => {
-    if (loadingMoreStarred || !hasMoreStarred) return;
+  const goToStarredPage = async (newPage: number) => {
+    if (loadingMoreStarred || newPage < 1) return;
     setLoadingMoreStarred(true);
-    const more = await GitHubApiService.getUserStarredRepos(pageStarred, PAGE_SIZE);
-    setStarredRepos((prev) => [...prev, ...more]);
-    setHasMoreStarred(more.length >= PAGE_SIZE);
-    setPageStarred((prev) => prev + 1);
+    const list = await GitHubApiService.getUserStarredRepos(newPage, PAGE_SIZE);
+    setStarredRepos(list);
+    setHasMoreStarred(list.length >= PAGE_SIZE);
+    setPageStarred(newPage);
     setLoadingMoreStarred(false);
   };
 
-  const loadMoreGists = async () => {
-    if (loadingMoreGists || !hasMoreGists) return;
+  const goToGistsPage = async (newPage: number) => {
+    if (loadingMoreGists || newPage < 1) return;
     setLoadingMoreGists(true);
-    const more = await GitHubApiService.getGists(pageGists, PAGE_SIZE);
-    setGists((prev) => [...prev, ...more]);
-    setHasMoreGists(more.length >= PAGE_SIZE);
-    setPageGists((prev) => prev + 1);
+    const list = await GitHubApiService.getGists(newPage, PAGE_SIZE);
+    setGists(list);
+    setHasMoreGists(list.length >= PAGE_SIZE);
+    setPageGists(newPage);
     setLoadingMoreGists(false);
   };
 
-  const loadMoreEvents = async () => {
-    if (loadingMoreEvents || !hasMoreEvents) return;
+  const goToEventsPage = async (newPage: number) => {
+    if (loadingMoreEvents || newPage < 1) return;
     setLoadingMoreEvents(true);
-    const more = await GitHubApiService.getUserEvents(user?.login, pageEvents, PAGE_SIZE);
-    setEvents((prev) => [...prev, ...more]);
-    setHasMoreEvents(more.length >= PAGE_SIZE);
-    setPageEvents((prev) => prev + 1);
+    const list = await GitHubApiService.getUserEvents(user?.login, newPage, PAGE_SIZE);
+    setEvents(list);
+    setHasMoreEvents(list.length >= PAGE_SIZE);
+    setPageEvents(newPage);
     setLoadingMoreEvents(false);
   };
 
-  const loadMoreFollowers = async () => {
-    if (loadingMoreFollowers || !hasMoreFollowers) return;
+  const goToFollowersPage = async (newPage: number) => {
+    if (loadingMoreFollowers || newPage < 1) return;
     setLoadingMoreFollowers(true);
-    const more = await GitHubApiService.getFollowers(user?.login, pageFollowers, PAGE_SIZE);
-    setFollowers((prev) => [...prev, ...more]);
-    setHasMoreFollowers(more.length >= PAGE_SIZE);
-    setPageFollowers((prev) => prev + 1);
+    const list = await GitHubApiService.getFollowers(user?.login, newPage, PAGE_SIZE);
+    setFollowers(list);
+    setHasMoreFollowers(list.length >= PAGE_SIZE);
+    setPageFollowers(newPage);
     setLoadingMoreFollowers(false);
   };
 
-  const loadMoreFollowing = async () => {
-    if (loadingMoreFollowing || !hasMoreFollowing) return;
+  const goToFollowingPage = async (newPage: number) => {
+    if (loadingMoreFollowing || newPage < 1) return;
     setLoadingMoreFollowing(true);
-    const more = await GitHubApiService.getFollowing(user?.login, pageFollowing, PAGE_SIZE);
-    setFollowing((prev) => [...prev, ...more]);
-    setHasMoreFollowing(more.length >= PAGE_SIZE);
-    setPageFollowing((prev) => prev + 1);
+    const list = await GitHubApiService.getFollowing(user?.login, newPage, PAGE_SIZE);
+    setFollowing(list);
+    setHasMoreFollowing(list.length >= PAGE_SIZE);
+    setPageFollowing(newPage);
     setLoadingMoreFollowing(false);
   };
 
@@ -313,7 +314,7 @@ export const ProfileScreen: React.FC = () => {
         setContributions(c);
         setRepos(rList);
         setHasMoreRepos(rList.length >= PAGE_SIZE);
-        setPageRepos(2);
+        setPageRepos(1);
 
         Alert.alert('Connected', `Signed in as @${u.login}`);
       }
@@ -861,18 +862,20 @@ export const ProfileScreen: React.FC = () => {
                         </TouchableOpacity>
                       ))}
 
-                      {hasMoreRepos && (
-                        <TouchableOpacity
-                          style={styles.loadMoreBtn}
-                          onPress={loadMoreRepos}
-                          disabled={loadingMoreRepos}
-                        >
-                          {loadingMoreRepos ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <Text style={styles.loadMoreText}>Load More Repositories</Text>
-                          )}
-                        </TouchableOpacity>
+                      {(hasMoreRepos || pageRepos > 1) && (
+                        <PaginationControl
+                          page={pageRepos}
+                          hasNext={hasMoreRepos}
+                          hasPrev={pageRepos > 1}
+                          totalPages={
+                            user?.public_repos
+                              ? Math.ceil(user.public_repos / PAGE_SIZE)
+                              : undefined
+                          }
+                          totalCount={user?.public_repos}
+                          loading={loadingMoreRepos}
+                          onPageChange={goToReposPage}
+                        />
                       )}
                     </>
                   ) : (
@@ -922,18 +925,14 @@ export const ProfileScreen: React.FC = () => {
                         </TouchableOpacity>
                       ))}
 
-                      {hasMoreStarred && (
-                        <TouchableOpacity
-                          style={styles.loadMoreBtn}
-                          onPress={loadMoreStarred}
-                          disabled={loadingMoreStarred}
-                        >
-                          {loadingMoreStarred ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <Text style={styles.loadMoreText}>Load More Starred Repos</Text>
-                          )}
-                        </TouchableOpacity>
+                      {(hasMoreStarred || pageStarred > 1) && (
+                        <PaginationControl
+                          page={pageStarred}
+                          hasNext={hasMoreStarred}
+                          hasPrev={pageStarred > 1}
+                          loading={loadingMoreStarred}
+                          onPageChange={goToStarredPage}
+                        />
                       )}
                     </>
                   ) : (
@@ -993,18 +992,20 @@ export const ProfileScreen: React.FC = () => {
                         );
                       })}
 
-                      {hasMoreGists && (
-                        <TouchableOpacity
-                          style={styles.loadMoreBtn}
-                          onPress={loadMoreGists}
-                          disabled={loadingMoreGists}
-                        >
-                          {loadingMoreGists ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <Text style={styles.loadMoreText}>Load More Gists</Text>
-                          )}
-                        </TouchableOpacity>
+                      {(hasMoreGists || pageGists > 1) && (
+                        <PaginationControl
+                          page={pageGists}
+                          hasNext={hasMoreGists}
+                          hasPrev={pageGists > 1}
+                          totalPages={
+                            user?.public_gists
+                              ? Math.ceil(user.public_gists / PAGE_SIZE)
+                              : undefined
+                          }
+                          totalCount={user?.public_gists}
+                          loading={loadingMoreGists}
+                          onPageChange={goToGistsPage}
+                        />
                       )}
                     </>
                   ) : (
@@ -1039,18 +1040,14 @@ export const ProfileScreen: React.FC = () => {
                         </View>
                       ))}
 
-                      {hasMoreEvents && (
-                        <TouchableOpacity
-                          style={styles.loadMoreBtn}
-                          onPress={loadMoreEvents}
-                          disabled={loadingMoreEvents}
-                        >
-                          {loadingMoreEvents ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <Text style={styles.loadMoreText}>Load More Activity</Text>
-                          )}
-                        </TouchableOpacity>
+                      {(hasMoreEvents || pageEvents > 1) && (
+                        <PaginationControl
+                          page={pageEvents}
+                          hasNext={hasMoreEvents}
+                          hasPrev={pageEvents > 1}
+                          loading={loadingMoreEvents}
+                          onPageChange={goToEventsPage}
+                        />
                       )}
                     </>
                   ) : (
@@ -1171,20 +1168,35 @@ export const ProfileScreen: React.FC = () => {
                         </TouchableOpacity>
                       ))}
 
-                      {(socialTab === 'followers' ? hasMoreFollowers : hasMoreFollowing) && (
-                        <TouchableOpacity
-                          style={styles.loadMoreBtn}
-                          onPress={socialTab === 'followers' ? loadMoreFollowers : loadMoreFollowing}
-                          disabled={socialTab === 'followers' ? loadingMoreFollowers : loadingMoreFollowing}
-                        >
-                          {(socialTab === 'followers' ? loadingMoreFollowers : loadingMoreFollowing) ? (
-                            <ActivityIndicator size="small" color={Colors.primary} />
-                          ) : (
-                            <Text style={styles.loadMoreText}>
-                              Load More {socialTab === 'followers' ? 'Followers' : 'Following'}
-                            </Text>
-                          )}
-                        </TouchableOpacity>
+                      {((socialTab === 'followers' ? hasMoreFollowers : hasMoreFollowing) ||
+                        (socialTab === 'followers' ? pageFollowers : pageFollowing) > 1) && (
+                        <PaginationControl
+                          page={socialTab === 'followers' ? pageFollowers : pageFollowing}
+                          hasNext={socialTab === 'followers' ? hasMoreFollowers : hasMoreFollowing}
+                          hasPrev={(socialTab === 'followers' ? pageFollowers : pageFollowing) > 1}
+                          totalPages={
+                            socialTab === 'followers'
+                              ? user?.followers
+                                ? Math.ceil(user.followers / PAGE_SIZE)
+                                : undefined
+                              : user?.following
+                              ? Math.ceil(user.following / PAGE_SIZE)
+                              : undefined
+                          }
+                          totalCount={
+                            socialTab === 'followers' ? user?.followers : user?.following
+                          }
+                          loading={
+                            socialTab === 'followers'
+                              ? loadingMoreFollowers
+                              : loadingMoreFollowing
+                          }
+                          onPageChange={
+                            socialTab === 'followers'
+                              ? goToFollowersPage
+                              : goToFollowingPage
+                          }
+                        />
                       )}
                     </>
                   ) : (

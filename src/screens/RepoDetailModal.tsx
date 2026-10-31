@@ -25,6 +25,7 @@ import {
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
+import { PaginationControl } from '../components/PaginationControl';
 
 interface RepoDetailModalProps {
   visible: boolean;
@@ -236,73 +237,69 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     }
   };
 
-  const loadMoreCommits = async () => {
-    if (!repo || loadingMoreCommits || !hasMoreCommits) return;
+  const goToCommitsPage = async (newPage: number) => {
+    if (!repo || loadingMoreCommits || newPage < 1) return;
     setLoadingMoreCommits(true);
     const [owner, name] = repo.full_name.split('/');
-    const nextPage = commitsPage + 1;
-    const more = await GitHubApiService.getRepoCommits(
+    const list = await GitHubApiService.getRepoCommits(
       owner,
       name,
       selectedBranch,
-      nextPage,
+      newPage,
       COMMITS_PAGE_SIZE
     );
-    setCommits((prev) => [...prev, ...more]);
-    setHasMoreCommits(more.length >= COMMITS_PAGE_SIZE);
-    setCommitsPage(nextPage);
+    setCommits(list);
+    setHasMoreCommits(list.length >= COMMITS_PAGE_SIZE);
+    setCommitsPage(newPage);
     setLoadingMoreCommits(false);
   };
 
-  const loadMoreIssues = async () => {
-    if (!repo || loadingMoreIssues || !hasMoreIssues) return;
+  const goToIssuesPage = async (newPage: number) => {
+    if (!repo || loadingMoreIssues || newPage < 1) return;
     setLoadingMoreIssues(true);
     const [owner, name] = repo.full_name.split('/');
-    const nextPage = issuesPage + 1;
     const { issues: moreI, prs: moreP } = await GitHubApiService.getIssuesAndPRs(
       owner,
       name,
-      nextPage,
+      newPage,
       ISSUES_PAGE_SIZE
     );
-    setIssues((prev) => [...prev, ...moreI]);
-    setPrs((prev) => [...prev, ...moreP]);
+    setIssues(moreI);
+    setPrs(moreP);
     setHasMoreIssues(moreI.length + moreP.length >= ISSUES_PAGE_SIZE);
-    setIssuesPage(nextPage);
+    setIssuesPage(newPage);
     setLoadingMoreIssues(false);
   };
 
-  const loadMoreWorkflowRuns = async () => {
-    if (!repo || loadingMoreRuns || !hasMoreRuns) return;
+  const goToWorkflowRunsPage = async (newPage: number) => {
+    if (!repo || loadingMoreRuns || newPage < 1) return;
     setLoadingMoreRuns(true);
     const [owner, name] = repo.full_name.split('/');
-    const nextPage = runsPage + 1;
-    const more = await GitHubApiService.getWorkflowRuns(
+    const list = await GitHubApiService.getWorkflowRuns(
       owner,
       name,
-      nextPage,
+      newPage,
       RUNS_PAGE_SIZE
     );
-    setWorkflowRuns((prev) => [...prev, ...more]);
-    setHasMoreRuns(more.length >= RUNS_PAGE_SIZE);
-    setRunsPage(nextPage);
+    setWorkflowRuns(list);
+    setHasMoreRuns(list.length >= RUNS_PAGE_SIZE);
+    setRunsPage(newPage);
     setLoadingMoreRuns(false);
   };
 
-  const loadMoreReleases = async () => {
-    if (!repo || loadingMoreReleases || !hasMoreReleases) return;
+  const goToReleasesPage = async (newPage: number) => {
+    if (!repo || loadingMoreReleases || newPage < 1) return;
     setLoadingMoreReleases(true);
     const [owner, name] = repo.full_name.split('/');
-    const nextPage = releasesPage + 1;
-    const more = await GitHubApiService.getRepoReleases(
+    const list = await GitHubApiService.getRepoReleases(
       owner,
       name,
-      nextPage,
+      newPage,
       RELEASES_PAGE_SIZE
     );
-    setReleases((prev) => [...prev, ...more]);
-    setHasMoreReleases(more.length >= RELEASES_PAGE_SIZE);
-    setReleasesPage(nextPage);
+    setReleases(list);
+    setHasMoreReleases(list.length >= RELEASES_PAGE_SIZE);
+    setReleasesPage(newPage);
     setLoadingMoreReleases(false);
   };
 
@@ -810,21 +807,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </TouchableOpacity>
                     ))}
 
-                    {/* Pagination Button */}
-                    {hasMoreCommits && (
-                      <TouchableOpacity
-                        style={styles.modalLoadMoreBtn}
-                        onPress={loadMoreCommits}
-                        disabled={loadingMoreCommits}
-                      >
-                        {loadingMoreCommits ? (
-                          <ActivityIndicator size="small" color={Colors.cyan} />
-                        ) : (
-                          <Text style={styles.modalLoadMoreText}>
-                            Load More Commits
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                    {(hasMoreCommits || commitsPage > 1) && (
+                      <PaginationControl
+                        page={commitsPage}
+                        hasNext={hasMoreCommits}
+                        hasPrev={commitsPage > 1}
+                        loading={loadingMoreCommits}
+                        onPageChange={goToCommitsPage}
+                      />
                     )}
                   </>
                 ) : (
@@ -965,21 +955,15 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   <Text style={styles.emptySubText}>No issues found.</Text>
                 )}
 
-                {/* Pagination Button for Issues & PRs */}
-                {hasMoreIssues && (
-                  <TouchableOpacity
-                    style={styles.modalLoadMoreBtn}
-                    onPress={loadMoreIssues}
-                    disabled={loadingMoreIssues}
-                  >
-                    {loadingMoreIssues ? (
-                      <ActivityIndicator size="small" color={Colors.cyan} />
-                    ) : (
-                      <Text style={styles.modalLoadMoreText}>
-                        Load More Issues & PRs
-                      </Text>
-                    )}
-                  </TouchableOpacity>
+                {/* Pagination for Issues & PRs */}
+                {(hasMoreIssues || issuesPage > 1) && (
+                  <PaginationControl
+                    page={issuesPage}
+                    hasNext={hasMoreIssues}
+                    hasPrev={issuesPage > 1}
+                    loading={loadingMoreIssues}
+                    onPageChange={goToIssuesPage}
+                  />
                 )}
               </View>
             )}
@@ -1015,21 +999,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </View>
                     ))}
 
-                    {/* Pagination Button */}
-                    {hasMoreRuns && (
-                      <TouchableOpacity
-                        style={styles.modalLoadMoreBtn}
-                        onPress={loadMoreWorkflowRuns}
-                        disabled={loadingMoreRuns}
-                      >
-                        {loadingMoreRuns ? (
-                          <ActivityIndicator size="small" color={Colors.cyan} />
-                        ) : (
-                          <Text style={styles.modalLoadMoreText}>
-                            Load More Actions Runs
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                    {(hasMoreRuns || runsPage > 1) && (
+                      <PaginationControl
+                        page={runsPage}
+                        hasNext={hasMoreRuns}
+                        hasPrev={runsPage > 1}
+                        loading={loadingMoreRuns}
+                        onPageChange={goToWorkflowRunsPage}
+                      />
                     )}
                   </>
                 ) : (
@@ -1102,21 +1079,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       </View>
                     ))}
 
-                    {/* Pagination Button */}
-                    {hasMoreReleases && (
-                      <TouchableOpacity
-                        style={styles.modalLoadMoreBtn}
-                        onPress={loadMoreReleases}
-                        disabled={loadingMoreReleases}
-                      >
-                        {loadingMoreReleases ? (
-                          <ActivityIndicator size="small" color={Colors.cyan} />
-                        ) : (
-                          <Text style={styles.modalLoadMoreText}>
-                            Load More Releases
-                          </Text>
-                        )}
-                      </TouchableOpacity>
+                    {(hasMoreReleases || releasesPage > 1) && (
+                      <PaginationControl
+                        page={releasesPage}
+                        hasNext={hasMoreReleases}
+                        hasPrev={releasesPage > 1}
+                        loading={loadingMoreReleases}
+                        onPageChange={goToReleasesPage}
+                      />
                     )}
                   </>
                 ) : (

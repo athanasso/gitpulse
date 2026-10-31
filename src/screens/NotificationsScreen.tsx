@@ -14,6 +14,7 @@ import { Colors, Spacing } from '../constants/theme';
 import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { formatRepoTimestamp } from '../utils/date';
+import { PaginationControl } from '../components/PaginationControl';
 
 type FilterType = 'unread' | 'all' | 'PullRequest' | 'Issue' | 'Release';
 
@@ -23,7 +24,7 @@ export const NotificationsScreen: React.FC = () => {
   const [notifications, setNotifications] = useState<GitHubNotification[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   const [activeFilter, setActiveFilter] = useState<FilterType>('unread');
@@ -31,52 +32,46 @@ export const NotificationsScreen: React.FC = () => {
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
 
+  const flatListRef = React.useRef<FlatList<GitHubNotification>>(null);
+
   useEffect(() => {
-    loadNotifications(true);
+    loadNotifications(1);
   }, []);
 
-  const loadNotifications = async (isRefresh: boolean = false) => {
+  const loadNotifications = async (targetPage: number = 1, isRefresh: boolean = false) => {
     if (isRefresh) {
       setRefreshing(true);
       setScopeError(null);
-      setPage(1);
-      setHasMore(true);
+    } else {
+      setPageLoading(true);
     }
 
     const auth = await GitHubApiService.init();
     setIsAuth(auth);
 
     if (auth) {
-      const currentPage = isRefresh ? 1 : page;
-      const list = await GitHubApiService.getNotifications(currentPage, PAGE_SIZE);
+      const list = await GitHubApiService.getNotifications(targetPage, PAGE_SIZE);
       const err = GitHubApiService.getLastNotificationError();
       if (err) {
         setScopeError(err);
       }
 
-      if (isRefresh) {
-        setNotifications(list);
-        setRefreshing(false);
-        setHasMore(list.length >= PAGE_SIZE);
-        setPage(2);
-      } else {
-        setNotifications((prev) => [...prev, ...list]);
-        setHasMore(list.length >= PAGE_SIZE);
-        setPage((prev) => prev + 1);
-        setLoadingMore(false);
-      }
+      setNotifications(list);
+      setPage(targetPage);
+      setHasMore(list.length >= PAGE_SIZE);
     } else {
       setNotifications([]);
-      setRefreshing(false);
-      setLoadingMore(false);
     }
+
+    if (isRefresh) setRefreshing(false);
+    else setPageLoading(false);
+
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
-  const handleEndReached = async () => {
-    if (hasMore && !loadingMore && !refreshing && isAuth) {
-      setLoadingMore(true);
-      await loadNotifications(false);
-    }
+  const goToPage = async (newPage: number) => {
+    if (pageLoading || newPage < 1) return;
+    await loadNotifications(newPage, false);
   };
 
   const markAsRead = async (id: string) => {
@@ -340,26 +335,30 @@ export const NotificationsScreen: React.FC = () => {
         </ScrollView>
       </View>
 
-      {/* List with Pagination */}
+      {/* List with Actual Page Controls */}
       <FlatList
+        ref={flatListRef}
         data={filtered}
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         contentContainerStyle={styles.listContent}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => loadNotifications(true)}
+            onRefresh={() => loadNotifications(1, true)}
             tintColor={Colors.primary}
           />
         }
         ListFooterComponent={
-          loadingMore ? (
-            <View style={styles.loadingMoreBox}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.loadingMoreText}>Loading more notifications...</Text>
+          filtered.length > 0 ? (
+            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: 24 }}>
+              <PaginationControl
+                page={page}
+                hasNext={hasMore}
+                hasPrev={page > 1}
+                loading={pageLoading}
+                onPageChange={goToPage}
+              />
             </View>
           ) : undefined
         }

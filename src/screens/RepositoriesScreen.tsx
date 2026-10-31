@@ -15,6 +15,7 @@ import { GitHubRepo } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatRepoTimestamp } from '../utils/date';
+import { PaginationControl } from '../components/PaginationControl';
 
 type RepoTypeFilter = 'all' | 'sources' | 'forks' | 'public' | 'private';
 type RepoSortOption = 'updated' | 'stars' | 'forks' | 'name';
@@ -45,7 +46,7 @@ export const RepositoriesScreen: React.FC = () => {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
   const [page, setPage] = useState(1);
   const [hasMore, setHasMore] = useState(true);
-  const [loadingMore, setLoadingMore] = useState(false);
+  const [pageLoading, setPageLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
 
   // Search & Remote results
@@ -64,55 +65,45 @@ export const RepositoriesScreen: React.FC = () => {
   const [selectedRepo, setSelectedRepo] = useState<GitHubRepo | null>(null);
   const [modalVisible, setModalVisible] = useState(false);
 
+  const flatListRef = React.useRef<FlatList<GitHubRepo>>(null);
+
   useEffect(() => {
-    loadRepos(true);
+    loadRepos(1);
   }, []);
 
-  const loadRepos = async (isRefresh: boolean = false) => {
+  const loadRepos = async (targetPage: number = 1, isRefresh: boolean = false) => {
     if (isRefresh) {
       setRefreshing(true);
-      setPage(1);
-      setHasMore(true);
+    } else {
+      setPageLoading(true);
     }
 
-    const currentPage = isRefresh ? 1 : page;
-    const list = await GitHubApiService.getUserRepos(currentPage, PAGE_SIZE);
+    const list = await GitHubApiService.getUserRepos(targetPage, PAGE_SIZE);
+    setRepos(list);
+    setPage(targetPage);
+    setHasMore(list.length >= PAGE_SIZE);
 
     if (isRefresh) {
-      setRepos(list);
       setRefreshing(false);
-      setHasMore(list.length >= PAGE_SIZE);
-      setPage(2);
     } else {
-      setRepos((prev) => [...prev, ...list]);
-      setHasMore(list.length >= PAGE_SIZE);
-      setPage((prev) => prev + 1);
-      setLoadingMore(false);
+      setPageLoading(false);
     }
+
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
   };
 
-  const handleEndReached = async () => {
+  const goToPage = async (newPage: number) => {
+    if (pageLoading || searchingRemote || newPage < 1) return;
     if (searchQuery.trim().length >= 3) {
-      // Paginate search
-      if (hasMoreSearch && !searchingRemote) {
-        setSearchingRemote(true);
-        const nextPage = searchPage + 1;
-        const moreResults = await GitHubApiService.searchRepos(
-          searchQuery,
-          nextPage,
-          PAGE_SIZE
-        );
-        setRemoteResults((prev) => [...prev, ...moreResults]);
-        setHasMoreSearch(moreResults.length >= PAGE_SIZE);
-        setSearchPage(nextPage);
-        setSearchingRemote(false);
-      }
+      setSearchingRemote(true);
+      const results = await GitHubApiService.searchRepos(searchQuery, newPage, PAGE_SIZE);
+      setRemoteResults(results);
+      setHasMoreSearch(results.length >= PAGE_SIZE);
+      setSearchPage(newPage);
+      setSearchingRemote(false);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     } else {
-      // Paginate repos
-      if (hasMore && !loadingMore && !refreshing) {
-        setLoadingMore(true);
-        await loadRepos(false);
-      }
+      await loadRepos(newPage, false);
     }
   };
 
@@ -126,15 +117,18 @@ export const RepositoriesScreen: React.FC = () => {
       setRemoteResults(results);
       setHasMoreSearch(results.length >= PAGE_SIZE);
       setSearchingRemote(false);
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
     } else {
       setRemoteResults([]);
     }
   };
 
-  const sourceList =
-    searchQuery.trim().length >= 3 && remoteResults.length > 0
-      ? remoteResults
-      : repos;
+  const isSearch = searchQuery.trim().length >= 3 && remoteResults.length > 0;
+  const currentUser = GitHubApiService.getCachedUser();
+  const totalRepos = currentUser?.public_repos;
+  const totalPages = totalRepos ? Math.ceil(totalRepos / PAGE_SIZE) : undefined;
+
+  const sourceList = isSearch ? remoteResults : repos;
 
   // Extract all unique languages dynamically from repos
   const dynamicLanguages = useMemo(() => {
@@ -416,26 +410,32 @@ export const RepositoriesScreen: React.FC = () => {
         </View>
       </View>
 
-      {/* Repositories List with Infinite Scroll Pagination */}
+      {/* Repositories List with Actual Page Controls */}
       <FlatList
+        ref={flatListRef}
         data={filteredRepos}
         keyExtractor={(item) => `${item.id}-${item.full_name}`}
         renderItem={renderRepoItem}
         contentContainerStyle={styles.listContent}
-        onEndReached={handleEndReached}
-        onEndReachedThreshold={0.4}
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={() => loadRepos(true)}
+            onRefresh={() => loadRepos(1, true)}
             tintColor={Colors.primary}
           />
         }
         ListFooterComponent={
-          loadingMore || searchingRemote ? (
-            <View style={styles.loadingMoreBox}>
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={styles.loadingMoreText}>Loading more repositories...</Text>
+          filteredRepos.length > 0 ? (
+            <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: 24 }}>
+              <PaginationControl
+                page={isSearch ? searchPage : page}
+                hasNext={isSearch ? hasMoreSearch : hasMore}
+                hasPrev={(isSearch ? searchPage : page) > 1}
+                totalPages={!isSearch ? totalPages : undefined}
+                totalCount={!isSearch ? totalRepos : undefined}
+                loading={pageLoading || searchingRemote}
+                onPageChange={goToPage}
+              />
             </View>
           ) : undefined
         }
