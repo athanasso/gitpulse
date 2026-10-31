@@ -90,6 +90,7 @@ export const ExploreScreen: React.FC = () => {
   // Search
   const [searchQuery, setSearchQuery] = useState<string>('');
   const [isSearchActive, setIsSearchActive] = useState<boolean>(false);
+  const [searchScope, setSearchScope] = useState<'global' | 'mine'>('global');
 
   // Data & State
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -110,13 +111,26 @@ export const ExploreScreen: React.FC = () => {
 
       try {
         if (isSearchActive && searchQuery.trim()) {
-          const results = await GitHubApiService.searchRepos(
-            searchQuery.trim(),
-            targetPage,
-            PAGE_SIZE
-          );
-          setRepos(results);
-          setTotalCount(GitHubApiService.getLastSearchTotalCount());
+          if (searchScope === 'global') {
+            const results = await GitHubApiService.searchRepos(
+              searchQuery.trim(),
+              targetPage,
+              PAGE_SIZE
+            );
+            setRepos(results);
+            setTotalCount(GitHubApiService.getLastSearchTotalCount());
+          } else {
+            const userRepos = await GitHubApiService.getUserRepos(1, 100);
+            const q = searchQuery.toLowerCase();
+            const matched = userRepos.filter(
+              (r) =>
+                r.name.toLowerCase().includes(q) ||
+                (r.description && r.description.toLowerCase().includes(q)) ||
+                (r.language && r.language.toLowerCase().includes(q))
+            );
+            setRepos(matched);
+            setTotalCount(matched.length);
+          }
         } else if (activeTab === 'trending') {
           const { items, totalCount: count } =
             await GitHubApiService.getExploreTrending(
@@ -156,6 +170,7 @@ export const ExploreScreen: React.FC = () => {
       selectedTopic,
       isSearchActive,
       searchQuery,
+      searchScope,
     ]
   );
 
@@ -168,6 +183,7 @@ export const ExploreScreen: React.FC = () => {
     selectedLanguage,
     selectedTopic,
     isSearchActive,
+    searchScope,
   ]);
 
   const handlePageChange = (newPage: number) => {
@@ -210,10 +226,14 @@ export const ExploreScreen: React.FC = () => {
     const rank = (page - 1) * PAGE_SIZE + index + 1;
     const langColor =
       (item.language && LANGUAGE_COLORS[item.language]) || colors.primary;
+    const isGlobal = !isSearchActive || searchScope === 'global';
 
     return (
       <TouchableOpacity
-        style={styles.repoCard}
+        style={[
+          styles.repoCard,
+          isGlobal && isSearchActive && styles.globalRepoCard,
+        ]}
         onPress={() => {
           setSelectedRepo(item);
           setModalVisible(true);
@@ -231,8 +251,15 @@ export const ExploreScreen: React.FC = () => {
             />
           )}
           <Text style={styles.repoTitle} numberOfLines={1}>
-            {item.full_name}
+            {isGlobal ? item.full_name : item.name}
           </Text>
+          {isSearchActive && (
+            <View style={isGlobal ? styles.globalBadge : styles.mineBadge}>
+              <Text style={isGlobal ? styles.globalBadgeText : styles.mineBadgeText}>
+                {isGlobal ? '🌐 Global' : '⚡ My Repo'}
+              </Text>
+            </View>
+          )}
         </View>
 
         {item.description ? (
@@ -495,15 +522,88 @@ export const ExploreScreen: React.FC = () => {
         </View>
       )}
 
-      {/* Active Search Banner */}
+      {/* Active Search: Scope Switcher & Banner */}
       {isSearchActive && (
-        <View style={styles.searchBanner}>
-          <Text style={styles.searchBannerText}>
-            Results for "{searchQuery}" ({totalCount} found)
-          </Text>
-          <TouchableOpacity onPress={handleClearSearch}>
-            <Text style={styles.searchBannerClear}>Exit Search</Text>
-          </TouchableOpacity>
+        <View style={styles.searchScopeWrapper}>
+          <View style={styles.scopeBar}>
+            <TouchableOpacity
+              style={[
+                styles.scopeTab,
+                searchScope === 'global' && styles.scopeTabActiveGlobal,
+              ]}
+              onPress={() => {
+                setSearchScope('global');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.scopeTabText,
+                  searchScope === 'global' && styles.scopeTabTextActiveGlobal,
+                ]}
+              >
+                🌐 All GitHub
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={[
+                styles.scopeTab,
+                searchScope === 'mine' && styles.scopeTabActiveMine,
+              ]}
+              onPress={() => {
+                setSearchScope('mine');
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[
+                  styles.scopeTabText,
+                  searchScope === 'mine' && styles.scopeTabTextActiveMine,
+                ]}
+              >
+                ⚡ My Repos
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          <View
+            style={[
+              styles.scopeBanner,
+              searchScope === 'global'
+                ? styles.scopeBannerGlobal
+                : styles.scopeBannerMine,
+            ]}
+          >
+            <View style={styles.scopeBannerLeft}>
+              <Text style={styles.scopeBannerIcon}>
+                {searchScope === 'global' ? '🌐' : '⚡'}
+              </Text>
+              <Text
+                style={[
+                  styles.scopeBannerTitle,
+                  {
+                    color:
+                      searchScope === 'global'
+                        ? colors.cyan
+                        : colors.primary,
+                  },
+                ]}
+              >
+                {searchScope === 'global'
+                  ? 'Global GitHub Search'
+                  : 'Your Repositories'}
+              </Text>
+              <Text style={styles.scopeBannerQuery} numberOfLines={1}>
+                "{searchQuery}"
+              </Text>
+            </View>
+            <TouchableOpacity onPress={handleClearSearch}>
+              <Text style={styles.searchBannerClear}>Exit Search</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       )}
 
@@ -867,5 +967,114 @@ const createStyles = (colors: ThemePalette) =>
       fontSize: 14,
       color: colors.textMuted,
       fontStyle: 'italic',
+    },
+    searchScopeWrapper: {
+      paddingBottom: 4,
+    },
+    scopeBar: {
+      flexDirection: 'row',
+      paddingHorizontal: Spacing.lg,
+      marginBottom: 8,
+      gap: 8,
+    },
+    scopeTab: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 7,
+      borderRadius: 10,
+      backgroundColor: colors.card,
+      borderWidth: 1,
+      borderColor: colors.cardBorder,
+    },
+    scopeTabActiveMine: {
+      backgroundColor: colors.primaryMuted,
+      borderColor: colors.primary,
+    },
+    scopeTabActiveGlobal: {
+      backgroundColor: colors.cyanMuted,
+      borderColor: colors.cyan,
+    },
+    scopeTabText: {
+      fontSize: 12,
+      fontWeight: '600',
+      color: colors.textSecondary,
+    },
+    scopeTabTextActiveMine: {
+      color: colors.primary,
+      fontWeight: '700',
+    },
+    scopeTabTextActiveGlobal: {
+      color: colors.cyan,
+      fontWeight: '700',
+    },
+    scopeBanner: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginHorizontal: Spacing.lg,
+      marginBottom: 8,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      borderRadius: 10,
+      borderWidth: 1,
+    },
+    scopeBannerMine: {
+      backgroundColor: colors.cardElevated,
+      borderColor: colors.cardBorder,
+    },
+    scopeBannerGlobal: {
+      backgroundColor: colors.cyanMuted,
+      borderColor: colors.cyan,
+    },
+    scopeBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flex: 1,
+    },
+    scopeBannerIcon: {
+      fontSize: 13,
+    },
+    scopeBannerTitle: {
+      fontSize: 12,
+      fontWeight: '700',
+    },
+    scopeBannerQuery: {
+      fontSize: 12,
+      color: colors.textMuted,
+      fontStyle: 'italic',
+      flex: 1,
+    },
+    globalBadge: {
+      backgroundColor: colors.cyanMuted,
+      borderWidth: 1,
+      borderColor: colors.cyan,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      marginLeft: 'auto',
+    },
+    globalBadgeText: {
+      color: colors.cyan,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    mineBadge: {
+      backgroundColor: colors.primaryMuted,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      paddingHorizontal: 6,
+      paddingVertical: 2,
+      borderRadius: 6,
+      marginLeft: 'auto',
+    },
+    mineBadgeText: {
+      color: colors.primary,
+      fontSize: 10,
+      fontWeight: '700',
+    },
+    globalRepoCard: {
+      borderColor: colors.cyanMuted,
     },
   });

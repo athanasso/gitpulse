@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,7 +9,9 @@ import {
   RefreshControl,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
+import * as Haptics from 'expo-haptics';
 import { ThemePalette, Spacing } from '../constants/theme';
 import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
@@ -53,10 +55,12 @@ export const RepositoriesScreen: React.FC = () => {
 
   // Search & Remote results
   const [searchQuery, setSearchQuery] = useState('');
+  const [searchScope, setSearchScope] = useState<'mine' | 'global'>('mine');
   const [remoteResults, setRemoteResults] = useState<GitHubRepo[]>([]);
   const [searchPage, setSearchPage] = useState(1);
   const [hasMoreSearch, setHasMoreSearch] = useState(true);
   const [searchingRemote, setSearchingRemote] = useState(false);
+  const searchDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const { colors } = useTheme();
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -86,7 +90,7 @@ export const RepositoriesScreen: React.FC = () => {
     GitHubApiService.getCachedUser()
   );
 
-  const flatListRef = React.useRef<FlatList<GitHubRepo>>(null);
+  const flatListRef = useRef<FlatList<GitHubRepo>>(null);
 
   useEffect(() => {
     loadRepos(1);
@@ -120,9 +124,9 @@ export const RepositoriesScreen: React.FC = () => {
 
   const goToPage = async (newPage: number) => {
     if (pageLoading || searchingRemote || newPage < 1) return;
-    if (searchQuery.trim().length >= 3) {
+    if (searchScope === 'global' && searchQuery.trim().length >= 2) {
       setSearchingRemote(true);
-      const results = await GitHubApiService.searchRepos(searchQuery, newPage, PAGE_SIZE);
+      const results = await GitHubApiService.searchRepos(searchQuery.trim(), newPage, PAGE_SIZE);
       setRemoteResults(results);
       setHasMoreSearch(results.length >= PAGE_SIZE);
       setSearchPage(newPage);
@@ -133,36 +137,67 @@ export const RepositoriesScreen: React.FC = () => {
     }
   };
 
-  const handleSearch = async (text: string) => {
+  const handleSearch = (text: string) => {
     setSearchQuery(text);
 
-    if (text.trim().length >= 3) {
+    if (searchDebounceRef.current) {
+      clearTimeout(searchDebounceRef.current);
+    }
+
+    if (text.trim().length >= 2) {
       setSearchingRemote(true);
-      setSearchPage(1);
-      const results = await GitHubApiService.searchRepos(text, 1, PAGE_SIZE);
-      setRemoteResults(results);
-      setHasMoreSearch(results.length >= PAGE_SIZE);
-      setSearchingRemote(false);
-      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+      searchDebounceRef.current = setTimeout(async () => {
+        try {
+          setSearchPage(1);
+          const results = await GitHubApiService.searchRepos(text.trim(), 1, PAGE_SIZE);
+          setRemoteResults(results);
+          setHasMoreSearch(results.length >= PAGE_SIZE);
+        } catch (e) {
+          console.warn('Remote search failed', e);
+        } finally {
+          setSearchingRemote(false);
+        }
+      }, 350);
     } else {
       setRemoteResults([]);
+      setSearchingRemote(false);
     }
   };
 
-  const isSearch = searchQuery.trim().length >= 3 && remoteResults.length > 0;
-  const searchTotal = GitHubApiService.getLastSearchTotalCount();
+  const handleSwitchScope = (scope: 'mine' | 'global') => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    setSearchScope(scope);
+    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+  };
 
-  // The real total number of repositories in user's GitHub account (or search result)
-  const realTotalRepos = isSearch
-    ? searchTotal || remoteResults.length
+  const isGlobalActive = searchScope === 'global' && searchQuery.trim().length > 0;
+  const sourceList = isGlobalActive ? remoteResults : repos;
+  const searchTotal = GitHubApiService.getLastSearchTotalCount();
+  const globalMatchCount = searchTotal || remoteResults.length;
+
+  // Local matching count in user's repositories
+  const localMatchCount = useMemo(() => {
+    if (!searchQuery.trim()) return repos.length;
+    const q = searchQuery.toLowerCase();
+    return repos.filter(
+      (r) =>
+        r.name.toLowerCase().includes(q) ||
+        (r.description && r.description.toLowerCase().includes(q)) ||
+        (r.language && r.language.toLowerCase().includes(q))
+    ).length;
+  }, [repos, searchQuery]);
+
+  // Real total number of repositories
+  const realTotalRepos = isGlobalActive
+    ? globalMatchCount
+    : searchQuery.trim()
+    ? localMatchCount
     : currentUser
     ? (currentUser.public_repos || 0) + (currentUser.total_private_repos || 0)
     : repos.length;
 
   const totalPages =
     realTotalRepos > 0 ? Math.ceil(realTotalRepos / PAGE_SIZE) : undefined;
-
-  const sourceList = isSearch ? remoteResults : repos;
 
   // Extract all unique languages dynamically from repos
   const dynamicLanguages = useMemo(() => {
@@ -184,8 +219,8 @@ export const RepositoriesScreen: React.FC = () => {
   const filteredRepos = useMemo(() => {
     let result = sourceList;
 
-    // Search query filter (for local matching)
-    if (searchQuery.trim()) {
+    // Search query filter (when filtering user's repos locally)
+    if (!isGlobalActive && searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (r) =>
@@ -200,15 +235,17 @@ export const RepositoriesScreen: React.FC = () => {
       result = result.filter((r) => r.language === selectedLanguage);
     }
 
-    // Type / Visibility filter
-    if (typeFilter === 'public') {
-      result = result.filter((r) => !r.private);
-    } else if (typeFilter === 'private') {
-      result = result.filter((r) => r.private);
-    } else if (typeFilter === 'sources') {
-      result = result.filter((r) => !r.fork);
-    } else if (typeFilter === 'forks') {
-      result = result.filter((r) => r.fork);
+    // Type / Visibility filter (applied to user's repos)
+    if (!isGlobalActive) {
+      if (typeFilter === 'public') {
+        result = result.filter((r) => !r.private);
+      } else if (typeFilter === 'private') {
+        result = result.filter((r) => r.private);
+      } else if (typeFilter === 'sources') {
+        result = result.filter((r) => !r.fork);
+      } else if (typeFilter === 'forks') {
+        result = result.filter((r) => r.fork);
+      }
     }
 
     // Sort order
@@ -218,7 +255,7 @@ export const RepositoriesScreen: React.FC = () => {
       if (sortBy === 'name') return a.name.localeCompare(b.name);
       return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
     });
-  }, [sourceList, searchQuery, selectedLanguage, typeFilter, sortBy]);
+  }, [sourceList, isGlobalActive, searchQuery, selectedLanguage, typeFilter, sortBy]);
 
   const openRepo = (repo: GitHubRepo) => {
     setSelectedRepo(repo);
@@ -236,27 +273,50 @@ export const RepositoriesScreen: React.FC = () => {
 
   const renderRepoItem = ({ item }: { item: GitHubRepo }) => {
     const isCompact = settings.repoCardDensity === 'compact';
+    const isGlobal = isGlobalActive;
+
     return (
       <TouchableOpacity
-        style={[styles.repoCard, isCompact && { paddingVertical: 10, paddingHorizontal: 12 }]}
+        style={[
+          styles.repoCard,
+          isGlobal && styles.globalRepoCard,
+          isCompact && { paddingVertical: 10, paddingHorizontal: 12 },
+        ]}
         onPress={() => openRepo(item)}
         activeOpacity={0.7}
       >
         <View style={styles.repoTopRow}>
-          <Text style={styles.repoTitle} numberOfLines={1}>
-            {item.name}
-          </Text>
-          <View style={styles.badgesGroup}>
-            {item.fork && settings.repoShowForkBadge !== false && (
-              <View style={styles.forkBadge}>
-                <Text style={styles.forkBadgeText}>🍴 Fork</Text>
-              </View>
+          <View style={styles.titleWrap}>
+            {isGlobal && item.owner?.avatar_url && (
+              <Image
+                source={{ uri: item.owner.avatar_url }}
+                style={styles.searchOwnerAvatar}
+              />
             )}
-            <View style={styles.visibilityBadge}>
-              <Text style={styles.visibilityText}>
-                {item.private ? '🔒 Private' : 'Public'}
-              </Text>
-            </View>
+            <Text style={styles.repoTitle} numberOfLines={1}>
+              {isGlobal ? item.full_name : item.name}
+            </Text>
+          </View>
+
+          <View style={styles.badgesGroup}>
+            {isGlobal ? (
+              <View style={styles.globalBadge}>
+                <Text style={styles.globalBadgeText}>🌐 Global</Text>
+              </View>
+            ) : (
+              <>
+                {item.fork && settings.repoShowForkBadge !== false && (
+                  <View style={styles.forkBadge}>
+                    <Text style={styles.forkBadgeText}>🍴 Fork</Text>
+                  </View>
+                )}
+                <View style={styles.visibilityBadge}>
+                  <Text style={styles.visibilityText}>
+                    {item.private ? '🔒 Private' : 'Public'}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
         </View>
 
@@ -309,7 +369,7 @@ export const RepositoriesScreen: React.FC = () => {
         <Text style={styles.searchIcon}>🔍</Text>
         <TextInput
           style={styles.searchInput}
-          placeholder="Search repositories, code, topics..."
+          placeholder="Search your repos or all GitHub..."
           placeholderTextColor={colors.textMuted}
           value={searchQuery}
           onChangeText={handleSearch}
@@ -322,6 +382,92 @@ export const RepositoriesScreen: React.FC = () => {
           </TouchableOpacity>
         )}
       </View>
+
+      {/* Scope Switcher: Appears when user is searching */}
+      {searchQuery.trim().length > 0 && (
+        <View style={styles.scopeBar}>
+          <TouchableOpacity
+            style={[
+              styles.scopeTab,
+              searchScope === 'mine' && styles.scopeTabActiveMine,
+            ]}
+            onPress={() => handleSwitchScope('mine')}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.scopeTabText,
+                searchScope === 'mine' && styles.scopeTabTextActiveMine,
+              ]}
+            >
+              ⚡ My Repos ({localMatchCount})
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.scopeTab,
+              searchScope === 'global' && styles.scopeTabActiveGlobal,
+            ]}
+            onPress={() => handleSwitchScope('global')}
+            activeOpacity={0.7}
+          >
+            <Text
+              style={[
+                styles.scopeTabText,
+                searchScope === 'global' && styles.scopeTabTextActiveGlobal,
+              ]}
+            >
+              🌐 All GitHub (
+              {searchingRemote
+                ? '...'
+                : globalMatchCount > 1000
+                ? `${(globalMatchCount / 1000).toFixed(1)}k`
+                : globalMatchCount}
+              )
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
+
+      {/* Distinct Scope Status Banner */}
+      {searchQuery.trim().length > 0 && (
+        <View
+          style={[
+            styles.scopeBanner,
+            searchScope === 'global'
+              ? styles.scopeBannerGlobal
+              : styles.scopeBannerMine,
+          ]}
+        >
+          <View style={styles.scopeBannerLeft}>
+            <Text style={styles.scopeBannerIcon}>
+              {searchScope === 'global' ? '🌐' : '⚡'}
+            </Text>
+            <Text
+              style={[
+                styles.scopeBannerTitle,
+                {
+                  color:
+                    searchScope === 'global' ? colors.cyan : colors.primary,
+                },
+              ]}
+            >
+              {searchScope === 'global'
+                ? 'Global GitHub Search'
+                : 'Your Repositories'}
+            </Text>
+            <Text style={styles.scopeBannerQuery} numberOfLines={1}>
+              "{searchQuery}"
+            </Text>
+          </View>
+          <Text style={styles.scopeBannerCount}>
+            {searchScope === 'global'
+              ? `${globalMatchCount} found`
+              : `${localMatchCount} matches`}
+          </Text>
+        </View>
+      )}
 
       {/* Type / Visibility Filter Row (Fully scrollable to prevent text clipping) */}
       <View style={styles.filterGroup}>
@@ -471,9 +617,9 @@ export const RepositoriesScreen: React.FC = () => {
           filteredRepos.length > 0 ? (
             <View style={{ paddingHorizontal: Spacing.lg, paddingBottom: 24 }}>
               <PaginationControl
-                page={isSearch ? searchPage : page}
-                hasNext={isSearch ? hasMoreSearch : hasMore}
-                hasPrev={(isSearch ? searchPage : page) > 1}
+                page={isGlobalActive ? searchPage : page}
+                hasNext={isGlobalActive ? hasMoreSearch : hasMore}
+                hasPrev={(isGlobalActive ? searchPage : page) > 1}
                 totalPages={totalPages}
                 totalCount={realTotalRepos}
                 loading={pageLoading || searchingRemote}
@@ -494,11 +640,42 @@ export const RepositoriesScreen: React.FC = () => {
               </View>
             ) : (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyIcon}>📂</Text>
-                <Text style={styles.emptyTitle}>No Repositories Found</Text>
-                <Text style={styles.emptySubtitle}>
-                  No repositories match your active search or filter criteria.
+                <Text style={styles.emptyIcon}>
+                  {searchQuery.trim() ? (searchScope === 'global' ? '🌐' : '⚡') : '📂'}
                 </Text>
+                <Text style={styles.emptyTitle}>
+                  {searchQuery.trim()
+                    ? searchScope === 'mine'
+                      ? 'No Repositories In Your Account'
+                      : 'No Repositories Found On GitHub'
+                    : 'No Repositories Found'}
+                </Text>
+                <Text style={styles.emptySubtitle}>
+                  {searchQuery.trim()
+                    ? searchScope === 'mine'
+                      ? `We couldn't find "${searchQuery}" in your personal repositories.`
+                      : `No public repositories found across GitHub for "${searchQuery}".`
+                    : 'No repositories match your active search or filter criteria.'}
+                </Text>
+                {searchQuery.trim().length > 0 &&
+                  searchScope === 'mine' &&
+                  (remoteResults.length > 0 || searchingRemote) && (
+                    <TouchableOpacity
+                      style={styles.switchScopeBtn}
+                      onPress={() => handleSwitchScope('global')}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles.switchScopeBtnText}>
+                        Search across all of GitHub (
+                        {searchingRemote
+                          ? '...'
+                          : globalMatchCount > 1000
+                          ? `${(globalMatchCount / 1000).toFixed(1)}k`
+                          : globalMatchCount}{' '}
+                        found) →
+                      </Text>
+                    </TouchableOpacity>
+                  )}
               </View>
             )
           ) : undefined
@@ -550,6 +727,127 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: colors.textMuted,
     fontSize: 14,
     padding: 4,
+  },
+  scopeBar: {
+    flexDirection: 'row',
+    marginHorizontal: Spacing.lg,
+    marginBottom: 8,
+    gap: 8,
+  },
+  scopeTab: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 7,
+    borderRadius: 10,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  scopeTabActiveMine: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  scopeTabActiveGlobal: {
+    backgroundColor: colors.cyanMuted,
+    borderColor: colors.cyan,
+  },
+  scopeTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textSecondary,
+  },
+  scopeTabTextActiveMine: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  scopeTabTextActiveGlobal: {
+    color: colors.cyan,
+    fontWeight: '700',
+  },
+  scopeBanner: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginHorizontal: Spacing.lg,
+    marginBottom: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: 10,
+    borderWidth: 1,
+  },
+  scopeBannerMine: {
+    backgroundColor: colors.cardElevated,
+    borderColor: colors.cardBorder,
+  },
+  scopeBannerGlobal: {
+    backgroundColor: colors.cyanMuted,
+    borderColor: colors.cyan,
+  },
+  scopeBannerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  scopeBannerIcon: {
+    fontSize: 13,
+  },
+  scopeBannerTitle: {
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  scopeBannerQuery: {
+    fontSize: 12,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+    flex: 1,
+  },
+  scopeBannerCount: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textSecondary,
+  },
+  titleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  searchOwnerAvatar: {
+    width: 18,
+    height: 18,
+    borderRadius: 4,
+  },
+  globalBadge: {
+    backgroundColor: colors.cyanMuted,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  globalBadgeText: {
+    color: colors.cyan,
+    fontSize: 10,
+    fontWeight: '700',
+  },
+  globalRepoCard: {
+    borderColor: colors.cyanMuted,
+  },
+  switchScopeBtn: {
+    marginTop: 14,
+    paddingHorizontal: 16,
+    paddingVertical: 9,
+    borderRadius: 10,
+    backgroundColor: colors.cyanMuted,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+  },
+  switchScopeBtnText: {
+    color: colors.cyan,
+    fontSize: 13,
+    fontWeight: '700',
   },
   filterGroup: {
     marginBottom: 6,
