@@ -396,11 +396,18 @@ class GitHubApiServiceClass {
     return [];
   }
 
+  private lastNotificationError: string | null = null;
+
+  getLastNotificationError(): string | null {
+    return this.lastNotificationError;
+  }
+
   /**
    * Fetch user notifications using API key
    */
   async getNotifications(): Promise<GitHubNotification[]> {
     await this.ensureInit();
+    this.lastNotificationError = null;
     if (!this.token) {
       return [];
     }
@@ -414,12 +421,61 @@ class GitHubApiServiceClass {
       if (res.ok) {
         const data = await res.json();
         return Array.isArray(data) ? data : [];
+      } else if (res.status === 403 || res.status === 401) {
+        const errJson = await res.json().catch(() => null);
+        this.lastNotificationError =
+          errJson?.message ||
+          'Your API token requires the "notifications" scope to access inbox.';
       }
-    } catch (e) {
+    } catch (e: any) {
       console.warn('Failed to fetch notifications', e);
+      this.lastNotificationError = e.message || 'Network error fetching notifications.';
     }
 
     return [];
+  }
+
+  /**
+   * Mark a notification thread as read on GitHub
+   */
+  async markNotificationRead(threadId: string): Promise<boolean> {
+    await this.ensureInit();
+    if (!this.token) return false;
+    try {
+      const res = await fetch(
+        `https://api.github.com/notifications/threads/${threadId}`,
+        {
+          method: 'PATCH',
+          headers: this.getHeaders(),
+        }
+      );
+      return res.status === 205 || res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Mark all notifications as read on GitHub
+   */
+  async markAllNotificationsRead(): Promise<boolean> {
+    await this.ensureInit();
+    if (!this.token) return false;
+    try {
+      const res = await fetch('https://api.github.com/notifications', {
+        method: 'PUT',
+        headers: {
+          ...this.getHeaders(),
+          'Content-Length': '0',
+        },
+        body: JSON.stringify({
+          last_read_at: new Date().toISOString(),
+        }),
+      });
+      return res.status === 205 || res.ok;
+    } catch {
+      return false;
+    }
   }
 
   /**
