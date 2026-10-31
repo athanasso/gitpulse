@@ -382,6 +382,11 @@ export const ProfileScreen: React.FC = () => {
       {!isAuth ? (
         // Unauthenticated: API Key Entry Gate
         <View style={styles.authGateCard}>
+          <Image
+            source={require('../../assets/hero-banner.png')}
+            style={styles.heroBanner}
+            resizeMode="cover"
+          />
           <View style={styles.authGateIconBox}>
             <Text style={styles.authGateIcon}>🔑</Text>
           </View>
@@ -426,6 +431,11 @@ export const ProfileScreen: React.FC = () => {
         <>
           {user && (
             <View style={styles.profileCard}>
+              <Image
+                source={require('../../assets/hero-banner.png')}
+                style={styles.profileBanner}
+                resizeMode="cover"
+              />
               <View style={styles.avatarRow}>
                 {user.avatar_url ? (
                   <Image source={{ uri: user.avatar_url }} style={styles.avatar} />
@@ -1112,6 +1122,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: Spacing.xl,
   },
+  heroBanner: {
+    width: '100%',
+    height: 100,
+    borderRadius: 12,
+    marginBottom: Spacing.lg,
+  },
   authGateIconBox: {
     width: 64,
     height: 64,
@@ -1186,6 +1202,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: Colors.cardBorder,
     marginBottom: Spacing.xl,
+  },
+  profileBanner: {
+    width: '100%',
+    height: 80,
+    borderRadius: 12,
+    marginBottom: Spacing.md,
   },
   avatarRow: {
     flexDirection: 'row',

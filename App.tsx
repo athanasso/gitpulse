@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   BackHandler,
+  Image,
 } from 'react-native';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
@@ -56,7 +57,10 @@ export default function App() {
         {/* Top App Header */}
         <View style={styles.topNav}>
           <View style={styles.brandRow}>
-            <View style={styles.pulseDot} />
+            <Image
+              source={require('./assets/favicon.png')}
+              style={styles.brandIcon}
+            />
             <Text style={styles.brandTitle}>GitPulse</Text>
             <View style={styles.versionBadge}>
               <Text style={styles.versionText}>v1.0</Text>
@@ -152,11 +156,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  pulseDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: Colors.emerald,
+  brandIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 6,
   },
   brandTitle: {
     fontSize: 20,
