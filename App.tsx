@@ -15,11 +15,12 @@ import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { CustomizationProvider } from './src/context/CustomizationContext';
 import { CustomizationModal } from './src/components/CustomizationModal';
 import { RepositoriesScreen } from './src/screens/RepositoriesScreen';
+import { ExploreScreen } from './src/screens/ExploreScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { GitHubApiService } from './src/services/GitHubApiService';
 
-type Tab = 'repos' | 'inbox' | 'profile';
+type Tab = 'repos' | 'explore' | 'inbox' | 'profile';
 
 function AppContent() {
   const { colors, theme } = useTheme();
@@ -114,6 +115,7 @@ function AppContent() {
       {/* Screen Switcher */}
       <View style={styles.content}>
         {activeTab === 'repos' && <RepositoriesScreen />}
+        {activeTab === 'explore' && <ExploreScreen />}
         {activeTab === 'inbox' && <NotificationsScreen />}
         {activeTab === 'profile' && (
           <ProfileScreen onOpenCustomization={() => setCustomizationVisible(true)} />
@@ -151,6 +153,30 @@ function AppContent() {
             ]}
           >
             Repositories
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={[
+            styles.tabItem,
+            activeTab === 'explore' && {
+              backgroundColor: colors.cardElevated,
+            },
+          ]}
+          onPress={() => setActiveTab('explore')}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.tabIcon}>🧭</Text>
+          <Text
+            style={[
+              styles.tabLabel,
+              {
+                color:
+                  activeTab === 'explore' ? colors.primary : colors.textMuted,
+              },
+            ]}
+          >
+            Explore
           </Text>
         </TouchableOpacity>
 

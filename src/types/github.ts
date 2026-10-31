@@ -2,21 +2,21 @@ export interface GitHubUser {
   login: string;
   id: number;
   avatar_url: string;
-  name: string;
-  bio: string | null;
-  public_repos: number;
+  name?: string;
+  bio?: string | null;
+  public_repos?: number;
   total_private_repos?: number;
   owned_private_repos?: number;
-  public_gists: number;
-  followers: number;
-  following: number;
-  created_at: string;
+  public_gists?: number;
+  followers?: number;
+  following?: number;
+  created_at?: string;
   html_url: string;
-  company: string | null;
-  location: string | null;
-  blog: string | null;
-  twitter_username: string | null;
-  email: string | null;
+  company?: string | null;
+  location?: string | null;
+  blog?: string | null;
+  twitter_username?: string | null;
+  email?: string | null;
 }
 
 export interface GitHubSocialAccount {

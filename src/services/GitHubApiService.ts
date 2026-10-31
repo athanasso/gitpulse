@@ -283,6 +283,100 @@ class GitHubApiServiceClass {
   }
 
   /**
+   * Get Explore Trending repositories with time window and language filter
+   */
+  async getExploreTrending(
+    timeframe: 'day' | 'week' | 'month' = 'week',
+    language: string = '',
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<{ items: GitHubRepo[]; totalCount: number }> {
+    await this.ensureInit();
+
+    const d = new Date();
+    if (timeframe === 'day') d.setDate(d.getDate() - 2);
+    else if (timeframe === 'week') d.setDate(d.getDate() - 7);
+    else if (timeframe === 'month') d.setDate(d.getDate() - 30);
+
+    const cutoff = d.toISOString().split('T')[0];
+    let query = `created:>=${cutoff}`;
+    if (language && language !== 'All') {
+      query += ` language:${language}`;
+    }
+
+    try {
+      const res = await fetch(
+        `https://api.github.com/search/repositories?q=${encodeURIComponent(
+          query
+        )}&sort=stars&order=desc&page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders() }
+      );
+      if (!res.ok) return { items: [], totalCount: 0 };
+      const data = await res.json();
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        totalCount: typeof data.total_count === 'number' ? data.total_count : 0,
+      };
+    } catch (e) {
+      console.warn('getExploreTrending failed', e);
+      return { items: [], totalCount: 0 };
+    }
+  }
+
+  /**
+   * Get Explore Repositories by Topic
+   */
+  async getExploreByTopic(
+    topic: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<{ items: GitHubRepo[]; totalCount: number }> {
+    await this.ensureInit();
+    try {
+      const res = await fetch(
+        `https://api.github.com/search/repositories?q=topic:${encodeURIComponent(
+          topic
+        )}&sort=stars&order=desc&page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders() }
+      );
+      if (!res.ok) return { items: [], totalCount: 0 };
+      const data = await res.json();
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        totalCount: typeof data.total_count === 'number' ? data.total_count : 0,
+      };
+    } catch (e) {
+      console.warn('getExploreByTopic failed', e);
+      return { items: [], totalCount: 0 };
+    }
+  }
+
+  /**
+   * Get Popular Developers / Creators
+   */
+  async getExploreDevelopers(
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<{ items: GitHubUser[]; totalCount: number }> {
+    await this.ensureInit();
+    try {
+      const res = await fetch(
+        `https://api.github.com/search/users?q=followers:>1000&sort=followers&order=desc&page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders() }
+      );
+      if (!res.ok) return { items: [], totalCount: 0 };
+      const data = await res.json();
+      return {
+        items: Array.isArray(data.items) ? data.items : [],
+        totalCount: typeof data.total_count === 'number' ? data.total_count : 0,
+      };
+    } catch (e) {
+      console.warn('getExploreDevelopers failed', e);
+      return { items: [], totalCount: 0 };
+    }
+  }
+
+  /**
    * Fetch repository README (GitHub rendered HTML or raw markdown)
    */
   async getRepoReadme(
