@@ -7,7 +7,12 @@ import {
   BackHandler,
   Image,
 } from 'react-native';
-import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import {
+  SafeAreaProvider,
+  SafeAreaView,
+  useSafeAreaInsets,
+  initialWindowMetrics,
+} from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { useKeepAwake } from 'expo-keep-awake';
 import { Spacing } from './src/constants/theme';
@@ -24,6 +29,7 @@ type Tab = 'repos' | 'explore' | 'inbox' | 'profile';
 
 function AppContent() {
   const { colors, theme } = useTheme();
+  const insets = useSafeAreaInsets();
 
   // Prevent screen sleep during reading sessions / code reviews
   useKeepAwake();
@@ -129,6 +135,7 @@ function AppContent() {
           {
             backgroundColor: colors.backgroundElevated,
             borderTopColor: colors.cardBorder,
+            paddingBottom: Math.max(insets.bottom, 10) + 8,
           },
         ]}
       >
@@ -252,7 +259,7 @@ function AppContent() {
 
 export default function App() {
   return (
-    <SafeAreaProvider>
+    <SafeAreaProvider initialMetrics={initialWindowMetrics}>
       <ThemeProvider>
         <CustomizationProvider>
           <AppContent />
@@ -316,8 +323,7 @@ const styles = StyleSheet.create({
   tabBar: {
     flexDirection: 'row',
     borderTopWidth: 1,
-    paddingVertical: Spacing.sm,
-    paddingBottom: 20,
+    paddingTop: Spacing.sm,
     justifyContent: 'space-around',
   },
   tabItem: {

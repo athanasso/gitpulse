@@ -9,6 +9,7 @@ import {
 } from 'react-native';
 import { Spacing, ThemeId } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   useCustomization,
   PROFILE_SECTIONS_META,
@@ -26,6 +27,7 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
   visible,
   onClose,
 }) => {
+  const insets = useSafeAreaInsets();
   const { colors, themeId, setThemeId, availableThemes } = useTheme();
   const {
     settings,
@@ -603,7 +605,16 @@ export const CustomizationModal: React.FC<CustomizationModalProps> = ({
           </ScrollView>
 
           {/* Bottom Actions */}
-          <View style={[styles.modalFooter, { borderTopColor: colors.cardBorder, backgroundColor: colors.card }]}>
+          <View
+            style={[
+              styles.modalFooter,
+              {
+                borderTopColor: colors.cardBorder,
+                backgroundColor: colors.card,
+                paddingBottom: Math.max(insets.bottom, Spacing.md) + 4,
+              },
+            ]}
+          >
             <TouchableOpacity
               style={[styles.resetBtn, { borderColor: colors.cardBorder, backgroundColor: colors.cardElevated }]}
               onPress={resetToDefaults}
