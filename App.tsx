@@ -19,6 +19,9 @@ import { Spacing } from './src/constants/theme';
 import { ThemeProvider, useTheme } from './src/context/ThemeContext';
 import { CustomizationProvider } from './src/context/CustomizationContext';
 import { CustomizationModal } from './src/components/CustomizationModal';
+import { AccountSwitcherModal } from './src/components/AccountSwitcherModal';
+import { AccountService } from './src/services/AccountService';
+import { GitAccount, PROVIDER_REGISTRY } from './src/types/provider';
 import { RepositoriesScreen } from './src/screens/RepositoriesScreen';
 import { ExploreScreen } from './src/screens/ExploreScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
@@ -37,6 +40,24 @@ function AppContent() {
   const [activeTab, setActiveTab] = useState<Tab>('repos');
   const [unreadCount, setUnreadCount] = useState<number>(0);
   const [customizationVisible, setCustomizationVisible] = useState(false);
+  const [accountSwitcherVisible, setAccountSwitcherVisible] = useState(false);
+  const [activeAccount, setActiveAccount] = useState<GitAccount | null>(() =>
+    AccountService.getActiveAccount()
+  );
+  const [accountKey, setAccountKey] = useState(0);
+
+  useEffect(() => {
+    AccountService.init().then((acc) => {
+      setActiveAccount(acc);
+    });
+
+    const unsub = AccountService.subscribe((acc) => {
+      setActiveAccount(acc);
+      setAccountKey((prev) => prev + 1);
+    });
+
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     GitHubApiService.init().then((isAuth) => {
@@ -46,7 +67,7 @@ function AppContent() {
         });
       }
     });
-  }, []);
+  }, [accountKey]);
 
   // Hardware back button returns to Repositories tab
   useEffect(() => {
@@ -102,24 +123,51 @@ function AppContent() {
           </View>
         </View>
 
-        {/* Global Customization & Settings Trigger */}
-        <TouchableOpacity
-          style={[
-            styles.headerSettingsBtn,
-            {
-              backgroundColor: colors.cardElevated,
-              borderColor: colors.cardBorder,
-            },
-          ]}
-          onPress={() => setCustomizationVisible(true)}
-          activeOpacity={0.7}
-        >
-          <Text style={styles.headerSettingsIcon}>⚙️</Text>
-        </TouchableOpacity>
+        {/* Right Header Actions: Multi-Provider Account Pill & Settings */}
+        <View style={styles.headerRightActions}>
+          <TouchableOpacity
+            style={[
+              styles.accountPill,
+              {
+                backgroundColor: colors.cardElevated,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+            onPress={() => setAccountSwitcherVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.accountPillIcon}>
+              {activeAccount ? PROVIDER_REGISTRY[activeAccount.provider].icon : '⚡'}
+            </Text>
+            <Text
+              style={[styles.accountPillUser, { color: colors.textPrimary }]}
+              numberOfLines={1}
+            >
+              @{activeAccount ? activeAccount.username : 'Account'}
+            </Text>
+            <Text style={[styles.accountPillChevron, { color: colors.textMuted }]}>
+              ▾
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.headerSettingsBtn,
+              {
+                backgroundColor: colors.cardElevated,
+                borderColor: colors.cardBorder,
+              },
+            ]}
+            onPress={() => setCustomizationVisible(true)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.headerSettingsIcon}>⚙️</Text>
+          </TouchableOpacity>
+        </View>
       </View>
 
       {/* Screen Switcher */}
-      <View style={styles.content}>
+      <View style={styles.content} key={accountKey}>
         {activeTab === 'repos' && <RepositoriesScreen />}
         {activeTab === 'explore' && <ExploreScreen />}
         {activeTab === 'inbox' && <NotificationsScreen />}
@@ -253,6 +301,16 @@ function AppContent() {
         visible={customizationVisible}
         onClose={() => setCustomizationVisible(false)}
       />
+
+      {/* Account & Multi-Provider Switcher Modal */}
+      <AccountSwitcherModal
+        visible={accountSwitcherVisible}
+        onClose={() => setAccountSwitcherVisible(false)}
+        onAccountSwitched={(acc) => {
+          setActiveAccount(acc);
+          setAccountKey((prev) => prev + 1);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -316,6 +374,33 @@ const styles = StyleSheet.create({
   },
   headerSettingsIcon: {
     fontSize: 16,
+  },
+  headerRightActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  accountPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 10,
+    borderWidth: 1,
+    maxWidth: 160,
+  },
+  accountPillIcon: {
+    fontSize: 14,
+  },
+  accountPillUser: {
+    fontSize: 12,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  accountPillChevron: {
+    fontSize: 10,
+    fontWeight: '700',
   },
   content: {
     flex: 1,

@@ -1,5 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CacheService, CacheKeys } from './CacheService';
+import { AccountService } from './AccountService';
+import { GitService } from './GitService';
 import {
   GitHubUser,
   GitHubRepo,
@@ -62,6 +64,50 @@ class GitHubApiServiceClass {
             this.tokenScopes = [];
           }
         }
+
+        // Multi-account initialization & subscription
+        await AccountService.init();
+        const activeAcc = AccountService.getActiveAccount();
+        if (activeAcc) {
+          this.token = activeAcc.token;
+          if (activeAcc.provider !== 'github') {
+            this.cachedUser = {
+              id: 1,
+              login: activeAcc.username,
+              name: activeAcc.displayName,
+              avatar_url: activeAcc.avatarUrl || '',
+              html_url: activeAcc.hostUrl || '',
+              public_repos: 0,
+              followers: 0,
+              following: 0,
+              created_at: new Date(activeAcc.createdAt).toISOString(),
+              updated_at: new Date().toISOString(),
+            } as GitHubUser;
+          }
+        }
+
+        AccountService.subscribe((acc) => {
+          if (acc) {
+            this.token = acc.token;
+            if (acc.provider !== 'github') {
+              this.cachedUser = {
+                id: 1,
+                login: acc.username,
+                name: acc.displayName,
+                avatar_url: acc.avatarUrl || '',
+                html_url: acc.hostUrl || '',
+                public_repos: 0,
+                followers: 0,
+                following: 0,
+                created_at: new Date(acc.createdAt).toISOString(),
+                updated_at: new Date().toISOString(),
+              } as GitHubUser;
+            }
+          } else {
+            this.token = null;
+            this.cachedUser = null;
+          }
+        });
 
         // Warm up cached repositories and critical data into memory
         const keysToWarm = [CacheKeys.USER_REPOS_PAGE_1];
@@ -142,6 +188,13 @@ class GitHubApiServiceClass {
       AsyncStorage.setItem(PAT_STORAGE_KEY, cleanToken),
       AsyncStorage.setItem(USER_CACHE_KEY, JSON.stringify(userData)),
       AsyncStorage.setItem(SCOPES_STORAGE_KEY, JSON.stringify(this.tokenScopes)),
+      AccountService.addAccount({
+        provider: 'github',
+        username: userData.login,
+        displayName: userData.name || userData.login,
+        avatarUrl: userData.avatar_url,
+        token: cleanToken,
+      }),
     ]);
 
     return userData;
@@ -195,6 +248,15 @@ class GitHubApiServiceClass {
    */
   async getCurrentUser(): Promise<GitHubUser | null> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      const u = await GitService.getCurrentUser();
+      if (u) {
+        this.cachedUser = u as GitHubUser;
+        return this.cachedUser;
+      }
+      return this.cachedUser;
+    }
     if (!this.token) {
       return null;
     }
@@ -240,6 +302,10 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubRepo[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getUserRepos(page, per_page)) as GitHubRepo[];
+    }
     if (!this.token) {
       return [];
     }
@@ -283,6 +349,13 @@ class GitHubApiServiceClass {
   ): Promise<GitHubRepo[]> {
     await this.ensureInit();
     if (!query.trim()) return [];
+
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      const results = (await GitService.searchRepos(query, page, per_page)) as GitHubRepo[];
+      this.lastSearchTotalCount = results.length;
+      return results;
+    }
 
     try {
       const res = await fetch(
@@ -408,6 +481,11 @@ class GitHubApiServiceClass {
     repo: string,
     format: 'html' | 'raw' = 'html'
   ): Promise<string> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.getRepoReadme(owner, repo);
+    }
+
     try {
       const acceptHeader =
         format === 'raw'
@@ -558,6 +636,11 @@ class GitHubApiServiceClass {
     path: string = '',
     ref?: string
   ): Promise<GitHubFileItem[]> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getRepoTree(owner, repo, path, ref)) as GitHubFileItem[];
+    }
+
     try {
       const queryRef = ref ? `?ref=${encodeURIComponent(ref)}` : '';
       const endpoint = path
@@ -590,6 +673,11 @@ class GitHubApiServiceClass {
     path: string,
     ref?: string
   ): Promise<string> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.getFileContent(owner, repo, path, ref);
+    }
+
     try {
       const queryRef = ref ? `?ref=${encodeURIComponent(ref)}` : '';
       const res = await fetch(
@@ -623,6 +711,11 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubCommit[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getRepoCommits(owner, repo, branch, page, per_page)) as GitHubCommit[];
+    }
+
     try {
       const queryBranch = branch ? `&sha=${encodeURIComponent(branch)}` : '';
       const res = await fetch(
@@ -651,6 +744,14 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<{ issues: GitHubIssue[]; prs: GitHubPullRequest[] }> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getIssuesAndPRs(owner, repo, page, per_page)) as {
+        issues: GitHubIssue[];
+        prs: GitHubPullRequest[];
+      };
+    }
+
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/issues?state=all&page=${page}&per_page=${per_page}`,
@@ -940,6 +1041,10 @@ class GitHubApiServiceClass {
    */
   async isRepoStarred(owner: string, repo: string): Promise<boolean> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.isRepoStarred(owner, repo);
+    }
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -957,6 +1062,10 @@ class GitHubApiServiceClass {
    */
   async starRepo(owner: string, repo: string): Promise<boolean> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.starRepo(owner, repo);
+    }
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -980,6 +1089,10 @@ class GitHubApiServiceClass {
    */
   async unstarRepo(owner: string, repo: string): Promise<boolean> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.unstarRepo(owner, repo);
+    }
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -1004,6 +1117,10 @@ class GitHubApiServiceClass {
     repo: string
   ): Promise<{ success: boolean; error?: string }> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.deleteRepo(owner, repo);
+    }
     if (!this.token) return { success: false, error: 'Authentication required.' };
     try {
       const res = await fetch(`https://api.github.com/repos/${owner}/${repo}`, {
@@ -1191,6 +1308,11 @@ class GitHubApiServiceClass {
    * Fetch repository branch list
    */
   async getRepoBranches(owner: string, repo: string): Promise<GitHubBranch[]> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getRepoBranches(owner, repo)) as GitHubBranch[];
+    }
+
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/branches?per_page=100`,
