@@ -1060,9 +1060,13 @@ class GitHubApiServiceClass {
   async getOrgs(username?: string): Promise<GitHubOrg[]> {
     await this.ensureInit();
     try {
-      const endpoint = username
-        ? `https://api.github.com/users/${encodeURIComponent(username)}/orgs?per_page=100`
-        : 'https://api.github.com/user/orgs?per_page=100';
+      const isMe =
+        !username ||
+        (this.cachedUser &&
+          this.cachedUser.login.toLowerCase() === username.toLowerCase());
+      const endpoint = isMe
+        ? 'https://api.github.com/user/orgs?per_page=100'
+        : `https://api.github.com/users/${encodeURIComponent(username!)}/orgs?per_page=100`;
       const res = await fetch(endpoint, {
         headers: this.getHeaders(),
       });

@@ -305,7 +305,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             GitHubApiService.getProfileReadme(u.login),
             GitHubApiService.getUserStarredRepos(1, PAGE_SIZE),
             GitHubApiService.getStarredCount(u.login),
-            GitHubApiService.getOrgs(u.login),
+            GitHubApiService.getOrgs(),
             GitHubApiService.getGists(1, PAGE_SIZE),
           ]);
           setContributions(c);
@@ -499,7 +499,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           GitHubApiService.getProfileReadme(u.login),
           GitHubApiService.getUserStarredRepos(1, PAGE_SIZE),
           GitHubApiService.getStarredCount(u.login),
-          GitHubApiService.getOrgs(u.login),
+          GitHubApiService.getOrgs(),
           GitHubApiService.getGists(1, PAGE_SIZE),
         ]);
         setContributions(c);
