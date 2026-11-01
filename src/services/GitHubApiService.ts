@@ -1,4 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { CacheService, CacheKeys } from './CacheService';
 import {
   GitHubUser,
   GitHubRepo,
@@ -62,6 +63,13 @@ class GitHubApiServiceClass {
           }
         }
 
+        // Warm up cached repositories and critical data into memory
+        const keysToWarm = [CacheKeys.USER_REPOS_PAGE_1];
+        if (this.cachedUser?.login) {
+          keysToWarm.push(CacheKeys.PROFILE_BUNDLE(this.cachedUser.login));
+        }
+        await CacheService.warmup(keysToWarm);
+
         this.initialized = true;
         return !!this.token;
       } catch {
@@ -85,14 +93,19 @@ class GitHubApiServiceClass {
     const cleanToken = token ? token.trim() : null;
 
     if (!cleanToken) {
-      this.token = null;
-      this.cachedUser = null;
-      this.tokenScopes = [];
-      await Promise.all([
+      const removals: Promise<any>[] = [
         AsyncStorage.removeItem(PAT_STORAGE_KEY),
         AsyncStorage.removeItem(USER_CACHE_KEY),
         AsyncStorage.removeItem(SCOPES_STORAGE_KEY),
-      ]);
+        CacheService.remove(CacheKeys.USER_REPOS_PAGE_1),
+      ];
+      if (this.cachedUser?.login) {
+        removals.push(CacheService.remove(CacheKeys.PROFILE_BUNDLE(this.cachedUser.login)));
+      }
+      this.token = null;
+      this.cachedUser = null;
+      this.tokenScopes = [];
+      await Promise.all(removals);
       return null;
     }
 
@@ -242,11 +255,22 @@ class GitHubApiServiceClass {
       }
 
       const data = await res.json();
-      return Array.isArray(data) ? data : [];
+      const list = Array.isArray(data) ? data : [];
+      if (page === 1 && list.length > 0) {
+        CacheService.set(CacheKeys.USER_REPOS_PAGE_1, list);
+      }
+      return list;
     } catch (e) {
       console.warn('Failed to fetch repositories', e);
       return [];
     }
+  }
+
+  /**
+   * Get cached user repos from local storage immediately (0ms)
+   */
+  async getCachedUserRepos(): Promise<GitHubRepo[]> {
+    return (await CacheService.get<GitHubRepo[]>(CacheKeys.USER_REPOS_PAGE_1)) || [];
   }
 
   /**

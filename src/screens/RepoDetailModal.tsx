@@ -26,6 +26,7 @@ import {
   GitHubContributor,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { CacheService, CacheKeys } from '../services/CacheService';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
@@ -308,6 +309,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       }
 
       const [owner, name] = repo.full_name.split('/');
+      CacheService.get<string>(CacheKeys.REPO_README(owner, name)).then((cached) => {
+        if (cached) setReadmeContent(cached);
+      });
       GitHubApiService.isRepoStarred(owner, name).then((starred) => {
         setIsStarred(starred);
       });
@@ -331,9 +335,20 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     try {
       const [owner, name] = repo.full_name.split('/');
 
-      if (activeTab === 'readme' && !readmeContent) {
+      if (activeTab === 'readme') {
+        const cacheKey = CacheKeys.REPO_README(owner, name);
+        if (!readmeContent) {
+          const cached = await CacheService.get<string>(cacheKey);
+          if (cached) {
+            setReadmeContent(cached);
+            setLoading(false);
+          }
+        }
         const md = await GitHubApiService.getRepoReadme(owner, name);
-        setReadmeContent(md);
+        if (md) {
+          setReadmeContent(md);
+          CacheService.set(cacheKey, md);
+        }
       } else if (activeTab === 'code' && fileTree.length === 0) {
         const tree = await GitHubApiService.getRepoTree(owner, name, currentPath, branch);
         setFileTree(tree);

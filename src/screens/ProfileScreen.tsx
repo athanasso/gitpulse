@@ -24,6 +24,7 @@ import {
   GitHubPinnedItem,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { CacheService, CacheKeys } from '../services/CacheService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatLocalDateTime, formatRepoTimestamp } from '../utils/date';
@@ -239,11 +240,42 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   };
 
   useEffect(() => {
+    // 1. Instant hydration from phone cache (0ms)
+    const cachedUser = GitHubApiService.getCachedUser();
+    if (cachedUser?.login) {
+      setUser(cachedUser);
+      setTokenScopes(GitHubApiService.getTokenScopes());
+      CacheService.get<any>(CacheKeys.PROFILE_BUNDLE(cachedUser.login)).then((cached) => {
+        if (cached) {
+          if (cached.contributions) setContributions(cached.contributions);
+          if (cached.repos) {
+            setRepos(cached.repos);
+            setHasMoreRepos(cached.repos.length >= PAGE_SIZE);
+          }
+          if (cached.socials) setSocialAccounts(cached.socials);
+          if (cached.pinned) setPinnedItems(cached.pinned);
+          if (cached.readme) setProfileReadme(cached.readme);
+          if (cached.starredList) {
+            setStarredRepos(cached.starredList);
+            setHasMoreStarred(cached.starredList.length >= PAGE_SIZE);
+          }
+          if (typeof cached.starredCount === 'number') setTotalStarredCount(cached.starredCount);
+          if (cached.orgsList) setOrgs(cached.orgsList);
+          if (cached.gistsList) {
+            setGists(cached.gistsList);
+            setHasMoreGists(cached.gistsList.length >= PAGE_SIZE);
+          }
+          setLoading(false);
+        }
+      });
+    }
     loadProfile();
   }, []);
 
   const loadProfile = async () => {
-    setLoading(true);
+    if (!GitHubApiService.getCachedUser()) {
+      setLoading(true);
+    }
     try {
       const auth = await GitHubApiService.init();
       setIsAuth(auth);
@@ -291,6 +323,19 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           setGists(gistsList);
           setHasMoreGists(gistsList.length >= PAGE_SIZE);
           setPageGists(1);
+
+          // Save bundle to phone storage
+          CacheService.set(CacheKeys.PROFILE_BUNDLE(u.login), {
+            contributions: c,
+            repos: rList,
+            socials,
+            pinned,
+            readme,
+            starredList,
+            starredCount,
+            orgsList,
+            gistsList,
+          });
         }
       } else {
         setUser(null);

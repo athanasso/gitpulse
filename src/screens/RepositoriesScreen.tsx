@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemePalette, Spacing } from '../constants/theme';
 import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { CacheService, CacheKeys } from '../services/CacheService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
@@ -93,33 +94,48 @@ export const RepositoriesScreen: React.FC = () => {
   const flatListRef = useRef<FlatList<GitHubRepo>>(null);
 
   useEffect(() => {
+    // 1. Hydrate from phone storage immediately (0ms)
+    CacheService.get<GitHubRepo[]>(CacheKeys.USER_REPOS_PAGE_1).then((cached) => {
+      if (cached && cached.length > 0 && repos.length === 0) {
+        setRepos(cached);
+      }
+    });
+    // 2. Refresh from network in background
     loadRepos(1);
   }, []);
 
   const loadRepos = async (targetPage: number = 1, isRefresh: boolean = false) => {
     if (isRefresh) {
       setRefreshing(true);
-    } else {
+    } else if (repos.length === 0) {
       setPageLoading(true);
     }
 
-    const [list, u] = await Promise.all([
-      GitHubApiService.getUserRepos(targetPage, PAGE_SIZE),
-      currentUser ? Promise.resolve(currentUser) : GitHubApiService.getCurrentUser(),
-    ]);
+    try {
+      const [list, u] = await Promise.all([
+        GitHubApiService.getUserRepos(targetPage, PAGE_SIZE),
+        currentUser ? Promise.resolve(currentUser) : GitHubApiService.getCurrentUser(),
+      ]);
 
-    setRepos(list);
-    setPage(targetPage);
-    setHasMore(list.length >= PAGE_SIZE);
-    if (u) setCurrentUser(u);
-
-    if (isRefresh) {
+      if (list && list.length > 0) {
+        setRepos(list);
+        setHasMore(list.length >= PAGE_SIZE);
+        if (targetPage === 1) {
+          CacheService.set(CacheKeys.USER_REPOS_PAGE_1, list);
+        }
+      }
+      setPage(targetPage);
+      if (u) setCurrentUser(u);
+    } catch (e) {
+      console.warn('loadRepos error', e);
+    } finally {
       setRefreshing(false);
-    } else {
       setPageLoading(false);
     }
 
-    flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    if (targetPage > 1) {
+      flatListRef.current?.scrollToOffset({ offset: 0, animated: true });
+    }
   };
 
   const goToPage = async (newPage: number) => {
@@ -362,6 +378,26 @@ export const RepositoriesScreen: React.FC = () => {
     );
   };
 
+  const renderSkeletonList = () => (
+    <View style={styles.listContent}>
+      {[1, 2, 3, 4, 5].map((i) => (
+        <View key={i} style={styles.skeletonCard}>
+          <View style={styles.skeletonTopRow}>
+            <View style={styles.skeletonTitle} />
+            <View style={styles.skeletonBadge} />
+          </View>
+          <View style={styles.skeletonDesc} />
+          <View style={styles.skeletonDescShort} />
+          <View style={styles.skeletonFooter}>
+            <View style={styles.skeletonMeta} />
+            <View style={styles.skeletonMeta} />
+            <View style={styles.skeletonMeta} />
+          </View>
+        </View>
+      ))}
+    </View>
+  );
+
   return (
     <View style={styles.container}>
       {/* Search Bar */}
@@ -600,6 +636,9 @@ export const RepositoriesScreen: React.FC = () => {
       </View>
 
       {/* Repositories List with Actual Page Controls */}
+      {pageLoading && repos.length === 0 && !searchQuery.trim() ? (
+        renderSkeletonList()
+      ) : (
       <FlatList
         ref={flatListRef}
         data={filteredRepos}
@@ -681,6 +720,7 @@ export const RepositoriesScreen: React.FC = () => {
           ) : undefined
         }
       />
+      )}
 
       {/* Detail Modal */}
       <RepoDetailModal
@@ -1099,5 +1139,55 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: colors.textSecondary,
     textAlign: 'center',
     maxWidth: 280,
+  },
+  skeletonCard: {
+    backgroundColor: colors.card,
+    borderRadius: 14,
+    padding: Spacing.md,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    marginBottom: Spacing.md,
+  },
+  skeletonTopRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 12,
+  },
+  skeletonTitle: {
+    width: '45%',
+    height: 18,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 6,
+  },
+  skeletonBadge: {
+    width: 60,
+    height: 18,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 6,
+  },
+  skeletonDesc: {
+    width: '85%',
+    height: 12,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 4,
+    marginBottom: 8,
+  },
+  skeletonDescShort: {
+    width: '60%',
+    height: 12,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 4,
+    marginBottom: 16,
+  },
+  skeletonFooter: {
+    flexDirection: 'row',
+    gap: 16,
+  },
+  skeletonMeta: {
+    width: 50,
+    height: 12,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 4,
   },
 });

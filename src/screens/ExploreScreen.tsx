@@ -16,6 +16,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemePalette, Spacing } from '../constants/theme';
 import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { CacheService, CacheKeys } from '../services/CacheService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { PaginationControl } from '../components/PaginationControl';
 import { useTheme } from '../context/ThemeContext';
@@ -107,7 +108,7 @@ export const ExploreScreen: React.FC = () => {
   const loadData = useCallback(
     async (targetPage: number = 1, isRefresh: boolean = false) => {
       if (isRefresh) setRefreshing(true);
-      else setLoading(true);
+      else if (repos.length === 0 && developers.length === 0) setLoading(true);
 
       try {
         if (isSearchActive && searchQuery.trim()) {
@@ -141,6 +142,12 @@ export const ExploreScreen: React.FC = () => {
             );
           setRepos(items);
           setTotalCount(count);
+          if (targetPage === 1 && !isSearchActive) {
+            CacheService.set(
+              CacheKeys.EXPLORE_TRENDING(timeframe, selectedLanguage),
+              { items, count }
+            );
+          }
         } else if (activeTab === 'topics') {
           const { items, totalCount: count } =
             await GitHubApiService.getExploreByTopic(
@@ -175,6 +182,15 @@ export const ExploreScreen: React.FC = () => {
   );
 
   useEffect(() => {
+    if (activeTab === 'trending' && !isSearchActive) {
+      const cacheKey = CacheKeys.EXPLORE_TRENDING(timeframe, selectedLanguage);
+      CacheService.get<{ items: GitHubRepo[]; count: number }>(cacheKey).then((cached) => {
+        if (cached && cached.items.length > 0 && repos.length === 0) {
+          setRepos(cached.items);
+          setTotalCount(cached.count);
+        }
+      });
+    }
     setPage(1);
     loadData(1);
   }, [
