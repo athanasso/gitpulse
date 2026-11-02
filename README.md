@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.4&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.5&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -37,6 +37,7 @@
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
   - Robust singleton persistence across app launches and restarts.
   - **Auto-Configured Token Redirects & Scope Guide**: 1-tap token creation shortcut automatically pre-selects required scopes in GitHub and GitLab URLs, while a visible in-app permissions breakdown guides setup across GitHub, GitLab, Gitea, and Bitbucket.
+  - **Auto-Prefix `https://` for Custom Hosts**: Custom server URLs entered for GitLab CE/EE or Gitea/Forgejo automatically have `https://` prepended if omitted.
 - **🔍 Live Token Permissions Inspector**:
   - Live inspection card displays active token permissions tailored to the current git provider.
   - Verification badges: `✓ GRANTED` (emerald), `✕ MISSING` (ruby required), `⚠️ RECOMMENDED`, and `○ OPTIONAL`.
@@ -44,18 +45,30 @@
   - High-precision detection: reads `x-oauth-scopes` on GitHub, `/personal_access_tokens/self` on GitLab, and REST permission probing on Gitea and Bitbucket.
   - Dynamic `Manage on <Forge> ↗` links opening token settings on the correct cloud or self-hosted instance.
 
-### 2. 💻 In-App Mobile Code Editor & Direct Push
-- **Edit on the Go**: Tap `[ ✏️ Edit ]` on any text/code file in the Code tab to open the full mobile editor.
-- **Code Editor Suite**:
-  - Full multiline monospace editor with dark syntax background.
-  - Live line count and character tracking.
-  - Real-time unsaved changes detection (`● Modified` vs `○ Clean`).
-  - Safe discard confirmation dialogs to prevent accidental loss on back navigation or modal close.
+### 2. 💻 In-App CodeMirror 6 Editor & Full Git Suite
+- **CodeMirror 6 Mobile Editor**:
+  - Full syntax highlighting powered by **CodeMirror 6** with language auto-detection from file extension (`.ts`, `.tsx`, `.js`, `.py`, `.rs`, `.go`, `.html`, `.css`, `.json`, `.md`, `.sh`, `.sql`, etc.).
+  - Line numbers, active line highlighting, fold gutter, bracket matching, indentation support, and theme synchronization (`oneDark` / `githubLight`).
+  - Real-time unsaved changes detection (`● Modified` vs `○ Clean`) with discard confirmation guards.
+- **🌿 Full Remote Branch Management**:
+  - Multi-tab branch modal: `[ Branches ]`, `[ ➕ New ]`, `[ 🔀 Merge ]`.
+  - **Create Branch**: Instant 1-tap creation of new branches from currently viewed branch or commit SHA.
+  - **Delete Branch**: Delete remote branches directly from mobile with confirm safety dialog.
+  - **Branch Switching**: Quick-switch active branch across directory trees, file viewers, and commits.
+  - Supported natively across GitHub, GitLab, Gitea, and Bitbucket.
+- **🔀 Pull Request / Merge Request Creation**:
+  - Open new PRs/MRs directly from the Code tab action bar (`🔀 New PR`).
+  - Configure Head (source) branch, Base (target) branch, PR title, and extended markdown description.
+  - Automatic dispatch to GitHub Pull Requests, GitLab Merge Requests, Gitea PRs, and Bitbucket PRs.
+- **🔀 In-App Branch Merging**:
+  - Merge source branch into target branch with optional custom merge commit message directly from the mobile modal.
+- **➕ New File Creation**:
+  - Create new files anywhere in the repo tree directly on the active branch (`➕ New File`).
+  - Embedded CodeMirror editor for writing initial contents with full syntax highlighting.
+  - Custom commit message + direct remote git push.
 - **1-Tap Direct Git Push**:
-  - Tap `[ Push 🚀 ]` to open the Mobile Commit Modal.
-  - Custom commit message + optional extended description.
-  - Real-time UTF-8 Base64 encoding supporting emojis, symbols, and non-ASCII text.
-  - Pushes directly to the active remote branch with automated blob SHA resolution across GitHub, GitLab, Gitea, and Bitbucket.
+  - Tap `[ Push 🚀 ]` in the editor to commit and push changes directly.
+  - Automated blob SHA resolution, UTF-8 Base64 encoding, and remote branch dispatch across all 4 providers.
 
 ### 3. 📄 File Actions Suite: History, Native Share & Direct Deletion Push
 - **🕒 File Commit History**:
@@ -198,7 +211,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.4 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.5 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -206,7 +219,7 @@ Direct signed APK releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.4`
+- **Version**: `1.3.5`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 
