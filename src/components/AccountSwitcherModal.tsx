@@ -19,6 +19,7 @@ import {
   GitAccount,
   GitProviderType,
   PROVIDER_REGISTRY,
+  normalizeHost,
 } from '../types/provider';
 import { ThemedDialog, DialogButton } from './ThemedDialog';
 
@@ -142,7 +143,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
 
     setValidating(true);
     try {
-      const cleanHost = hostUrl.trim() || undefined;
+      const cleanHost = hostUrl.trim() ? normalizeHost(hostUrl.trim()) : undefined;
       const user = await GitService.validateAccount(selectedProvider, tokenInput.trim(), cleanHost);
 
       const saved = await AccountService.addAccount({
@@ -415,6 +416,11 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                     placeholderTextColor={colors.textMuted}
                     value={hostUrl}
                     onChangeText={setHostUrl}
+                    onBlur={() => {
+                      if (hostUrl.trim()) {
+                        setHostUrl(normalizeHost(hostUrl.trim()));
+                      }
+                    }}
                     autoCapitalize="none"
                     autoCorrect={false}
                   />

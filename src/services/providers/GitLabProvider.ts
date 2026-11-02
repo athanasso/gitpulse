@@ -497,5 +497,165 @@ export class GitLabProvider implements IGitProvider {
       message: err.message || `Failed to delete file (${res.status})`,
     };
   }
+
+  async createBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string,
+    fromBranchOrSha: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const url = `${api}/projects/${projId}/repository/branches?branch=${encodeURIComponent(branchName)}&ref=${encodeURIComponent(fromBranchOrSha)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+      });
+      if (res.status === 201 || res.ok) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async deleteBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const url = `${api}/projects/${projId}/repository/branches/${encodeURIComponent(branchName)}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(token),
+      });
+      if (res.status === 204 || res.ok) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async mergeBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    head: string,
+    commitMessage?: string
+  ): Promise<{ success: boolean; message?: string; sha?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      // Create MR then accept/merge
+      const mrRes = await fetch(`${api}/projects/${projId}/merge_requests`, {
+        method: 'POST',
+        headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_branch: head,
+          target_branch: baseBranch,
+          title: commitMessage || `Merge ${head} into ${baseBranch}`,
+        }),
+      });
+      const mrData = await mrRes.json().catch(() => ({}));
+      if (!mrRes.ok) {
+        return { success: false, message: mrData.message || `HTTP ${mrRes.status}` };
+      }
+
+      const mergeRes = await fetch(
+        `${api}/projects/${projId}/merge_requests/${mrData.iid}/merge`,
+        {
+          method: 'PUT',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            merge_commit_message: commitMessage || undefined,
+          }),
+        }
+      );
+      const mergeData = await mergeRes.json().catch(() => ({}));
+      if (mergeRes.ok) {
+        return { success: true, sha: mergeData.merge_commit_sha };
+      }
+      return { success: false, message: mergeData.message || `MR #${mrData.iid} created but auto-merge returned ${mergeRes.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createPullRequest(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    baseBranch: string,
+    body?: string
+  ): Promise<{ success: boolean; message?: string; url?: string; number?: number }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const res = await fetch(`${api}/projects/${projId}/merge_requests`, {
+        method: 'POST',
+        headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          source_branch: head,
+          target_branch: baseBranch,
+          title,
+          description: body || '',
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return { success: true, url: data.web_url, number: data.iid };
+      }
+      return { success: false, message: Array.isArray(data.message) ? data.message.join('; ') : data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch,
+          commit_message: message.trim() || `Add ${path}`,
+          content,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || res.status === 201) {
+        return { success: true, commitSha: data.file_path };
+      }
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
 }
 

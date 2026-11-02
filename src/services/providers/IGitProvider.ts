@@ -175,5 +175,69 @@ export interface IGitProvider {
     sha?: string,
     branch?: string
   ): Promise<{ success: boolean; message?: string }>;
+
+  /**
+   * Create a new branch
+   */
+  createBranch?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string,
+    fromBranchOrSha: string
+  ): Promise<{ success: boolean; message?: string }>;
+
+  /**
+   * Delete a branch
+   */
+  deleteBranch?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string
+  ): Promise<{ success: boolean; message?: string }>;
+
+  /**
+   * Merge two branches
+   */
+  mergeBranch?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    base: string,
+    head: string,
+    commitMessage?: string
+  ): Promise<{ success: boolean; message?: string; sha?: string }>;
+
+  /**
+   * Create a Pull Request or Merge Request
+   */
+  createPullRequest?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    base: string,
+    body?: string
+  ): Promise<{ success: boolean; message?: string; url?: string; number?: number }>;
+
+  /**
+   * Create a new file via commit
+   */
+  createFile?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }>;
 }
 

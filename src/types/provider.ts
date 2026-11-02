@@ -34,7 +34,7 @@ export interface ProviderMeta {
   scopes: ScopeRequirement[];
 }
 
-const normalizeHost = (host?: string, defaultBase = ''): string => {
+export const normalizeHost = (host?: string, defaultBase = ''): string => {
   let h = host?.trim();
   if (!h) return defaultBase;
   if (!h.startsWith('http://') && !h.startsWith('https://')) {

@@ -279,6 +279,139 @@ class GitServiceClass {
     const p = this.getProvider(acc.provider);
     return await p.deleteRepo(acc.token, acc.hostUrl, owner, repo);
   }
+
+  /**
+   * Create a new branch
+   */
+  async createBranch(
+    owner: string,
+    repo: string,
+    branchName: string,
+    fromBranchOrSha: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.createBranch) {
+      return { success: false, message: `createBranch not supported on ${providerType}` };
+    }
+    return await p.createBranch(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      branchName,
+      fromBranchOrSha
+    );
+  }
+
+  /**
+   * Delete an existing branch
+   */
+  async deleteBranch(
+    owner: string,
+    repo: string,
+    branchName: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.deleteBranch) {
+      return { success: false, message: `deleteBranch not supported on ${providerType}` };
+    }
+    return await p.deleteBranch(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      branchName
+    );
+  }
+
+  /**
+   * Merge two branches
+   */
+  async mergeBranch(
+    owner: string,
+    repo: string,
+    base: string,
+    head: string,
+    commitMessage?: string
+  ): Promise<{ success: boolean; message?: string; sha?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.mergeBranch) {
+      return { success: false, message: `mergeBranch not supported on ${providerType}` };
+    }
+    return await p.mergeBranch(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      base,
+      head,
+      commitMessage
+    );
+  }
+
+  /**
+   * Create a Pull Request or Merge Request
+   */
+  async createPullRequest(
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    base: string,
+    body?: string
+  ): Promise<{ success: boolean; message?: string; url?: string; number?: number }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.createPullRequest) {
+      return { success: false, message: `createPullRequest not supported on ${providerType}` };
+    }
+    return await p.createPullRequest(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      title,
+      head,
+      base,
+      body
+    );
+  }
+
+  /**
+   * Create a new file via git commit
+   */
+  async createFile(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.createFile) {
+      return { success: false, message: `createFile not supported on ${providerType}` };
+    }
+    return await p.createFile(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      path,
+      content,
+      message,
+      branch
+    );
+  }
 }
 
 export const GitService = new GitServiceClass();

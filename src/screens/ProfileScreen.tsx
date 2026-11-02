@@ -870,7 +870,11 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
             </View>
           </View>
-          <TouchableOpacity onPress={() => Linking.openURL(manageUrl)}>
+          <TouchableOpacity
+            style={styles.manageScopesBtn}
+            onPress={() => Linking.openURL(manageUrl)}
+            activeOpacity={0.7}
+          >
             <Text style={styles.editScopesLink}>
               Manage on {providerMeta.name} ↗
             </Text>
@@ -2375,11 +2379,14 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     borderColor: colors.cardBorder,
     padding: Spacing.md,
     marginBottom: Spacing.md,
+    overflow: 'hidden',
   },
   activeScopesHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
     marginBottom: Spacing.sm,
   },
   activeScopesHeaderTitle: {
@@ -2394,6 +2401,16 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     alignItems: 'center',
     gap: 8,
     flexWrap: 'wrap',
+    flexShrink: 1,
+  },
+  manageScopesBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 6,
+    backgroundColor: colors.card,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignSelf: 'flex-start',
   },
   grantedCountPill: {
     paddingHorizontal: 7,

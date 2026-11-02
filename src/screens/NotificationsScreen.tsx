@@ -518,6 +518,7 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(234, 179, 8, 0.3)',
+    overflow: 'hidden',
   },
   scopeWarningIcon: {
     fontSize: 20,

@@ -1,5 +1,5 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { GitAccount, GitProviderType } from '../types/provider';
+import { GitAccount, GitProviderType, normalizeHost } from '../types/provider';
 
 const ACCOUNTS_STORAGE_KEY = '@gitpulse_multi_accounts_v1';
 const ACTIVE_ACCOUNT_ID_KEY = '@gitpulse_active_account_id';
@@ -135,7 +135,9 @@ class AccountServiceClass {
     await this.init();
 
     const cleanUsername = accountData.username.trim();
-    const cleanHost = accountData.hostUrl ? accountData.hostUrl.trim() : undefined;
+    const cleanHost = accountData.hostUrl?.trim()
+      ? normalizeHost(accountData.hostUrl.trim())
+      : undefined;
     const cleanToken = accountData.token.trim();
 
     const newAccount: GitAccount = {

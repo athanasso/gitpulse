@@ -479,5 +479,164 @@ export class GiteaProvider implements IGitProvider {
       message: err.message || `Failed to delete file (${res.status})`,
     };
   }
+
+  async createBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string,
+    fromBranchOrSha: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          new_branch_name: branchName,
+          old_branch_name: fromBranchOrSha,
+        }),
+      });
+      if (res.status === 201 || res.ok) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async deleteBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/branches/${encodeURIComponent(branchName)}`;
+      const res = await fetch(url, {
+        method: 'DELETE',
+        headers: this.getHeaders(token),
+      });
+      if (res.status === 204 || res.ok) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async mergeBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    head: string,
+    commitMessage?: string
+  ): Promise<{ success: boolean; message?: string; sha?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      // Create PR then merge it
+      const prRes = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title: commitMessage || `Merge ${head} into ${baseBranch}`,
+            head,
+            base: baseBranch,
+          }),
+        }
+      );
+      const prData = await prRes.json().catch(() => ({}));
+      if (!prRes.ok) {
+        return { success: false, message: prData.message || `HTTP ${prRes.status}` };
+      }
+
+      const mergeRes = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls/${prData.number}/merge`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            Do: 'merge',
+            MergeTitleField: commitMessage || `Merge pull request #${prData.number}`,
+          }),
+        }
+      );
+      if (mergeRes.ok) return { success: true };
+      const mergeErr = await mergeRes.json().catch(() => ({}));
+      return { success: false, message: mergeErr.message || `HTTP ${mergeRes.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createPullRequest(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    baseBranch: string,
+    body?: string
+  ): Promise<{ success: boolean; message?: string; url?: string; number?: number }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, head, base: baseBranch, body: body || '' }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return { success: true, url: data.html_url, number: data.number };
+      }
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          branch,
+          message: message.trim() || `Add ${path}`,
+          content: utf8ToBase64(content),
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok || res.status === 201) {
+        return { success: true, commitSha: data.commit?.sha };
+      }
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
 }
 

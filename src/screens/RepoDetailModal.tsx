@@ -33,6 +33,7 @@ import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
 import { useCustomization } from '../context/CustomizationContext';
 import { MarkdownWebView } from '../components/MarkdownWebView';
+import { CodeEditorWebView } from '../components/CodeEditorWebView';
 
 interface RepoDetailModalProps {
   visible: boolean;
@@ -258,6 +259,32 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [commitMessage, setCommitMessage] = useState<string>('');
   const [commitDescription, setCommitDescription] = useState<string>('');
   const [isPushing, setIsPushing] = useState<boolean>(false);
+
+  // Branch management state
+  const [branchActionMode, setBranchActionMode] = useState<'list' | 'create' | 'delete' | 'rename' | 'merge' | 'pr'>('list');
+  const [newBranchName, setNewBranchName] = useState('');
+  const [renameBranchTarget, setRenameBranchTarget] = useState('');
+  const [renameNewName, setRenameNewName] = useState('');
+  const [deleteBranchTarget, setDeleteBranchTarget] = useState('');
+  const [mergeBranchHead, setMergeBranchHead] = useState('');
+  const [mergeBranchBase, setMergeBranchBase] = useState('');
+  const [mergeCommitMsg, setMergeCommitMsg] = useState('');
+  const [branchActionLoading, setBranchActionLoading] = useState(false);
+
+  // PR creation state
+  const [prModalVisible, setPrModalVisible] = useState(false);
+  const [prTitle, setPrTitle] = useState('');
+  const [prBody, setPrBody] = useState('');
+  const [prHead, setPrHead] = useState('');
+  const [prBase, setPrBase] = useState('');
+  const [isPrCreating, setIsPrCreating] = useState(false);
+
+  // New file state
+  const [newFileModalVisible, setNewFileModalVisible] = useState(false);
+  const [newFileName, setNewFileName] = useState('');
+  const [newFileContent, setNewFileContent] = useState('');
+  const [newFileCommitMsg, setNewFileCommitMsg] = useState('');
+  const [isCreatingFile, setIsCreatingFile] = useState(false);
 
   // File History state
   const [showingFileHistory, setShowingFileHistory] = useState<boolean>(false);
@@ -532,6 +559,145 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         type: 'danger',
         buttons: [{ text: 'OK', onPress: hideDialog }],
       });
+    }
+  };
+
+  // ── Branch management handlers ────────────────────────────────────────────
+
+  const refreshBranches = async () => {
+    if (!repo) return;
+    const [owner, name] = getRepoOwnerAndName();
+    const bList = await GitHubApiService.getRepoBranches(owner, name);
+    if (bList.length > 0) setBranches(bList);
+  };
+
+  const handleCreateBranch = async () => {
+    if (!repo || !newBranchName.trim()) return;
+    setBranchActionLoading(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.createBranch(owner, name, newBranchName.trim(), selectedBranch);
+    setBranchActionLoading(false);
+    if (res.success) {
+      await refreshBranches();
+      setNewBranchName('');
+      setBranchActionMode('list');
+      showDialog({
+        title: 'Branch Created ✅',
+        message: `Branch "${newBranchName.trim()}" created from "${selectedBranch}".`,
+        type: 'success',
+        buttons: [{ text: 'Switch to it', style: 'primary', onPress: () => { hideDialog(); handleSelectBranch(newBranchName.trim()); } },
+                  { text: 'Stay', onPress: hideDialog }],
+      });
+    } else {
+      showDialog({ title: 'Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    }
+  };
+
+  const handleDeleteBranch = async () => {
+    if (!repo || !deleteBranchTarget) return;
+    if (deleteBranchTarget === selectedBranch) {
+      showDialog({ title: 'Cannot Delete', message: 'Switch to a different branch before deleting this one.', type: 'warning', buttons: [{ text: 'OK', onPress: hideDialog }] });
+      return;
+    }
+    setBranchActionLoading(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.deleteBranch(owner, name, deleteBranchTarget);
+    setBranchActionLoading(false);
+    if (res.success) {
+      await refreshBranches();
+      setDeleteBranchTarget('');
+      setBranchActionMode('list');
+      showDialog({ title: 'Branch Deleted 🗑️', message: `"${deleteBranchTarget}" was deleted.`, type: 'success', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    } else {
+      showDialog({ title: 'Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    }
+  };
+
+  const handleRenameBranch = async () => {
+    if (!repo || !renameBranchTarget || !renameNewName.trim()) return;
+    setBranchActionLoading(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.renameBranch(owner, name, renameBranchTarget, renameNewName.trim());
+    setBranchActionLoading(false);
+    if (res.success) {
+      if (selectedBranch === renameBranchTarget) setSelectedBranch(renameNewName.trim());
+      await refreshBranches();
+      setRenameBranchTarget('');
+      setRenameNewName('');
+      setBranchActionMode('list');
+      showDialog({ title: 'Branch Renamed ✏️', message: `"${renameBranchTarget}" → "${renameNewName.trim()}"`, type: 'success', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    } else {
+      showDialog({ title: 'Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    }
+  };
+
+  const handleMergeBranch = async () => {
+    if (!repo || !mergeBranchHead || !mergeBranchBase) return;
+    setBranchActionLoading(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.mergeBranch(owner, name, mergeBranchBase, mergeBranchHead, mergeCommitMsg || undefined);
+    setBranchActionLoading(false);
+    if (res.success) {
+      setMergeBranchHead('');
+      setMergeBranchBase('');
+      setMergeCommitMsg('');
+      setBranchModalVisible(false);
+      setBranchActionMode('list');
+      showDialog({ title: 'Merged! 🎉', message: res.message || `"${mergeBranchHead}" merged into "${mergeBranchBase}".`, type: 'success', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    } else {
+      showDialog({ title: 'Merge Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    }
+  };
+
+  // ── PR creation handler ───────────────────────────────────────────────────
+
+  const handleCreatePR = async () => {
+    if (!repo || !prTitle.trim() || !prHead || !prBase) return;
+    setIsPrCreating(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.createPullRequest(owner, name, prTitle.trim(), prHead, prBase, prBody);
+    setIsPrCreating(false);
+    if (res.success) {
+      setPrModalVisible(false);
+      setPrTitle('');
+      setPrBody('');
+      showDialog({
+        title: 'PR Created! 🚀',
+        message: `Pull Request #${res.number} created.`,
+        type: 'success',
+        buttons: [
+          { text: 'Open in Browser', style: 'primary', onPress: () => { hideDialog(); if (res.url) Linking.openURL(res.url); } },
+          { text: 'Done', onPress: hideDialog },
+        ],
+      });
+    } else {
+      showDialog({ title: 'Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    }
+  };
+
+  // ── New file handler ──────────────────────────────────────────────────────
+
+  const handleCreateNewFile = async () => {
+    if (!repo || !newFileName.trim()) return;
+    setIsCreatingFile(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const filePath = currentPath ? `${currentPath}/${newFileName.trim()}` : newFileName.trim();
+    const res = await GitHubApiService.createFile(
+      owner, name, filePath, newFileContent,
+      newFileCommitMsg.trim() || `Add ${newFileName.trim()}`,
+      selectedBranch
+    );
+    setIsCreatingFile(false);
+    if (res.success) {
+      setNewFileModalVisible(false);
+      setNewFileName('');
+      setNewFileContent('');
+      setNewFileCommitMsg('');
+      const tree = await GitHubApiService.getRepoTree(owner, name, currentPath, selectedBranch);
+      if (tree && tree.length > 0) setFileTree(tree);
+      showDialog({ title: 'File Created ✅', message: `"${filePath}" committed to "${selectedBranch}".`, type: 'success', buttons: [{ text: 'OK', onPress: hideDialog }] });
+    } else {
+      showDialog({ title: 'Failed', message: res.message, type: 'danger', buttons: [{ text: 'OK', onPress: hideDialog }] });
     }
   };
 
@@ -1390,16 +1556,11 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             {editContent !== fileContent ? '● Modified' : '○ Clean'}
                           </Text>
                         </View>
-                        <TextInput
-                          style={styles.editorInput}
+                        <CodeEditorWebView
                           value={editContent}
-                          onChangeText={setEditContent}
-                          multiline
-                          autoCapitalize="none"
-                          autoCorrect={false}
-                          textAlignVertical="top"
-                          placeholder="Type code here..."
-                          placeholderTextColor={colors.textMuted}
+                          onChange={setEditContent}
+                          language={viewingFile?.name?.split('.').pop()}
+                          isDark={colors.background === '#1e1e2e' || colors.background === '#0d1117' || (colors.background || '').startsWith('#0') || (colors.background || '').startsWith('#1')}
                         />
                       </View>
                     ) : showingFileHistory ? (
@@ -1619,6 +1780,44 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 ) : fileTree.length > 0 ? (
                   // Directory Tree
                   <View style={styles.treeContainer}>
+                    {/* Code Tab Action Bar */}
+                    <View style={styles.codeToolbar}>
+                      <TouchableOpacity
+                        style={styles.codeToolbarBtn}
+                        onPress={() => {
+                          setNewFileName('');
+                          setNewFileContent('');
+                          setNewFileCommitMsg('');
+                          setNewFileModalVisible(true);
+                        }}
+                      >
+                        <Text style={styles.codeToolbarBtnText}>➕ New File</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={styles.codeToolbarBtn}
+                        onPress={() => {
+                          setBranchActionMode('list');
+                          setBranchModalVisible(true);
+                        }}
+                      >
+                        <Text style={styles.codeToolbarBtnText}>🌿 {selectedBranch} ▾</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity
+                        style={[styles.codeToolbarBtn, styles.codeToolbarBtnPrimary]}
+                        onPress={() => {
+                          setPrHead(selectedBranch);
+                          setPrBase(repo.default_branch || 'main');
+                          setPrTitle('');
+                          setPrBody('');
+                          setPrModalVisible(true);
+                        }}
+                      >
+                        <Text style={styles.codeToolbarBtnPrimaryText}>🔀 New PR</Text>
+                      </TouchableOpacity>
+                    </View>
+
                     {fileTree.length > 1 && (
                       <View style={styles.codeSearchBar}>
                         <Text style={styles.codeSearchIcon}>🔍</Text>
@@ -2174,65 +2373,378 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           </ScrollView>
         )}
 
-        {/* Branch Selector Modal */}
+        {/* Branch Management Modal */}
         <Modal
           visible={branchModalVisible}
           animationType="fade"
           transparent
-          onRequestClose={() => setBranchModalVisible(false)}
+          onRequestClose={() => {
+            setBranchModalVisible(false);
+            setBranchActionMode('list');
+          }}
         >
           <View style={styles.modalOverlay}>
             <View style={styles.branchModalCard}>
               <View style={styles.branchModalHeader}>
-                <Text style={styles.branchModalTitle}>Switch Branch</Text>
+                <Text style={styles.branchModalTitle}>🌿 Branch Management</Text>
                 <TouchableOpacity
-                  onPress={() => setBranchModalVisible(false)}
+                  onPress={() => {
+                    setBranchModalVisible(false);
+                    setBranchActionMode('list');
+                  }}
                   style={styles.branchModalClose}
                 >
                   <Text style={styles.branchModalCloseText}>✕</Text>
                 </TouchableOpacity>
               </View>
 
-              <FlatList
-                data={branches}
-                keyExtractor={(item) => item.name}
-                style={styles.branchList}
-                renderItem={({ item }) => {
-                  const isCurrent = item.name === selectedBranch;
-                  return (
-                    <TouchableOpacity
-                      style={[
-                        styles.branchItem,
-                        isCurrent && styles.branchItemActive,
-                      ]}
-                      onPress={() => handleSelectBranch(item.name)}
-                    >
-                      <Text style={styles.branchItemIcon}>🌿</Text>
-                      <Text
+              {/* Mode switch tabs */}
+              <View style={styles.branchModeTabs}>
+                <TouchableOpacity
+                  style={[styles.branchModeTab, branchActionMode === 'list' && styles.branchModeTabActive]}
+                  onPress={() => setBranchActionMode('list')}
+                >
+                  <Text style={[styles.branchModeTabText, branchActionMode === 'list' && styles.branchModeTabTextActive]}>
+                    Branches ({branches.length})
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.branchModeTab, branchActionMode === 'create' && styles.branchModeTabActive]}
+                  onPress={() => setBranchActionMode('create')}
+                >
+                  <Text style={[styles.branchModeTabText, branchActionMode === 'create' && styles.branchModeTabTextActive]}>
+                    ➕ New
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={[styles.branchModeTab, branchActionMode === 'merge' && styles.branchModeTabActive]}
+                  onPress={() => {
+                    setMergeBranchBase(selectedBranch);
+                    setMergeBranchHead(branches.find((b) => b.name !== selectedBranch)?.name || '');
+                    setBranchActionMode('merge');
+                  }}
+                >
+                  <Text style={[styles.branchModeTabText, branchActionMode === 'merge' && styles.branchModeTabTextActive]}>
+                    🔀 Merge
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {branchActionMode === 'list' && (
+                <FlatList
+                  data={branches}
+                  keyExtractor={(item) => item.name}
+                  style={styles.branchList}
+                  renderItem={({ item }) => {
+                    const isCurrent = item.name === selectedBranch;
+                    return (
+                      <View
                         style={[
-                          styles.branchItemText,
-                          isCurrent && styles.branchItemTextActive,
+                          styles.branchItem,
+                          isCurrent && styles.branchItemActive,
                         ]}
                       >
-                        {item.name}
+                        <TouchableOpacity
+                          style={styles.branchItemMain}
+                          onPress={() => handleSelectBranch(item.name)}
+                        >
+                          <Text style={styles.branchItemIcon}>🌿</Text>
+                          <Text
+                            style={[
+                              styles.branchItemText,
+                              isCurrent && styles.branchItemTextActive,
+                            ]}
+                          >
+                            {item.name}
+                          </Text>
+                          {item.protected && (
+                            <View style={styles.protectedBadge}>
+                              <Text style={styles.protectedText}>protected</Text>
+                            </View>
+                          )}
+                          {isCurrent && <Text style={styles.checkIcon}>✓</Text>}
+                        </TouchableOpacity>
+
+                        {!isCurrent && (
+                          <TouchableOpacity
+                            style={styles.branchDeleteBtn}
+                            onPress={() => {
+                              showDialog({
+                                title: 'Delete Branch',
+                                message: `Permanently delete branch "${item.name}" from remote?`,
+                                icon: '🗑️',
+                                type: 'danger',
+                                buttons: [
+                                  { text: 'Cancel', onPress: hideDialog },
+                                  {
+                                    text: 'Delete',
+                                    style: 'destructive',
+                                    onPress: async () => {
+                                      hideDialog();
+                                      setBranchActionLoading(true);
+                                      const [owner, name] = getRepoOwnerAndName();
+                                      const res = await GitHubApiService.deleteBranch(owner, name, item.name);
+                                      setBranchActionLoading(false);
+                                      if (res.success) {
+                                        await refreshBranches();
+                                        showDialog({
+                                          title: 'Branch Deleted 🗑️',
+                                          message: `Branch "${item.name}" was deleted.`,
+                                          type: 'success',
+                                          buttons: [{ text: 'OK', onPress: hideDialog }],
+                                        });
+                                      } else {
+                                        showDialog({
+                                          title: 'Delete Failed',
+                                          message: res.message || 'Could not delete branch.',
+                                          type: 'danger',
+                                          buttons: [{ text: 'OK', onPress: hideDialog }],
+                                        });
+                                      }
+                                    },
+                                  },
+                                ],
+                              });
+                            }}
+                          >
+                            <Text style={styles.branchDeleteBtnText}>🗑️</Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
+                    );
+                  }}
+                  ListEmptyComponent={
+                    <View style={styles.emptyCard}>
+                      <Text style={styles.emptyDetailText}>
+                        No alternate branches found.
                       </Text>
-                      {item.protected && (
-                        <View style={styles.protectedBadge}>
-                          <Text style={styles.protectedText}>protected</Text>
-                        </View>
-                      )}
-                      {isCurrent && <Text style={styles.checkIcon}>✓</Text>}
-                    </TouchableOpacity>
-                  );
-                }}
-                ListEmptyComponent={
-                  <View style={styles.emptyCard}>
-                    <Text style={styles.emptyDetailText}>
-                      No alternate branches found.
-                    </Text>
-                  </View>
-                }
-              />
+                    </View>
+                  }
+                />
+              )}
+
+              {branchActionMode === 'create' && (
+                <View style={styles.branchActionForm}>
+                  <Text style={styles.branchFormLabel}>NEW BRANCH NAME</Text>
+                  <TextInput
+                    style={styles.branchInput}
+                    placeholder="e.g. feature/my-cool-update"
+                    placeholderTextColor={colors.textMuted}
+                    value={newBranchName}
+                    onChangeText={setNewBranchName}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  <Text style={styles.branchFormSubtext}>
+                    Base: Branch will be created from <Text style={{ fontWeight: '700', color: colors.primary }}>{selectedBranch}</Text>
+                  </Text>
+                  <TouchableOpacity
+                    style={[styles.branchSubmitBtn, (!newBranchName.trim() || branchActionLoading) && styles.btnDisabled]}
+                    onPress={handleCreateBranch}
+                    disabled={!newBranchName.trim() || branchActionLoading}
+                  >
+                    {branchActionLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.branchSubmitBtnText}>Create Branch 🚀</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {branchActionMode === 'merge' && (
+                <View style={styles.branchActionForm}>
+                  <Text style={styles.branchFormLabel}>HEAD (SOURCE BRANCH)</Text>
+                  <TextInput
+                    style={styles.branchInput}
+                    placeholder="Branch with changes (e.g. feature/foo)"
+                    placeholderTextColor={colors.textMuted}
+                    value={mergeBranchHead}
+                    onChangeText={setMergeBranchHead}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>BASE (TARGET BRANCH)</Text>
+                  <TextInput
+                    style={styles.branchInput}
+                    placeholder="Branch to receive changes (e.g. main)"
+                    placeholderTextColor={colors.textMuted}
+                    value={mergeBranchBase}
+                    onChangeText={setMergeBranchBase}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>COMMIT MESSAGE (OPTIONAL)</Text>
+                  <TextInput
+                    style={styles.branchInput}
+                    placeholder={`Merge ${mergeBranchHead || 'feature'} into ${mergeBranchBase || 'main'}`}
+                    placeholderTextColor={colors.textMuted}
+                    value={mergeCommitMsg}
+                    onChangeText={setMergeCommitMsg}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+
+                  <TouchableOpacity
+                    style={[styles.branchSubmitBtn, (!mergeBranchHead.trim() || !mergeBranchBase.trim() || branchActionLoading) && styles.btnDisabled]}
+                    onPress={handleMergeBranch}
+                    disabled={!mergeBranchHead.trim() || !mergeBranchBase.trim() || branchActionLoading}
+                  >
+                    {branchActionLoading ? (
+                      <ActivityIndicator size="small" color="#fff" />
+                    ) : (
+                      <Text style={styles.branchSubmitBtnText}>Merge Branches 🔀</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
+            </View>
+          </View>
+        </Modal>
+
+        {/* Pull Request / Merge Request Modal */}
+        <Modal
+          visible={prModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setPrModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.branchModalCard, { maxHeight: '85%' }]}>
+              <View style={styles.branchModalHeader}>
+                <Text style={styles.branchModalTitle}>🔀 Create Pull Request</Text>
+                <TouchableOpacity
+                  onPress={() => setPrModalVisible(false)}
+                  style={styles.branchModalClose}
+                >
+                  <Text style={styles.branchModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ padding: Spacing.md }}>
+                <Text style={styles.branchFormLabel}>HEAD (SOURCE BRANCH)</Text>
+                <TextInput
+                  style={styles.branchInput}
+                  value={prHead}
+                  onChangeText={setPrHead}
+                  placeholder="e.g. feature-branch"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>BASE (TARGET BRANCH)</Text>
+                <TextInput
+                  style={styles.branchInput}
+                  value={prBase}
+                  onChangeText={setPrBase}
+                  placeholder="e.g. main"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>TITLE *</Text>
+                <TextInput
+                  style={styles.branchInput}
+                  value={prTitle}
+                  onChangeText={setPrTitle}
+                  placeholder="e.g. Add in-app code editor & branch controls"
+                  placeholderTextColor={colors.textMuted}
+                />
+
+                <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>DESCRIPTION</Text>
+                <TextInput
+                  style={[styles.branchInput, { minHeight: 80, textAlignVertical: 'top' }]}
+                  value={prBody}
+                  onChangeText={setPrBody}
+                  placeholder="Describe your changes..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                />
+
+                <TouchableOpacity
+                  style={[styles.branchSubmitBtn, (!prTitle.trim() || isPrCreating) && styles.btnDisabled, { marginVertical: 16 }]}
+                  onPress={handleCreatePR}
+                  disabled={!prTitle.trim() || isPrCreating}
+                >
+                  {isPrCreating ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.branchSubmitBtnText}>Submit Pull Request 🚀</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
+            </View>
+          </View>
+        </Modal>
+
+        {/* New File Creation Modal */}
+        <Modal
+          visible={newFileModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => setNewFileModalVisible(false)}
+        >
+          <View style={styles.modalOverlay}>
+            <View style={[styles.branchModalCard, { maxHeight: '90%' }]}>
+              <View style={styles.branchModalHeader}>
+                <Text style={styles.branchModalTitle}>➕ Create New File</Text>
+                <TouchableOpacity
+                  onPress={() => setNewFileModalVisible(false)}
+                  style={styles.branchModalClose}
+                >
+                  <Text style={styles.branchModalCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView style={{ padding: Spacing.md }}>
+                <Text style={styles.branchFormLabel}>FILE PATH & NAME *</Text>
+                <TextInput
+                  style={styles.branchInput}
+                  value={newFileName}
+                  onChangeText={setNewFileName}
+                  placeholder="e.g. src/index.ts or README.md"
+                  placeholderTextColor={colors.textMuted}
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+
+                <Text style={[styles.branchFormLabel, { marginTop: 12 }]}>COMMIT MESSAGE</Text>
+                <TextInput
+                  style={styles.branchInput}
+                  value={newFileCommitMsg}
+                  onChangeText={setNewFileCommitMsg}
+                  placeholder={`Add ${newFileName || 'file'}`}
+                  placeholderTextColor={colors.textMuted}
+                />
+
+                <Text style={[styles.branchFormLabel, { marginTop: 12, marginBottom: 6 }]}>
+                  INITIAL FILE CONTENT (CODE EDITOR)
+                </Text>
+                <View style={{ height: 200, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 8, overflow: 'hidden' }}>
+                  <CodeEditorWebView
+                    value={newFileContent}
+                    onChange={setNewFileContent}
+                    language={newFileName.split('.').pop()}
+                    isDark={colors.background === '#1e1e2e' || colors.background === '#0d1117' || (colors.background || '').startsWith('#0') || (colors.background || '').startsWith('#1')}
+                  />
+                </View>
+
+                <TouchableOpacity
+                  style={[styles.branchSubmitBtn, (!newFileName.trim() || isCreatingFile) && styles.btnDisabled, { marginVertical: 16 }]}
+                  onPress={handleCreateNewFile}
+                  disabled={!newFileName.trim() || isCreatingFile}
+                >
+                  {isCreatingFile ? (
+                    <ActivityIndicator size="small" color="#fff" />
+                  ) : (
+                    <Text style={styles.branchSubmitBtnText}>Commit New File 🚀</Text>
+                  )}
+                </TouchableOpacity>
+              </ScrollView>
             </View>
           </View>
         </Modal>
@@ -2867,7 +3379,7 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
   },
   editorWrapper: {
     backgroundColor: colors.codeBackground,
-    minHeight: 380,
+    height: 520,
   },
   editorMetaBar: {
     flexDirection: 'row',
@@ -3651,6 +4163,117 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
   },
   branchList: {
     padding: Spacing.md,
+  },
+  branchModeTabs: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    backgroundColor: colors.cardElevated,
+  },
+  branchModeTab: {
+    flex: 1,
+    paddingVertical: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  branchModeTabActive: {
+    borderBottomWidth: 2,
+    borderBottomColor: colors.primary,
+    backgroundColor: colors.card,
+  },
+  branchModeTabText: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  branchModeTabTextActive: {
+    color: colors.primary,
+    fontWeight: '800',
+  },
+  branchItemMain: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  branchDeleteBtn: {
+    padding: 6,
+    marginLeft: 6,
+  },
+  branchDeleteBtnText: {
+    fontSize: 13,
+  },
+  branchActionForm: {
+    padding: Spacing.lg,
+  },
+  branchFormLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  branchInput: {
+    backgroundColor: colors.cardElevated,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    color: colors.textPrimary,
+    fontSize: 13,
+  },
+  branchFormSubtext: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 6,
+    marginBottom: 16,
+  },
+  branchSubmitBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 8,
+    paddingVertical: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  branchSubmitBtnText: {
+    color: '#fff',
+    fontWeight: '800',
+    fontSize: 13,
+  },
+  codeToolbar: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+  },
+  codeToolbarBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardElevated,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  codeToolbarBtnText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  codeToolbarBtnPrimary: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  codeToolbarBtnPrimaryText: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: colors.primary,
+  },
+  btnDisabled: {
+    opacity: 0.5,
   },
   branchItem: {
     flexDirection: 'row',

@@ -369,5 +369,172 @@ export class GitHubProvider implements IGitProvider {
       message: err.message || `Failed to delete file (${res.status})`,
     };
   }
+
+  async createBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string,
+    fromBranchOrSha: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      let sha = fromBranchOrSha;
+      if (!fromBranchOrSha.match(/^[0-9a-f]{40}$/i)) {
+        const refRes = await fetch(
+          `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(fromBranchOrSha)}`,
+          { headers: this.getHeaders(token) }
+        );
+        if (refRes.ok) {
+          const refData = await refRes.json();
+          sha = refData.object?.sha || fromBranchOrSha;
+        }
+      }
+
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ref: `refs/heads/${branchName}`, sha }),
+        }
+      );
+      if (res.ok) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async deleteBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    branchName: string
+  ): Promise<{ success: boolean; message?: string }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/git/refs/heads/${encodeURIComponent(branchName)}`,
+        { method: 'DELETE', headers: this.getHeaders(token) }
+      );
+      if (res.status === 204) return { success: true };
+      const data = await res.json().catch(() => ({}));
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async mergeBranch(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    baseBranch: string,
+    head: string,
+    commitMessage?: string
+  ): Promise<{ success: boolean; message?: string; sha?: string }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const body: Record<string, string> = { base: baseBranch, head };
+      if (commitMessage) body.commit_message = commitMessage;
+
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/merges`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+        }
+      );
+      if (res.status === 201) {
+        const data = await res.json().catch(() => ({}));
+        return { success: true, sha: data.sha };
+      }
+      if (res.status === 204) return { success: true, message: 'Already merged (no-op).' };
+      const data = await res.json().catch(() => ({}));
+      return {
+        success: false,
+        message:
+          res.status === 409
+            ? 'Merge conflict detected. Resolve conflicts manually.'
+            : data.message || `HTTP ${res.status}`,
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createPullRequest(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    title: string,
+    head: string,
+    baseBranch: string,
+    body?: string
+  ): Promise<{ success: boolean; message?: string; url?: string; number?: number }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/pulls`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title, head, base: baseBranch, body: body || '' }),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return { success: true, url: data.html_url, number: data.number };
+      return {
+        success: false,
+        message:
+          Array.isArray(data.errors)
+            ? data.errors.map((e: any) => e.message).join('; ')
+            : data.message || `HTTP ${res.status}`,
+      };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async createFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const bodyPayload: Record<string, string> = {
+        message: message.trim() || `Add ${path.split('/').pop() || path}`,
+        content: utf8ToBase64(content),
+      };
+      if (branch) bodyPayload.branch = branch;
+
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`,
+        {
+          method: 'PUT',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify(bodyPayload),
+        }
+      );
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) return { success: true, commitSha: data.commit?.sha };
+      return { success: false, message: data.message || `HTTP ${res.status}` };
+    } catch (e: any) {
+      return { success: false, message: e?.message || 'Network error' };
+    }
+  }
 }
 
