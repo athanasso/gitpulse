@@ -5,7 +5,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.1&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.2&logo=android" alt="Latest Release"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript" alt="TypeScript">
@@ -57,7 +57,16 @@
   - Supported across all 4 providers (GitHub, GitLab, Gitea, and Bitbucket).
   - Automatically refreshes directory tree and clears file viewer on success.
 
-### 4. ⚡ Offline-First Stale-While-Revalidate (SWR) Caching
+### 4. 🔗 Native Deep Linking & Android App Links
+- **Auto-Redirect From Links**:
+  - Tapping any `github.com/:owner/:repo` link (in browser, Slack, Discord, Messages, Gmail, WhatsApp) opens directly in GitPulse.
+  - Supports `https://github.com`, `http://github.com`, `https://www.github.com`, and `https://gitlab.com`.
+  - Custom deep link scheme: `gitpulse://:owner/:repo` and `gitpulse://repo/:owner/:repo`.
+  - In-app markdown README links to GitHub repositories automatically open directly inside GitPulse without launching external browser.
+  - Android Intent Filters configured with `autoVerify="true"` for seamless App Links resolution.
+  - Automatic fallback resolver ensures private or offline repositories open cleanly without freezing.
+
+### 5. ⚡ Offline-First Stale-While-Revalidate (SWR) Caching
 - **0ms Instant Hydration**: Phone storage cache (`AsyncStorage` + warmed in-memory Map) displays your repositories, profile bio, heatmap, and README immediately on launch.
 - **Silent Background Revalidation**: Fetches fresh commits and repositories in the background without blocking spinners or UI flashes.
 - **Skeleton Loaders**: Polished 5-card placeholder animations on fresh installs when local storage is empty.
@@ -150,7 +159,7 @@
 
 Direct APK builds are published on GitHub Releases:
 
-👉 **[Download GitPulse v1.3.1 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.2 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -158,7 +167,7 @@ Direct APK builds are published on GitHub Releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.1`
+- **Version**: `1.3.2`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 

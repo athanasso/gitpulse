@@ -27,6 +27,9 @@ import { ExploreScreen } from './src/screens/ExploreScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { GitHubApiService } from './src/services/GitHubApiService';
+import { RepoDetailModal } from './src/screens/RepoDetailModal';
+import { DeepLinkService } from './src/services/DeepLinkService';
+import { GitHubRepo } from './src/types/github';
 
 type Tab = 'repos' | 'explore' | 'inbox' | 'profile';
 
@@ -48,6 +51,8 @@ function AppContent() {
     AccountService.getAccounts()
   );
   const [accountKey, setAccountKey] = useState(0);
+  const [deepLinkRepo, setDeepLinkRepo] = useState<GitHubRepo | null>(null);
+  const [deepLinkModalVisible, setDeepLinkModalVisible] = useState(false);
 
   useEffect(() => {
     AccountService.init().then((acc) => {
@@ -61,7 +66,16 @@ function AppContent() {
       setAccountKey((prev) => prev + 1);
     });
 
-    return () => unsub();
+    DeepLinkService.init();
+    const unsubDeepLink = DeepLinkService.subscribe((repo) => {
+      setDeepLinkRepo(repo);
+      setDeepLinkModalVisible(true);
+    });
+
+    return () => {
+      unsub();
+      unsubDeepLink();
+    };
   }, []);
 
   useEffect(() => {
@@ -123,7 +137,7 @@ function AppContent() {
             ]}
           >
             <Text style={[styles.versionText, { color: colors.primary }]}>
-              v1.3.1
+              v1.3.2
             </Text>
           </View>
         </View>
@@ -335,6 +349,16 @@ function AppContent() {
         onAccountSwitched={(acc) => {
           setActiveAccount(acc);
           setAccountKey((prev) => prev + 1);
+        }}
+      />
+
+      {/* Direct Deep Link Repository Modal */}
+      <RepoDetailModal
+        visible={deepLinkModalVisible}
+        repo={deepLinkRepo}
+        onClose={() => {
+          setDeepLinkModalVisible(false);
+          setDeepLinkRepo(null);
         }}
       />
     </SafeAreaView>

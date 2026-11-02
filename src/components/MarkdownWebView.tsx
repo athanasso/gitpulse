@@ -10,6 +10,7 @@ import {
 } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
 import { ThemePalette } from '../constants/theme';
+import { DeepLinkService } from '../services/DeepLinkService';
 
 interface MarkdownWebViewProps {
   htmlContent: string;
@@ -248,8 +249,17 @@ export const MarkdownWebView: React.FC<MarkdownWebViewProps> = ({
     if (
       request.url.startsWith('http://') ||
       request.url.startsWith('https://') ||
-      request.url.startsWith('mailto:')
+      request.url.startsWith('gitpulse://')
     ) {
+      const parsed = DeepLinkService.parseUrl(request.url);
+      if (parsed) {
+        DeepLinkService.handleIncomingUrl(request.url);
+        return false;
+      }
+      Linking.openURL(request.url).catch(() => {});
+      return false;
+    }
+    if (request.url.startsWith('mailto:')) {
       Linking.openURL(request.url).catch(() => {});
       return false;
     }
