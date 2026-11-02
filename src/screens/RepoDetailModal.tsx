@@ -1557,6 +1557,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           </Text>
                         </View>
                         <CodeEditorWebView
+                          key={viewingFile?.path || 'editor'}
                           value={editContent}
                           onChange={setEditContent}
                           language={viewingFile?.name?.split('.').pop()}
@@ -2726,6 +2727,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 </Text>
                 <View style={{ height: 200, borderWidth: 1, borderColor: colors.cardBorder, borderRadius: 8, overflow: 'hidden' }}>
                   <CodeEditorWebView
+                    key={newFileName || 'newfile'}
                     value={newFileContent}
                     onChange={setNewFileContent}
                     language={newFileName.split('.').pop()}

@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.5&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.6&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -212,7 +212,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.5 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.6 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -220,7 +220,7 @@ Direct signed APK releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.5`
+- **Version**: `1.3.6`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 
