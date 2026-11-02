@@ -47,6 +47,7 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
   const [hostUrl, setHostUrl] = useState('');
   const [tokenInput, setTokenInput] = useState('');
   const [validating, setValidating] = useState(false);
+  const [showScopes, setShowScopes] = useState(true);
 
   // Themed Dialog
   const [dialogConfig, setDialogConfig] = useState<{
@@ -420,13 +421,160 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                 </View>
               )}
 
+              {/* 1-Tap Auto-Configured Scopes Redirect Button */}
+              <TouchableOpacity
+                style={[
+                  styles.autoScopeButton,
+                  {
+                    backgroundColor: colors.primaryMuted,
+                    borderColor: colors.primary,
+                  },
+                ]}
+                onPress={() => {
+                  const url = currentProviderMeta.getTokenUrl(hostUrl);
+                  Linking.openURL(url);
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.autoScopeIcon}>⚡</Text>
+                <View style={styles.autoScopeTextWrap}>
+                  <Text style={[styles.autoScopeTitle, { color: colors.primary }]}>
+                    {currentProviderMeta.hasPreconfiguredScopes
+                      ? `Generate ${currentProviderMeta.name} Token (Pre-Selected) ↗`
+                      : `Open ${currentProviderMeta.name} Token Settings ↗`}
+                  </Text>
+                  <Text style={[styles.autoScopeSubtitle, { color: colors.textSecondary }]}>
+                    {currentProviderMeta.hasPreconfiguredScopes
+                      ? `Opens ${currentProviderMeta.name} with all required scopes pre-checked automatically`
+                      : `Opens ${currentProviderMeta.name} settings to create your personal access token`}
+                  </Text>
+                </View>
+              </TouchableOpacity>
+
+              {/* Required Permissions & Scopes Breakdown */}
+              <View
+                style={[
+                  styles.scopesCard,
+                  {
+                    backgroundColor: colors.card,
+                    borderColor: colors.cardBorder,
+                  },
+                ]}
+              >
+                <TouchableOpacity
+                  style={styles.scopesCardHeader}
+                  onPress={() => setShowScopes((prev) => !prev)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.scopesTitleWrap}>
+                    <Text style={[styles.scopesCardTitle, { color: colors.textPrimary }]}>
+                      🔑 {currentProviderMeta.name.toUpperCase()} PERMISSIONS ({currentProviderMeta.scopes.length})
+                    </Text>
+                    {currentProviderMeta.hasPreconfiguredScopes ? (
+                      <View
+                        style={[
+                          styles.autoConfiguredBadge,
+                          {
+                            backgroundColor: colors.emeraldMuted,
+                            borderColor: colors.emerald,
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.autoConfiguredBadgeText, { color: colors.emerald }]}>
+                          ✓ AUTO-ENABLED IN LINK
+                        </Text>
+                      </View>
+                    ) : (
+                      <View
+                        style={[
+                          styles.autoConfiguredBadge,
+                          {
+                            backgroundColor: 'rgba(245, 158, 11, 0.15)',
+                            borderColor: '#F59E0B',
+                          },
+                        ]}
+                      >
+                        <Text style={[styles.autoConfiguredBadgeText, { color: '#F59E0B' }]}>
+                          MANUAL CHECK
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+
+                  <Text style={[styles.scopesToggleText, { color: colors.primary }]}>
+                    {showScopes ? '▲ Hide' : '▼ Show'}
+                  </Text>
+                </TouchableOpacity>
+
+                <Text style={[styles.scopesCardHint, { color: colors.textMuted }]}>
+                  {currentProviderMeta.hasPreconfiguredScopes
+                    ? `The button above pre-selects these scopes on ${currentProviderMeta.name}:`
+                    : `Ensure the following permissions are checked when generating on ${currentProviderMeta.name}:`}
+                </Text>
+
+                {showScopes && (
+                  <View style={styles.scopesList}>
+                    {currentProviderMeta.scopes.map((s) => (
+                      <View
+                        key={s.scope}
+                        style={[styles.scopeRow, { borderBottomColor: colors.cardBorder }]}
+                      >
+                        <View style={styles.scopeRowTop}>
+                          <Text
+                            style={[
+                              styles.scopeCodeBadge,
+                              {
+                                backgroundColor: colors.cardElevated,
+                                borderColor: colors.cardBorder,
+                                color: colors.cyan,
+                              },
+                            ]}
+                          >
+                            {s.scope}
+                          </Text>
+                          <View
+                            style={[
+                              styles.scopeLevelBadge,
+                              s.level === 'Required'
+                                ? { backgroundColor: 'rgba(239, 68, 68, 0.15)', borderColor: '#EF4444' }
+                                : s.level === 'Recommended'
+                                ? { backgroundColor: 'rgba(245, 158, 11, 0.15)', borderColor: '#F59E0B' }
+                                : { backgroundColor: 'rgba(59, 130, 246, 0.15)', borderColor: '#3B82F6' },
+                            ]}
+                          >
+                            <Text
+                              style={[
+                                styles.scopeLevelText,
+                                s.level === 'Required'
+                                  ? { color: '#EF4444' }
+                                  : s.level === 'Recommended'
+                                  ? { color: '#F59E0B' }
+                                  : { color: '#3B82F6' },
+                              ]}
+                            >
+                              {s.level.toUpperCase()}
+                            </Text>
+                          </View>
+                        </View>
+                        <Text style={[styles.scopeDesc, { color: colors.textSecondary }]}>
+                          <Text style={{ color: colors.textPrimary, fontWeight: '600' }}>
+                            {s.name}:{' '}
+                          </Text>
+                          {s.desc}
+                        </Text>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </View>
+
               <View style={styles.inputGroup}>
                 <View style={styles.labelWithHelper}>
                   <Text style={[styles.inputLabel, { color: colors.textSecondary }]}>
                     PERSONAL ACCESS TOKEN / CREDENTIALS
                   </Text>
                   <TouchableOpacity
-                    onPress={() => Linking.openURL(currentProviderMeta.tokenDocsUrl)}
+                    onPress={() => Linking.openURL(currentProviderMeta.getTokenUrl(hostUrl))}
                   >
                     <Text style={[styles.helperLink, { color: colors.primary }]}>
                       Get Token ↗
@@ -451,6 +599,9 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                   autoCorrect={false}
                   secureTextEntry
                 />
+                <Text style={[styles.tokenHintText, { color: colors.textMuted }]}>
+                  {currentProviderMeta.tokenFormatHint}
+                </Text>
               </View>
 
               <View style={styles.buttonRow}>
@@ -503,7 +654,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   modalCard: {
-    maxHeight: '85%',
+    maxHeight: '90%',
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     borderWidth: 1,
@@ -743,6 +894,112 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 14,
     fontWeight: '800',
+  },
+  autoScopeButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 12,
+    borderRadius: 12,
+    borderWidth: 1,
+    gap: 12,
+  },
+  autoScopeIcon: {
+    fontSize: 22,
+  },
+  autoScopeTextWrap: {
+    flex: 1,
+  },
+  autoScopeTitle: {
+    fontSize: 13,
+    fontWeight: '800',
+  },
+  autoScopeSubtitle: {
+    fontSize: 11,
+    marginTop: 2,
+    lineHeight: 15,
+  },
+  scopesCard: {
+    borderRadius: 14,
+    borderWidth: 1,
+    padding: 12,
+    gap: 8,
+  },
+  scopesCardHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  scopesTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  scopesCardTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  scopesToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+  },
+  autoConfiguredBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  autoConfiguredBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  scopesCardHint: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  scopesList: {
+    gap: 8,
+    marginTop: 2,
+  },
+  scopeRow: {
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    gap: 4,
+  },
+  scopeRowTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  scopeCodeBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  scopeLevelBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  scopeLevelText: {
+    fontSize: 9,
+    fontWeight: '800',
+  },
+  scopeDesc: {
+    fontSize: 11,
+    lineHeight: 16,
+  },
+  tokenHintText: {
+    fontSize: 11,
+    lineHeight: 15,
+    marginTop: 2,
   },
 });
 

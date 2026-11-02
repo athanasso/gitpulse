@@ -36,6 +36,7 @@
   - 1-tap switching from the header pill modal (`[ ⚡ @athanasso ▾ ]` $\leftrightarrow$ `[ 🦊 @work ▾ ]`).
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
   - Robust singleton persistence across app launches and restarts.
+  - **Auto-Configured Token Redirects & Scope Guide**: 1-tap token creation shortcut automatically pre-selects required scopes in GitHub and GitLab URLs, while a visible in-app permissions breakdown guides setup across GitHub, GitLab, Gitea, and Bitbucket.
 
 ### 2. 💻 In-App Mobile Code Editor & Direct Push
 - **Edit on the Go**: Tap `[ ✏️ Edit ]` on any text/code file in the Code tab to open the full mobile editor.
