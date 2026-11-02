@@ -509,14 +509,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         title: 'Changes Pushed! 🚀',
         message: `Successfully committed and pushed to "${selectedBranch}".`,
         type: 'success',
-        buttons: [{ text: 'OK' }],
+        buttons: [{ text: 'OK', onPress: hideDialog }],
       });
     } else {
       showDialog({
         title: 'Push Failed',
         message: res.message || 'Could not commit changes to repository.',
         type: 'danger',
-        buttons: [{ text: 'OK' }],
+        buttons: [{ text: 'OK', onPress: hideDialog }],
       });
     }
   };
@@ -865,11 +865,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           message: 'You have unsaved changes in this file. Are you sure you want to discard them?',
           type: 'warning',
           buttons: [
-            { text: 'Keep Editing', style: 'cancel' },
+            { text: 'Keep Editing', style: 'cancel', onPress: hideDialog },
             {
               text: 'Discard',
               style: 'destructive',
               onPress: () => {
+                hideDialog();
                 setIsEditing(false);
                 setEditContent('');
               },
@@ -1022,11 +1023,12 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       message: 'You have unsaved changes. Discard and exit repository?',
                       type: 'warning',
                       buttons: [
-                        { text: 'Keep Editing', style: 'cancel' },
+                        { text: 'Keep Editing', style: 'cancel', onPress: hideDialog },
                         {
                           text: 'Discard & Close',
                           style: 'destructive',
                           onPress: () => {
+                            hideDialog();
                             setIsEditing(false);
                             setEditContent('');
                             onClose();

@@ -12,72 +12,97 @@ class AccountServiceClass {
   private accounts: GitAccount[] = [];
   private activeAccount: GitAccount | null = null;
   private initialized: boolean = false;
+  private initPromise: Promise<GitAccount | null> | null = null;
   private listeners: Set<AccountChangeListener> = new Set();
 
   async init(): Promise<GitAccount | null> {
     if (this.initialized) return this.activeAccount;
+    if (this.initPromise) return this.initPromise;
 
-    try {
-      const [rawAccounts, rawActiveId, legacyPat, legacyUser] = await Promise.all([
-        AsyncStorage.getItem(ACCOUNTS_STORAGE_KEY),
-        AsyncStorage.getItem(ACTIVE_ACCOUNT_ID_KEY),
-        AsyncStorage.getItem(LEGACY_PAT_KEY),
-        AsyncStorage.getItem(LEGACY_USER_KEY),
-      ]);
+    this.initPromise = (async () => {
+      try {
+        const [rawAccounts, rawActiveId, legacyPat, legacyUser] = await Promise.all([
+          AsyncStorage.getItem(ACCOUNTS_STORAGE_KEY),
+          AsyncStorage.getItem(ACTIVE_ACCOUNT_ID_KEY),
+          AsyncStorage.getItem(LEGACY_PAT_KEY),
+          AsyncStorage.getItem(LEGACY_USER_KEY),
+        ]);
 
-      if (rawAccounts) {
-        try {
-          this.accounts = JSON.parse(rawAccounts);
-        } catch {
-          this.accounts = [];
-        }
-      }
-
-      // Auto-migrate legacy GitHub account if present and no accounts exist
-      if (this.accounts.length === 0 && legacyPat) {
-        let legacyLogin = 'User';
-        let legacyAvatar = '';
-        if (legacyUser) {
+        let loadedAccounts: GitAccount[] = [];
+        if (rawAccounts) {
           try {
-            const parsed = JSON.parse(legacyUser);
-            legacyLogin = parsed.login || 'User';
-            legacyAvatar = parsed.avatar_url || '';
+            const parsed = JSON.parse(rawAccounts);
+            if (Array.isArray(parsed)) {
+              loadedAccounts = parsed;
+            }
           } catch {
-            // ignore
+            loadedAccounts = [];
           }
         }
 
-        const migratedAccount: GitAccount = {
-          id: `github_${legacyLogin.toLowerCase()}_${Date.now()}`,
-          provider: 'github',
-          username: legacyLogin,
-          displayName: legacyLogin,
-          avatarUrl: legacyAvatar,
-          token: legacyPat,
-          createdAt: Date.now(),
-        };
+        // Auto-migrate legacy GitHub account if present and not already registered
+        if (legacyPat && legacyPat.trim()) {
+          let legacyLogin = 'User';
+          let legacyAvatar = '';
+          if (legacyUser) {
+            try {
+              const parsed = JSON.parse(legacyUser);
+              legacyLogin = parsed.login || 'User';
+              legacyAvatar = parsed.avatar_url || '';
+            } catch {
+              // ignore
+            }
+          }
 
-        this.accounts.push(migratedAccount);
-        await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(this.accounts));
+          const cleanPat = legacyPat.trim();
+          const cleanLogin = legacyLogin.trim();
+
+          const alreadyExists = loadedAccounts.some(
+            (a) =>
+              a.provider === 'github' &&
+              (a.username.toLowerCase() === cleanLogin.toLowerCase() || a.token === cleanPat)
+          );
+
+          if (!alreadyExists) {
+            const migratedAccount: GitAccount = {
+              id: `github_${cleanLogin.toLowerCase()}_${Date.now()}`,
+              provider: 'github',
+              username: cleanLogin,
+              displayName: cleanLogin,
+              avatarUrl: legacyAvatar,
+              token: cleanPat,
+              createdAt: Date.now(),
+            };
+            loadedAccounts.push(migratedAccount);
+            await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(loadedAccounts));
+          }
+        }
+
+        this.accounts = loadedAccounts;
+
+        // Determine active account
+        if (rawActiveId) {
+          this.activeAccount = this.accounts.find((a) => a.id === rawActiveId) || null;
+        }
+
+        if (!this.activeAccount && this.accounts.length > 0) {
+          this.activeAccount = this.accounts[0];
+          await AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, this.activeAccount.id);
+        }
+
+        this.initialized = true;
+        this.notifyListeners();
+        return this.activeAccount;
+      } catch (e) {
+        console.warn('[AccountService] Init failed', e);
+        this.initialized = true;
+        return null;
+      } finally {
+        this.initPromise = null;
       }
+    })();
 
-      // Determine active account
-      if (rawActiveId) {
-        this.activeAccount = this.accounts.find((a) => a.id === rawActiveId) || null;
-      }
-
-      if (!this.activeAccount && this.accounts.length > 0) {
-        this.activeAccount = this.accounts[0];
-        await AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, this.activeAccount.id);
-      }
-
-      this.initialized = true;
-      return this.activeAccount;
-    } catch (e) {
-      console.warn('[AccountService] Init failed', e);
-      this.initialized = true;
-      return null;
-    }
+    return this.initPromise;
   }
 
   getAccounts(): GitAccount[] {
@@ -89,19 +114,36 @@ class AccountServiceClass {
   }
 
   async setActiveAccount(id: string): Promise<GitAccount | null> {
+    await this.init();
+
     const target = this.accounts.find((a) => a.id === id);
     if (!target) return null;
 
     this.activeAccount = target;
     await AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, id);
+
+    // Keep legacy PAT key synced for background services if GitHub
+    if (target.provider === 'github') {
+      await AsyncStorage.setItem(LEGACY_PAT_KEY, target.token);
+    }
+
     this.notifyListeners();
     return target;
   }
 
   async addAccount(accountData: Omit<GitAccount, 'id' | 'createdAt'>): Promise<GitAccount> {
+    await this.init();
+
+    const cleanUsername = accountData.username.trim();
+    const cleanHost = accountData.hostUrl ? accountData.hostUrl.trim() : undefined;
+    const cleanToken = accountData.token.trim();
+
     const newAccount: GitAccount = {
       ...accountData,
-      id: `${accountData.provider}_${accountData.username.toLowerCase()}_${Date.now()}`,
+      username: cleanUsername,
+      hostUrl: cleanHost,
+      token: cleanToken,
+      id: `${accountData.provider}_${cleanUsername.toLowerCase()}_${Date.now()}`,
       createdAt: Date.now(),
     };
 
@@ -110,33 +152,68 @@ class AccountServiceClass {
       (a) =>
         a.provider === newAccount.provider &&
         a.username.toLowerCase() === newAccount.username.toLowerCase() &&
-        (a.hostUrl || '') === (newAccount.hostUrl || '')
+        (a.hostUrl || '').toLowerCase() === (newAccount.hostUrl || '').toLowerCase()
     );
 
     if (existingIndex >= 0) {
-      this.accounts[existingIndex] = newAccount;
+      this.accounts[existingIndex] = {
+        ...this.accounts[existingIndex],
+        ...newAccount,
+        id: this.accounts[existingIndex].id, // retain stable ID
+      };
+      this.activeAccount = this.accounts[existingIndex];
     } else {
       this.accounts.push(newAccount);
+      this.activeAccount = newAccount;
     }
 
-    this.activeAccount = newAccount;
-
+    // Persist full accounts list to AsyncStorage
     await Promise.all([
       AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(this.accounts)),
-      AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, newAccount.id),
+      AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, this.activeAccount.id),
+      this.activeAccount.provider === 'github'
+        ? AsyncStorage.setItem(LEGACY_PAT_KEY, this.activeAccount.token)
+        : Promise.resolve(),
     ]);
 
     this.notifyListeners();
-    return newAccount;
+    return this.activeAccount;
+  }
+
+  async updateAccount(
+    id: string,
+    updates: Partial<Omit<GitAccount, 'id' | 'createdAt'>>
+  ): Promise<void> {
+    await this.init();
+
+    const idx = this.accounts.findIndex((a) => a.id === id);
+    if (idx < 0) return;
+
+    this.accounts[idx] = {
+      ...this.accounts[idx],
+      ...updates,
+    };
+
+    if (this.activeAccount?.id === id) {
+      this.activeAccount = this.accounts[idx];
+    }
+
+    await AsyncStorage.setItem(ACCOUNTS_STORAGE_KEY, JSON.stringify(this.accounts));
+    this.notifyListeners();
   }
 
   async removeAccount(id: string): Promise<void> {
+    await this.init();
+
     this.accounts = this.accounts.filter((a) => a.id !== id);
 
     if (this.activeAccount?.id === id) {
       this.activeAccount = this.accounts[0] || null;
       if (this.activeAccount) {
         await AsyncStorage.setItem(ACTIVE_ACCOUNT_ID_KEY, this.activeAccount.id);
+        if (this.activeAccount.provider === 'github') {
+          await AsyncStorage.setItem(LEGACY_PAT_KEY, this.activeAccount.token);
+        }
       } else {
         await AsyncStorage.removeItem(ACTIVE_ACCOUNT_ID_KEY);
       }
@@ -148,6 +225,13 @@ class AccountServiceClass {
 
   subscribe(listener: AccountChangeListener): () => void {
     this.listeners.add(listener);
+    if (this.initialized) {
+      try {
+        listener(this.activeAccount, [...this.accounts]);
+      } catch (e) {
+        console.warn('[AccountService] Initial subscriber notification error', e);
+      }
+    }
     return () => this.listeners.delete(listener);
   }
 
@@ -163,4 +247,3 @@ class AccountServiceClass {
 }
 
 export const AccountService = new AccountServiceClass();
-

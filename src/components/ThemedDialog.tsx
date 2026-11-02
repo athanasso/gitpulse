@@ -16,6 +16,7 @@ export interface DialogButton {
   style?: 'default' | 'cancel' | 'destructive' | 'primary' | 'success';
   onPress?: () => void;
   loading?: boolean;
+  autoDismiss?: boolean;
 }
 
 export interface ThemedDialogProps {
@@ -161,10 +162,14 @@ export const ThemedDialog: React.FC<ThemedDialogProps> = ({
                         buttons.length === 2 && styles.btnHalf,
                       ]}
                       onPress={() => {
+                        const isCancel = btn.style === 'cancel';
                         if (btn.onPress) {
                           btn.onPress();
-                        } else if (onClose) {
-                          onClose();
+                        }
+                        if (btn.autoDismiss || isCancel || !btn.onPress) {
+                          if (btn.autoDismiss !== false && onClose) {
+                            onClose();
+                          }
                         }
                       }}
                       activeOpacity={0.7}

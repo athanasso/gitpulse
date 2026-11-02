@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -75,7 +75,22 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
     setDialogConfig((prev) => ({ ...prev, visible: false }));
   };
 
-  const reloadData = () => {
+  useEffect(() => {
+    if (visible) {
+      reloadData();
+    }
+  }, [visible]);
+
+  useEffect(() => {
+    const unsub = AccountService.subscribe((active, list) => {
+      setActiveAccount(active);
+      setAccounts(list);
+    });
+    return () => unsub();
+  }, []);
+
+  const reloadData = async () => {
+    await AccountService.init();
     setAccounts(AccountService.getAccounts());
     setActiveAccount(AccountService.getActiveAccount());
   };
@@ -197,6 +212,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
               <Text style={[styles.headerSubtitle, { color: colors.textSecondary }]}>
                 {isAdding
                   ? `Add a new ${currentProviderMeta.name} account`
+                  : accounts.length > 0
+                  ? `${accounts.length} account${accounts.length === 1 ? '' : 's'} connected across ${
+                      new Set(accounts.map((a) => a.provider)).size
+                    } git forge${new Set(accounts.map((a) => a.provider)).size === 1 ? '' : 's'}`
                   : 'Switch active workspace or add another git forge'}
               </Text>
             </View>
@@ -214,9 +233,51 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
           {!isAdding ? (
             /* Accounts List View */
             <ScrollView style={styles.scrollList} contentContainerStyle={styles.listContent}>
-              <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
-                CONNECTED ACCOUNTS ({accounts.length})
-              </Text>
+              <View style={styles.sectionHeaderRow}>
+                <Text style={[styles.sectionTitle, { color: colors.textMuted }]}>
+                  CONNECTED ACCOUNTS
+                </Text>
+                <View
+                  style={[
+                    styles.countBadge,
+                    {
+                      backgroundColor:
+                        accounts.length > 1 ? colors.primary : colors.cardElevated,
+                    },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.countBadgeText,
+                      {
+                        color: accounts.length > 1 ? '#FFFFFF' : colors.textSecondary,
+                      },
+                    ]}
+                  >
+                    {accounts.length}
+                  </Text>
+                </View>
+              </View>
+
+              {accounts.length === 0 && (
+                <View
+                  style={[
+                    styles.emptyAccountsCard,
+                    {
+                      backgroundColor: colors.card,
+                      borderColor: colors.cardBorder,
+                    },
+                  ]}
+                >
+                  <Text style={styles.emptyAccountsIcon}>👥</Text>
+                  <Text style={[styles.emptyAccountsTitle, { color: colors.textPrimary }]}>
+                    No Accounts Connected
+                  </Text>
+                  <Text style={[styles.emptyAccountsDesc, { color: colors.textSecondary }]}>
+                    Connect your GitHub, GitLab, Gitea, or Bitbucket account to browse repositories and push commits.
+                  </Text>
+                </View>
+              )}
 
               {accounts.map((acc) => {
                 const meta = PROVIDER_REGISTRY[acc.provider];
@@ -486,11 +547,51 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.lg,
     gap: 16,
   },
+  sectionHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginBottom: 4,
+  },
   sectionTitle: {
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.5,
+  },
+  countBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  countBadgeText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  emptyAccountsCard: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: Spacing.xl,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    marginVertical: 12,
+  },
+  emptyAccountsIcon: {
+    fontSize: 32,
+    marginBottom: 8,
+  },
+  emptyAccountsTitle: {
+    fontSize: 15,
+    fontWeight: '800',
     marginBottom: 4,
+  },
+  emptyAccountsDesc: {
+    fontSize: 12,
+    textAlign: 'center',
+    lineHeight: 18,
   },
   accountCard: {
     flexDirection: 'row',

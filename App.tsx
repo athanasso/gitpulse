@@ -44,15 +44,20 @@ function AppContent() {
   const [activeAccount, setActiveAccount] = useState<GitAccount | null>(() =>
     AccountService.getActiveAccount()
   );
+  const [accounts, setAccounts] = useState<GitAccount[]>(() =>
+    AccountService.getAccounts()
+  );
   const [accountKey, setAccountKey] = useState(0);
 
   useEffect(() => {
     AccountService.init().then((acc) => {
       setActiveAccount(acc);
+      setAccounts(AccountService.getAccounts());
     });
 
-    const unsub = AccountService.subscribe((acc) => {
+    const unsub = AccountService.subscribe((acc, allAccounts) => {
       setActiveAccount(acc);
+      setAccounts(allAccounts);
       setAccountKey((prev) => prev + 1);
     });
 
@@ -118,7 +123,7 @@ function AppContent() {
             ]}
           >
             <Text style={[styles.versionText, { color: colors.primary }]}>
-              v1.1
+              v1.3.1
             </Text>
           </View>
         </View>
@@ -135,6 +140,7 @@ function AppContent() {
             ]}
             onPress={() => setAccountSwitcherVisible(true)}
             activeOpacity={0.7}
+            accessibilityLabel={`Connected accounts: ${accounts.length}. Active: @${activeAccount ? activeAccount.username : 'Account'}`}
           >
             <Text style={styles.accountPillIcon}>
               {activeAccount ? PROVIDER_REGISTRY[activeAccount.provider].icon : '⚡'}
@@ -145,6 +151,26 @@ function AppContent() {
             >
               @{activeAccount ? activeAccount.username : 'Account'}
             </Text>
+            <View
+              style={[
+                styles.accountCountBadge,
+                {
+                  backgroundColor:
+                    accounts.length > 1 ? colors.primary : colors.cardBorder,
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.accountCountBadgeText,
+                  {
+                    color: accounts.length > 1 ? '#FFFFFF' : colors.textMuted,
+                  },
+                ]}
+              >
+                {accounts.length}
+              </Text>
+            </View>
             <Text style={[styles.accountPillChevron, { color: colors.textMuted }]}>
               ▾
             </Text>
@@ -388,7 +414,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 10,
     borderWidth: 1,
-    maxWidth: 160,
+    maxWidth: 185,
   },
   accountPillIcon: {
     fontSize: 14,
@@ -397,6 +423,19 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
     flexShrink: 1,
+  },
+  accountCountBadge: {
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+    borderRadius: 8,
+    minWidth: 16,
+    height: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  accountCountBadgeText: {
+    fontSize: 9,
+    fontWeight: '800',
   },
   accountPillChevron: {
     fontSize: 10,

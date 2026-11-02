@@ -71,39 +71,35 @@ class GitHubApiServiceClass {
         const activeAcc = AccountService.getActiveAccount();
         if (activeAcc) {
           this.token = activeAcc.token;
-          if (activeAcc.provider !== 'github') {
-            this.cachedUser = {
-              id: 1,
-              login: activeAcc.username,
-              name: activeAcc.displayName,
-              avatar_url: activeAcc.avatarUrl || '',
-              html_url: activeAcc.hostUrl || '',
-              public_repos: 0,
-              followers: 0,
-              following: 0,
-              created_at: new Date(activeAcc.createdAt).toISOString(),
-              updated_at: new Date().toISOString(),
-            } as GitHubUser;
-          }
+          this.cachedUser = {
+            id: 1,
+            login: activeAcc.username,
+            name: activeAcc.displayName || activeAcc.username,
+            avatar_url: activeAcc.avatarUrl || '',
+            html_url: activeAcc.hostUrl || '',
+            public_repos: 0,
+            followers: 0,
+            following: 0,
+            created_at: new Date(activeAcc.createdAt).toISOString(),
+            updated_at: new Date().toISOString(),
+          } as GitHubUser;
         }
 
         AccountService.subscribe((acc) => {
           if (acc) {
             this.token = acc.token;
-            if (acc.provider !== 'github') {
-              this.cachedUser = {
-                id: 1,
-                login: acc.username,
-                name: acc.displayName,
-                avatar_url: acc.avatarUrl || '',
-                html_url: acc.hostUrl || '',
-                public_repos: 0,
-                followers: 0,
-                following: 0,
-                created_at: new Date(acc.createdAt).toISOString(),
-                updated_at: new Date().toISOString(),
-              } as GitHubUser;
-            }
+            this.cachedUser = {
+              id: 1,
+              login: acc.username,
+              name: acc.displayName || acc.username,
+              avatar_url: acc.avatarUrl || '',
+              html_url: acc.hostUrl || '',
+              public_repos: 0,
+              followers: 0,
+              following: 0,
+              created_at: new Date(acc.createdAt).toISOString(),
+              updated_at: new Date().toISOString(),
+            } as GitHubUser;
           } else {
             this.token = null;
             this.cachedUser = null;

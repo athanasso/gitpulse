@@ -24,6 +24,7 @@ import {
   GitHubPinnedItem,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { AccountService } from '../services/AccountService';
 import { CacheService, CacheKeys } from '../services/CacheService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
@@ -552,6 +553,10 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           style: 'destructive',
           onPress: async () => {
             hideDialog();
+            const activeAcc = AccountService.getActiveAccount();
+            if (activeAcc) {
+              await AccountService.removeAccount(activeAcc.id);
+            }
             await GitHubApiService.setToken(null);
             setUser(null);
             setIsAuth(false);
