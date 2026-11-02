@@ -870,6 +870,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
               </Text>
             </View>
           </View>
+        </View>
+
+        <View style={styles.scopesMetaRow}>
+          <Text style={styles.fineGrainedNote} numberOfLines={1}>
+            ● Connected via {providerMeta.name} (
+            {activeAccount?.username
+              ? `@${activeAccount.username}`
+              : user?.login
+              ? `@${user.login}`
+              : 'Authenticated'}
+            )
+          </Text>
           <TouchableOpacity
             style={styles.manageScopesBtn}
             onPress={() => Linking.openURL(manageUrl)}
@@ -880,16 +892,6 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
             </Text>
           </TouchableOpacity>
         </View>
-
-        <Text style={styles.fineGrainedNote}>
-          ● Connected via {providerMeta.name} (
-          {activeAccount?.username
-            ? `@${activeAccount.username}`
-            : user?.login
-            ? `@${user.login}`
-            : 'Authenticated'}
-          )
-        </Text>
 
         <View style={styles.scopesListContainer}>
           {evaluated.map((item) => (
@@ -2403,10 +2405,19 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     flexWrap: 'wrap',
     flexShrink: 1,
   },
+  scopesMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+    marginBottom: 4,
+  },
   manageScopesBtn: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
     backgroundColor: colors.card,
     borderWidth: 1,
     borderColor: colors.cardBorder,

@@ -299,8 +299,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const getRepoOwnerAndName = useCallback((): [string, string] => {
     if (!repo) return ['', ''];
     if (repo.full_name && repo.full_name.includes('/')) {
-      const parts = repo.full_name.split('/');
-      return [parts[0] || '', parts[1] || ''];
+      const lastSlash = repo.full_name.lastIndexOf('/');
+      const owner = repo.full_name.substring(0, lastSlash);
+      const name = repo.full_name.substring(lastSlash + 1);
+      return [owner, name];
     }
     return [repo.owner?.login || '', repo.name || ''];
   }, [repo]);
@@ -418,7 +420,18 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         setIsStarred(starred);
       });
       GitHubApiService.getRepoBranches(owner, name).then((bList) => {
-        if (bList.length > 0) setBranches(bList);
+        if (bList.length > 0) {
+          setBranches(bList);
+          const currentBranch = repo.default_branch || 'main';
+          const currentExists = bList.some((b) => b.name === currentBranch);
+          const targetBranch = currentExists
+            ? currentBranch
+            : (bList.find((b) => b.name === 'master')?.name || bList[0]?.name || 'main');
+          if (targetBranch !== currentBranch) {
+            setSelectedBranch(targetBranch);
+            loadTabData(targetBranch);
+          }
+        }
       });
     }
   }, [visible, repo]);
@@ -427,7 +440,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     if (visible && repo) {
       loadTabData();
     }
-  }, [visible, repo, activeTab]);
+  }, [visible, repo, activeTab, selectedBranch]);
 
   const loadTabData = async (branchRef?: string) => {
     if (!repo) return;

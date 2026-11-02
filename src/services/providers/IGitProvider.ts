@@ -7,6 +7,8 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
 } from '../../types/provider';
 
 export interface IGitProvider {
@@ -239,5 +241,37 @@ export interface IGitProvider {
     message: string,
     branch?: string
   ): Promise<{ success: boolean; message?: string; commitSha?: string }>;
+
+  /**
+   * Fetch repo languages
+   */
+  getRepoLanguages?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<Record<string, number>>;
+
+  /**
+   * Fetch repo contributors
+   */
+  getRepoContributors?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<UnifiedContributor[]>;
+
+  /**
+   * Fetch repo releases
+   */
+  getRepoReleases?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page?: number,
+    perPage?: number
+  ): Promise<UnifiedRelease[]>;
 }
 

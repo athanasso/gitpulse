@@ -8,13 +8,19 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
 } from '../../types/provider';
 
 export class GitLabProvider implements IGitProvider {
   readonly type: GitProviderType = 'gitlab';
 
   private getApiUrl(hostUrl?: string): string {
-    const base = hostUrl && hostUrl.trim() ? hostUrl.trim().replace(/\/+$/, '') : 'https://gitlab.com';
+    let base = hostUrl && hostUrl.trim() ? hostUrl.trim() : 'https://gitlab.com';
+    if (!base.startsWith('http://') && !base.startsWith('https://')) {
+      base = `https://${base}`;
+    }
+    base = base.replace(/\/api\/v4\/?$/, '').replace(/\/+$/, '');
     return `${base}/api/v4`;
   }
 
@@ -30,8 +36,24 @@ export class GitLabProvider implements IGitProvider {
   }
 
   private getProjectIdentifier(owner: string, repo: string): string {
-    // If owner/repo, encode path
-    return encodeURIComponent(`${owner}/${repo}`);
+    const cleanRepo = (repo || '').trim();
+    const cleanOwner = (owner || '').trim();
+
+    // 1. Direct numeric ID (GitLab API v4 natively accepts project ID)
+    if (/^\d+$/.test(cleanRepo)) return cleanRepo;
+    if (/^\d+$/.test(cleanOwner)) return cleanOwner;
+
+    // 2. Already full path in repo
+    const strippedOwner = cleanOwner.replace(/^\/+|\/+$/g, '');
+    const strippedRepo = cleanRepo.replace(/^\/+|\/+$/g, '');
+
+    if (!strippedOwner) {
+      return encodeURIComponent(strippedRepo);
+    }
+    if (strippedRepo.startsWith(`${strippedOwner}/`)) {
+      return encodeURIComponent(strippedRepo);
+    }
+    return encodeURIComponent(`${strippedOwner}/${strippedRepo}`);
   }
 
   async validateToken(token: string, hostUrl?: string): Promise<UnifiedUser> {
@@ -109,12 +131,17 @@ export class GitLabProvider implements IGitProvider {
 
   private mapGitLabProject(p: any): UnifiedRepo {
     const ownerLogin =
-      p.namespace?.path || p.namespace?.name || (p.path_with_namespace ? p.path_with_namespace.split('/')[0] : 'gitlab');
+      p.namespace?.full_path ||
+      p.namespace?.path ||
+      p.namespace?.name ||
+      (p.path_with_namespace ? p.path_with_namespace.substring(0, p.path_with_namespace.lastIndexOf('/')) : 'gitlab');
+    const repoSlug = p.path || p.name;
+    const fullPath = p.path_with_namespace || `${ownerLogin}/${repoSlug}`;
 
     return {
       id: p.id,
-      name: p.name || p.path,
-      full_name: p.path_with_namespace || `${ownerLogin}/${p.name}`,
+      name: repoSlug,
+      full_name: fullPath,
       private: p.visibility === 'private' || p.visibility === 'internal',
       description: p.description || null,
       fork: !!p.forked_from_project,
@@ -144,18 +171,38 @@ export class GitLabProvider implements IGitProvider {
   ): Promise<string> {
     const api = this.getApiUrl(hostUrl);
     const projId = this.getProjectIdentifier(owner, repo);
+    const headers = this.getHeaders(token);
 
-    // Try common README file names
-    const readmeCandidates = ['README.md', 'readme.md', 'README', 'README.txt'];
-    for (const file of readmeCandidates) {
-      try {
-        const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(file)}/raw`;
-        const res = await fetch(url, { headers: this.getHeaders(token) });
-        if (res.ok) {
-          return await res.text();
+    // 1. Detect default branch from project metadata
+    let defaultBranch = 'main';
+    try {
+      const projRes = await fetch(`${api}/projects/${projId}`, { headers });
+      if (projRes.ok) {
+        const projData = await projRes.json();
+        if (projData.default_branch) {
+          defaultBranch = projData.default_branch;
         }
-      } catch {
-        // try next
+      }
+    } catch {
+      // ignore
+    }
+
+    const branchesToTry = [defaultBranch, 'main', 'master'].filter(
+      (b, idx, arr) => arr.indexOf(b) === idx
+    );
+    const readmeCandidates = ['README.md', 'readme.md', 'README', 'README.txt', 'Readme.md'];
+
+    for (const br of branchesToTry) {
+      for (const file of readmeCandidates) {
+        try {
+          const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(file)}/raw?ref=${encodeURIComponent(br)}`;
+          const res = await fetch(url, { headers });
+          if (res.ok) {
+            return await res.text();
+          }
+        } catch {
+          // try next
+        }
       }
     }
     return '';
@@ -191,13 +238,22 @@ export class GitLabProvider implements IGitProvider {
     owner: string,
     repo: string,
     path: string = '',
-    branch: string = 'main'
+    branch?: string
   ): Promise<UnifiedFileItem[]> {
     const api = this.getApiUrl(hostUrl);
     const projId = this.getProjectIdentifier(owner, repo);
     const pathParam = path ? `&path=${encodeURIComponent(path)}` : '';
-    const url = `${api}/projects/${projId}/repository/tree?ref=${encodeURIComponent(branch)}${pathParam}&per_page=100`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    const refParam = branch ? `&ref=${encodeURIComponent(branch)}` : '';
+
+    let url = `${api}/projects/${projId}/repository/tree?per_page=100${pathParam}${refParam}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
+
+    // Fallback: if explicit ref failed (e.g. branch is main but repo uses master), retry without ref (uses default branch)
+    if (!res.ok && refParam) {
+      url = `${api}/projects/${projId}/repository/tree?per_page=100${pathParam}`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+    }
+
     if (!res.ok) return [];
     const list = await res.json();
     if (!Array.isArray(list)) return [];
@@ -225,9 +281,16 @@ export class GitLabProvider implements IGitProvider {
   ): Promise<string> {
     const api = this.getApiUrl(hostUrl);
     const projId = this.getProjectIdentifier(owner, repo);
-    const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}/raw?ref=${encodeURIComponent(branch)}`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+
+    let url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}/raw?ref=${encodeURIComponent(branch)}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
     if (res.ok) return await res.text();
+
+    if (branch === 'main') {
+      url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}/raw?ref=master`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+      if (res.ok) return await res.text();
+    }
     return '';
   }
 
@@ -236,7 +299,7 @@ export class GitLabProvider implements IGitProvider {
     hostUrl: string | undefined,
     owner: string,
     repo: string,
-    branch: string = 'main',
+    branch?: string,
     page: number = 1,
     perPage: number = 30,
     path?: string
@@ -244,8 +307,17 @@ export class GitLabProvider implements IGitProvider {
     const api = this.getApiUrl(hostUrl);
     const projId = this.getProjectIdentifier(owner, repo);
     const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
-    const url = `${api}/projects/${projId}/repository/commits?ref_name=${encodeURIComponent(branch)}&page=${page}&per_page=${perPage}${queryPath}`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    const refParam = branch ? `&ref_name=${encodeURIComponent(branch)}` : '';
+
+    let url = `${api}/projects/${projId}/repository/commits?page=${page}&per_page=${perPage}${refParam}${queryPath}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
+
+    // Fallback if branch ref not found
+    if (!res.ok && refParam) {
+      url = `${api}/projects/${projId}/repository/commits?page=${page}&per_page=${perPage}${queryPath}`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+    }
+
     if (!res.ok) return [];
     const list = await res.json();
     if (!Array.isArray(list)) return [];
@@ -655,6 +727,116 @@ export class GitLabProvider implements IGitProvider {
       return { success: false, message: data.message || `HTTP ${res.status}` };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async getRepoLanguages(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<Record<string, number>> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const res = await fetch(`${api}/projects/${projId}/languages`, {
+        headers: this.getHeaders(token),
+      });
+      if (!res.ok) return {};
+      const data = await res.json();
+      if (data && typeof data === 'object') {
+        // GitLab returns percentage e.g. { "TypeScript": 65.5, "JavaScript": 34.5 }
+        // Convert to integers (e.g. * 1000) for byte-like breakdown calculation
+        const result: Record<string, number> = {};
+        for (const [lang, val] of Object.entries(data)) {
+          if (typeof val === 'number') {
+            result[lang] = Math.round(val * 1000);
+          }
+        }
+        return result;
+      }
+      return {};
+    } catch {
+      return {};
+    }
+  }
+
+  async getRepoContributors(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<UnifiedContributor[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const res = await fetch(`${api}/projects/${projId}/repository/contributors?per_page=30`, {
+        headers: this.getHeaders(token),
+      });
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((c: any) => ({
+        login: c.name || c.email || 'GitLab User',
+        id: 0,
+        node_id: '',
+        avatar_url: '',
+        gravatar_id: '',
+        url: '',
+        html_url: '',
+        followers_url: '',
+        following_url: '',
+        gists_url: '',
+        starred_url: '',
+        subscriptions_url: '',
+        organizations_url: '',
+        repos_url: '',
+        events_url: '',
+        received_events_url: '',
+        type: 'User',
+        site_admin: false,
+        contributions: c.commits || 0,
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getRepoReleases(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<UnifiedRelease[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const projId = this.getProjectIdentifier(owner, repo);
+      const res = await fetch(`${api}/projects/${projId}/releases?page=${page}&per_page=${perPage}`, {
+        headers: this.getHeaders(token),
+      });
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((r: any, idx: number) => ({
+        id: idx + 1,
+        tag_name: r.tag_name || '',
+        name: r.name || r.tag_name || 'Release',
+        body: r.description || null,
+        html_url: r._links?.self || '',
+        created_at: r.created_at || r.released_at || new Date().toISOString(),
+        published_at: r.released_at || r.created_at || new Date().toISOString(),
+        draft: false,
+        prerelease: false,
+        author: {
+          login: r.author?.name || r.author?.username || 'GitLab',
+          avatar_url: r.author?.avatar_url || '',
+        },
+        assets: [],
+      }));
+    } catch {
+      return [];
     }
   }
 }

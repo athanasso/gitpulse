@@ -14,6 +14,8 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
   PROVIDER_REGISTRY,
 } from '../types/provider';
 
@@ -411,6 +413,44 @@ class GitServiceClass {
       message,
       branch
     );
+  }
+
+  /**
+   * Fetch repo languages across providers
+   */
+  async getRepoLanguages(owner: string, repo: string): Promise<Record<string, number>> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getRepoLanguages) return {};
+    return await p.getRepoLanguages(acc?.token || '', acc?.hostUrl, owner, repo);
+  }
+
+  /**
+   * Fetch repo contributors across providers
+   */
+  async getRepoContributors(owner: string, repo: string): Promise<UnifiedContributor[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getRepoContributors) return [];
+    return await p.getRepoContributors(acc?.token || '', acc?.hostUrl, owner, repo);
+  }
+
+  /**
+   * Fetch repo releases across providers
+   */
+  async getRepoReleases(
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<UnifiedRelease[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getRepoReleases) return [];
+    return await p.getRepoReleases(acc?.token || '', acc?.hostUrl, owner, repo, page, perPage);
   }
 }
 

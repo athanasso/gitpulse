@@ -40,7 +40,7 @@ export const normalizeHost = (host?: string, defaultBase = ''): string => {
   if (!h.startsWith('http://') && !h.startsWith('https://')) {
     h = `https://${h}`;
   }
-  return h.replace(/\/+$/, '');
+  return h.replace(/\/api\/(v[0-9]+)\/?$/i, '').replace(/\/+$/, '');
 };
 
 export const PROVIDER_REGISTRY: Record<GitProviderType, ProviderMeta> = {

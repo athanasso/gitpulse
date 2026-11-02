@@ -988,6 +988,10 @@ class GitHubApiServiceClass {
     per_page: number = 20
   ): Promise<GitHubWorkflowRun[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return [];
+    }
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/actions/runs?page=${page}&per_page=${per_page}`,
@@ -1488,6 +1492,11 @@ class GitHubApiServiceClass {
     page: number = 1,
     per_page: number = 20
   ): Promise<GitHubRelease[]> {
+    await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getRepoReleases(owner, repo, page, per_page)) as GitHubRelease[];
+    }
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/releases?page=${page}&per_page=${per_page}`,
@@ -1534,6 +1543,10 @@ class GitHubApiServiceClass {
     owner: string,
     repo: string
   ): Promise<Record<string, number>> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.getRepoLanguages(owner, repo);
+    }
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/languages`,
@@ -1556,6 +1569,10 @@ class GitHubApiServiceClass {
     owner: string,
     repo: string
   ): Promise<GitHubContributor[]> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getRepoContributors(owner, repo)) as GitHubContributor[];
+    }
     try {
       const res = await fetch(
         `https://api.github.com/repos/${owner}/${repo}/contributors?per_page=30`,

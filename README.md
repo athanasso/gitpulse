@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.6&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.7&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -27,7 +27,7 @@
 ### 1. 🌐 Multi-Provider & Multi-Account Engine
 - **Universal Forge Support**:
   - ⚡ **GitHub**: Public, private, and GitHub Enterprise.
-  - 🦊 **GitLab**: `gitlab.com` + custom self-hosted GitLab CE/EE instances via REST v4.
+  - 🦊 **GitLab**: `gitlab.com` + custom self-hosted GitLab CE/EE instances via REST v4 with deep subgroup resolution, numeric project ID fallback, automatic default branch detection, raw README parsing, and insights.
   - 🍵 **Gitea / Forgejo / Codeberg**: Public forges and self-hosted instances via REST v1.
   - 🪣 **Bitbucket Cloud**: Workspaces and repositories via REST 2.0.
 - **Concurrent Multi-Account Switcher**:
@@ -37,13 +37,13 @@
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
   - Robust singleton persistence across app launches and restarts.
   - **Auto-Configured Token Redirects & Scope Guide**: 1-tap token creation shortcut automatically pre-selects required scopes in GitHub and GitLab URLs, while a visible in-app permissions breakdown guides setup across GitHub, GitLab, Gitea, and Bitbucket.
-  - **Auto-Prefix `https://` for Custom Hosts**: Custom server URLs entered for GitLab CE/EE or Gitea/Forgejo automatically have `https://` prepended if omitted.
+  - **Auto-Prefix `https://` for Custom Hosts**: Custom server URLs entered for GitLab CE/EE or Gitea/Forgejo automatically have `https://` prepended if omitted and clean trailing `/api/v4` or `/api/v1` pathing.
 - **🔍 Live Token Permissions Inspector**:
   - Live inspection card displays active token permissions tailored to the current git provider.
   - Verification badges: `✓ GRANTED` (emerald), `✕ MISSING` (ruby required), `⚠️ RECOMMENDED`, and `○ OPTIONAL`.
   - Dynamic granted ratio pill badge (`4/4 Granted` vs `2/4 Granted`).
   - High-precision detection: reads `x-oauth-scopes` on GitHub, `/personal_access_tokens/self` on GitLab, and REST permission probing on Gitea and Bitbucket.
-  - Dynamic `Manage on <Forge> ↗` links opening token settings on the correct cloud or self-hosted instance.
+  - Responsive in-card `Manage on <Forge> ↗` action row perfectly aligned within container card boundaries.
 
 ### 2. 💻 In-App CodeMirror 6 Editor & Full Git Suite
 - **CodeMirror 6 Mobile Editor**:
@@ -212,7 +212,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.6 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.7 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -220,7 +220,7 @@ Direct signed APK releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.6`
+- **Version**: `1.3.7`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 

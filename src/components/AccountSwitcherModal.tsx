@@ -437,7 +437,8 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                   },
                 ]}
                 onPress={() => {
-                  const url = currentProviderMeta.getTokenUrl(hostUrl);
+                  const cleanHost = hostUrl.trim() ? normalizeHost(hostUrl.trim()) : undefined;
+                  const url = currentProviderMeta.getTokenUrl(cleanHost);
                   Linking.openURL(url);
                 }}
                 activeOpacity={0.8}
@@ -580,7 +581,10 @@ export const AccountSwitcherModal: React.FC<AccountSwitcherModalProps> = ({
                     PERSONAL ACCESS TOKEN / CREDENTIALS
                   </Text>
                   <TouchableOpacity
-                    onPress={() => Linking.openURL(currentProviderMeta.getTokenUrl(hostUrl))}
+                    onPress={() => {
+                      const cleanHost = hostUrl.trim() ? normalizeHost(hostUrl.trim()) : undefined;
+                      Linking.openURL(currentProviderMeta.getTokenUrl(cleanHost));
+                    }}
                   >
                     <Text style={[styles.helperLink, { color: colors.primary }]}>
                       Get Token ↗
