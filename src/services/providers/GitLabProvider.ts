@@ -400,5 +400,39 @@ export class GitLabProvider implements IGitProvider {
       error: errData?.message || `Failed to delete GitLab project (${res.status}).`,
     };
   }
+
+  async updateFileContent(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    _sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const api = this.getApiUrl(hostUrl);
+    const projId = this.getProjectIdentifier(owner, repo);
+    const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}`;
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        branch,
+        commit_message: message.trim() || `Update ${path}`,
+        content,
+      }),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return { success: true, commitSha: data.file_path };
+    }
+    return { success: false, message: data.message || `HTTP ${res.status}` };
+  }
 }
 

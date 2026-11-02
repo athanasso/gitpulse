@@ -29,7 +29,20 @@
   - 1-tap switching from the top header account pill (`[ ⚡ @athanasso ▾ ]` $\leftrightarrow$ `[ 🦊 @work ▾ ]`).
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
 
-### 2. ⚡ Offline-First Stale-While-Revalidate (SWR) Caching
+### 2. 💻 In-App Mobile Code Editor & Direct Push
+- **Edit on the Go**: Tap `[ ✏️ Edit ]` on any file in the Code tab to open the full mobile editor.
+- **Code Editor Suite**:
+  - Full multiline monospace editor with dark syntax background.
+  - Live line count and character tracking.
+  - Real-time unsaved changes detection (`● Modified` vs `○ Clean`).
+  - Safe discard confirmation alerts to prevent accidental data loss.
+- **1-Tap Direct Git Push**:
+  - Tap `[ Push 🚀 ]` to open the Mobile Commit Modal.
+  - Custom commit message + optional extended description.
+  - Real-time UTF-8 Base64 encoding supporting emojis, symbols, and non-ASCII text.
+  - Pushes directly to the active remote branch with automated blob SHA resolution across GitHub, GitLab, Gitea, and Bitbucket.
+
+### 3. ⚡ Offline-First Stale-While-Revalidate (SWR) Caching
 - **0ms Instant Hydration**: Phone storage cache (`AsyncStorage` + warmed in-memory Map) displays your repositories, profile bio, heatmap, and README immediately on launch.
 - **Silent Background Revalidation**: Fetches fresh commits and repositories in the background without blocking spinners or UI flashes.
 - **Skeleton Loaders**: Polished 5-card placeholder animations on fresh installs when local storage is empty.

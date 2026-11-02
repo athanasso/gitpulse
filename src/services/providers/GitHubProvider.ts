@@ -1,4 +1,5 @@
 import { IGitProvider } from './IGitProvider';
+import { utf8ToBase64 } from '../../utils/base64';
 import {
   GitProviderType,
   UnifiedRepo,
@@ -271,6 +272,42 @@ export class GitHubProvider implements IGitProvider {
       success: false,
       error: errData?.message || `Failed to delete repository (${res.status}).`,
     };
+  }
+
+  async updateFileContent(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const base = this.getBaseUrl(hostUrl);
+    const url = `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+    const body: Record<string, any> = {
+      message: message.trim() || `Update ${path}`,
+      content: utf8ToBase64(content),
+    };
+    if (sha) body.sha = sha;
+    if (branch) body.branch = branch;
+
+    const res = await fetch(url, {
+      method: 'PUT',
+      headers: {
+        ...this.getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    const data = await res.json().catch(() => ({}));
+    if (res.ok) {
+      return { success: true, commitSha: data.commit?.sha };
+    }
+    return { success: false, message: data.message || `HTTP ${res.status}` };
   }
 }
 

@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CacheService, CacheKeys } from './CacheService';
 import { AccountService } from './AccountService';
 import { GitService } from './GitService';
+import { utf8ToBase64 } from '../utils/base64';
 import {
   GitHubUser,
   GitHubRepo,
@@ -698,6 +699,110 @@ class GitHubApiServiceClass {
     }
 
     return '';
+  }
+
+  /**
+   * Commit and push file changes to repository
+   */
+  async updateFileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.updateFileContent(
+        owner,
+        repo,
+        path,
+        content,
+        message,
+        sha,
+        branch
+      );
+    }
+
+    if (!this.isAuthenticated()) {
+      return {
+        success: false,
+        message: 'Personal Access Token required with repo scope to push changes.',
+      };
+    }
+
+    try {
+      let fileSha = sha;
+      // If SHA missing, fetch latest file metadata
+      if (!fileSha) {
+        const queryRef = branch ? `?ref=${encodeURIComponent(branch)}` : '';
+        const metaRes = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/contents/${path}${queryRef}`,
+          {
+            headers: {
+              ...this.getHeaders(),
+              Accept: 'application/vnd.github.v3+json',
+            },
+          }
+        );
+        if (metaRes.ok) {
+          const metaData = await metaRes.json();
+          fileSha = metaData.sha;
+        }
+      }
+
+      const bodyPayload: Record<string, any> = {
+        message: message.trim() || `Update ${path.split('/').pop() || path}`,
+        content: utf8ToBase64(content),
+      };
+
+      if (fileSha) {
+        bodyPayload.sha = fileSha;
+      }
+      if (branch) {
+        bodyPayload.branch = branch;
+      }
+
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+        {
+          method: 'PUT',
+          headers: {
+            ...this.getHeaders(),
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bodyPayload),
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+
+      if (res.ok) {
+        return {
+          success: true,
+          message: 'Changes committed and pushed successfully!',
+          commitSha: data.commit?.sha,
+        };
+      } else {
+        const errMsg =
+          data.message ||
+          (res.status === 409
+            ? 'Conflict: file has been modified concurrently. Reload and try again.'
+            : res.status === 403
+            ? 'Push denied: ensure your PAT has write/repo permissions.'
+            : `HTTP ${res.status}: Failed to commit changes.`);
+        return { success: false, message: errMsg };
+      }
+    } catch (e: any) {
+      console.warn('updateFileContent error', e);
+      return {
+        success: false,
+        message: e?.message || 'Network error occurred while pushing changes.',
+      };
+    }
   }
 
   /**

@@ -140,5 +140,20 @@ export interface IGitProvider {
     owner: string,
     repo: string
   ): Promise<{ success: boolean; error?: string }>;
+
+  /**
+   * Commit and push file changes
+   */
+  updateFileContent(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }>;
 }
 

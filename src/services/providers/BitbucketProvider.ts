@@ -336,5 +336,34 @@ export class BitbucketProvider implements IGitProvider {
       error: `Failed to delete Bitbucket repository (${res.status}).`,
     };
   }
+
+  async updateFileContent(
+    token: string,
+    _hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    _sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src`;
+    const formData = new FormData();
+    formData.append(path, content);
+    formData.append('message', message.trim() || `Update ${path}`);
+    formData.append('branch', branch);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: formData,
+    });
+    if (res.ok) {
+      return { success: true };
+    }
+    const data = await res.json().catch(() => ({}));
+    return { success: false, message: data.error?.message || `HTTP ${res.status}` };
+  }
 }
 

@@ -250,6 +250,14 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [codeFilterQuery, setCodeFilterQuery] = useState<string>('');
   const [fileSearchQuery, setFileSearchQuery] = useState<string>('');
 
+  // In-App Code Editor & Commit state
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [editContent, setEditContent] = useState<string>('');
+  const [commitModalVisible, setCommitModalVisible] = useState<boolean>(false);
+  const [commitMessage, setCommitMessage] = useState<string>('');
+  const [commitDescription, setCommitDescription] = useState<string>('');
+  const [isPushing, setIsPushing] = useState<boolean>(false);
+
   const getRepoOwnerAndName = useCallback((): [string, string] => {
     if (!repo) return ['', ''];
     if (repo.full_name && repo.full_name.includes('/')) {
@@ -449,6 +457,56 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       console.warn('Error loading repo tab', e);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleCommitAndPush = async () => {
+    if (!repo || !viewingFile) return;
+    setIsPushing(true);
+
+    const [owner, name] = getRepoOwnerAndName();
+    const finalMsg = commitDescription.trim()
+      ? `${commitMessage.trim()}\n\n${commitDescription.trim()}`
+      : commitMessage.trim() || `Update ${viewingFile.name}`;
+
+    const res = await GitHubApiService.updateFileContent(
+      owner,
+      name,
+      viewingFile.path,
+      editContent,
+      finalMsg,
+      viewingFile.sha,
+      selectedBranch
+    );
+
+    setIsPushing(false);
+
+    if (res.success) {
+      setCommitModalVisible(false);
+      setIsEditing(false);
+      setFileContent(editContent);
+      if (res.commitSha) {
+        setViewingFile((prev) => (prev ? { ...prev, sha: res.commitSha! } : prev));
+      }
+
+      // Refresh directory tree to keep shas current
+      GitHubApiService.getRepoTree(owner, name, currentPath, selectedBranch).then((tree) => {
+        if (tree && tree.length > 0) setFileTree(tree);
+      });
+
+      showDialog({
+        title: 'Changes Pushed! 🚀',
+        message: `Successfully committed and pushed to "${selectedBranch}".`,
+        type: 'success',
+        buttons: [{ text: 'OK' }],
+      });
+    } else {
+      showDialog({
+        title: 'Push Failed',
+        message: res.message || 'Could not commit changes to repository.',
+        type: 'danger',
+        buttons: [{ text: 'OK' }],
+      });
     }
   };
 
@@ -918,21 +976,106 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     <View style={styles.fileViewerHeader}>
                       <TouchableOpacity
                         onPress={() => {
+                          if (isEditing) {
+                            if (editContent !== fileContent) {
+                              showDialog({
+                                title: 'Discard Changes?',
+                                message: 'You have unsaved changes in this file. Are you sure you want to discard them?',
+                                type: 'warning',
+                                buttons: [
+                                  { text: 'Keep Editing', style: 'cancel' },
+                                  {
+                                    text: 'Discard',
+                                    style: 'destructive',
+                                    onPress: () => {
+                                      setIsEditing(false);
+                                      setEditContent('');
+                                    },
+                                  },
+                                ],
+                              });
+                              return;
+                            }
+                            setIsEditing(false);
+                            setEditContent('');
+                            return;
+                          }
                           setViewingFile(null);
                           setFileSearchQuery('');
                         }}
                         style={styles.backButton}
                       >
                         <Text style={styles.backButtonText}>
-                          ← {viewingFile.name}
+                          {isEditing ? '✕ Cancel' : `← ${viewingFile.name}`}
                         </Text>
                       </TouchableOpacity>
-                      <Text style={styles.fileSizeText}>
-                        {viewingFile.size ? `${Math.round(viewingFile.size / 1024)} KB` : ''}
-                      </Text>
+
+                      <View style={styles.fileViewerHeaderRight}>
+                        <Text style={styles.fileSizeText}>
+                          {isEditing
+                            ? `${editContent.split('\n').length} lines`
+                            : viewingFile.size
+                            ? `${Math.round(viewingFile.size / 1024)} KB`
+                            : ''}
+                        </Text>
+
+                        {!isBinaryFile(viewingFile, fileContent) && (
+                          isEditing ? (
+                            <TouchableOpacity
+                              style={styles.pushActionBtn}
+                              onPress={() => {
+                                setCommitMessage(`Update ${viewingFile.name}`);
+                                setCommitDescription('');
+                                setCommitModalVisible(true);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.pushActionBtnText}>Push 🚀</Text>
+                            </TouchableOpacity>
+                          ) : (
+                            <TouchableOpacity
+                              style={styles.editFileBtn}
+                              onPress={() => {
+                                setEditContent(fileContent);
+                                setIsEditing(true);
+                              }}
+                              activeOpacity={0.7}
+                            >
+                              <Text style={styles.editFileBtnText}>✏️ Edit</Text>
+                            </TouchableOpacity>
+                          )
+                        )}
+                      </View>
                     </View>
 
-                    {isBinaryFile(viewingFile, fileContent) ? (
+                    {isEditing ? (
+                      <View style={styles.editorWrapper}>
+                        <View style={styles.editorMetaBar}>
+                          <View style={styles.editorBranchPill}>
+                            <Text style={styles.editorBranchText}>🌿 {selectedBranch}</Text>
+                          </View>
+                          <Text
+                            style={[
+                              styles.editorStatusText,
+                              editContent !== fileContent && styles.editorStatusModified,
+                            ]}
+                          >
+                            {editContent !== fileContent ? '● Modified' : '○ Clean'}
+                          </Text>
+                        </View>
+                        <TextInput
+                          style={styles.editorInput}
+                          value={editContent}
+                          onChangeText={setEditContent}
+                          multiline
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                          textAlignVertical="top"
+                          placeholder="Type code here..."
+                          placeholderTextColor={colors.textMuted}
+                        />
+                      </View>
+                    ) : isBinaryFile(viewingFile, fileContent) ? (
                       <View style={styles.binaryCard}>
                         <Text style={styles.binaryIcon}>📦</Text>
                         <Text style={styles.binaryTitle}>{viewingFile.name}</Text>
@@ -1710,6 +1853,103 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           </View>
         </Modal>
 
+        {/* Mobile Git Commit & Push Modal */}
+        <Modal
+          visible={commitModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => {
+            if (!isPushing) setCommitModalVisible(false);
+          }}
+        >
+          <View style={styles.commitModalOverlay}>
+            <View style={styles.commitModalCard}>
+              <View style={styles.commitModalHeader}>
+                <View style={styles.commitModalHeaderTitleRow}>
+                  <Text style={styles.commitModalHeaderIcon}>🚀</Text>
+                  <Text style={styles.commitModalTitle}>Commit & Push Changes</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setCommitModalVisible(false)}
+                  disabled={isPushing}
+                  style={styles.safetyCloseBtn}
+                >
+                  <Text style={styles.safetyCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.commitTargetCard}>
+                <Text style={styles.commitTargetPath} numberOfLines={1}>
+                  📄 {viewingFile?.path}
+                </Text>
+                <View style={styles.commitBranchRow}>
+                  <Text style={styles.commitBranchLabel}>Target Branch:</Text>
+                  <View style={styles.commitBranchBadge}>
+                    <Text style={styles.commitBranchBadgeText}>🌿 {selectedBranch}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.commitInputLabel}>Commit Message *</Text>
+              <TextInput
+                style={styles.commitMessageInput}
+                value={commitMessage}
+                onChangeText={setCommitMessage}
+                placeholder={`Update ${viewingFile?.name || 'file'}`}
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="sentences"
+                editable={!isPushing}
+              />
+
+              <Text style={styles.commitInputLabel}>Extended Description (Optional)</Text>
+              <TextInput
+                style={styles.commitDescInput}
+                value={commitDescription}
+                onChangeText={setCommitDescription}
+                placeholder="Add an optional extended description..."
+                placeholderTextColor={colors.textMuted}
+                multiline
+                numberOfLines={3}
+                textAlignVertical="top"
+                editable={!isPushing}
+              />
+
+              <View style={styles.commitWarningBox}>
+                <Text style={styles.commitWarningText}>
+                  ⚡ Pushing directly creates a new git commit on <Text style={{ fontWeight: 'bold' }}>{selectedBranch}</Text>.
+                </Text>
+              </View>
+
+              <View style={styles.commitModalActions}>
+                <TouchableOpacity
+                  style={styles.commitCancelBtn}
+                  onPress={() => setCommitModalVisible(false)}
+                  disabled={isPushing}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.commitCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.commitSubmitBtn,
+                    (!commitMessage.trim() || isPushing) && styles.commitSubmitBtnDisabled,
+                  ]}
+                  onPress={handleCommitAndPush}
+                  disabled={!commitMessage.trim() || isPushing}
+                  activeOpacity={0.8}
+                >
+                  {isPushing ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.commitSubmitBtnText}>Commit & Push 🚀</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* App-Themed Pop-Up Dialog */}
         <ThemedDialog
           visible={dialogConfig.visible}
@@ -1991,6 +2231,223 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
   fileSizeText: {
     fontSize: 12,
     color: colors.textMuted,
+  },
+  fileViewerHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  editFileBtn: {
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.primary,
+  },
+  editFileBtnText: {
+    color: colors.primary,
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  pushActionBtn: {
+    backgroundColor: colors.emerald,
+    paddingHorizontal: 12,
+    paddingVertical: 5,
+    borderRadius: 8,
+  },
+  pushActionBtnText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '700',
+  },
+  editorWrapper: {
+    backgroundColor: colors.codeBackground,
+    minHeight: 380,
+  },
+  editorMetaBar: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    backgroundColor: colors.cardElevated,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+  },
+  editorBranchPill: {
+    backgroundColor: colors.card,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  editorBranchText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textPrimary,
+  },
+  editorStatusText: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontWeight: '600',
+  },
+  editorStatusModified: {
+    color: colors.gold,
+  },
+  editorInput: {
+    fontFamily: 'monospace',
+    fontSize: 12,
+    lineHeight: 18,
+    color: colors.textPrimary,
+    padding: Spacing.md,
+    minHeight: 360,
+  },
+  commitModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  commitModalCard: {
+    backgroundColor: colors.card,
+    borderRadius: 16,
+    width: '100%',
+    maxWidth: 440,
+    padding: Spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  commitModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  commitModalHeaderTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+  },
+  commitModalHeaderIcon: {
+    fontSize: 18,
+  },
+  commitModalTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  commitTargetCard: {
+    backgroundColor: colors.cardElevated,
+    borderRadius: 10,
+    padding: Spacing.sm,
+    marginBottom: Spacing.md,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  commitTargetPath: {
+    fontSize: 12,
+    fontFamily: 'monospace',
+    color: colors.textPrimary,
+    marginBottom: 6,
+  },
+  commitBranchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  commitBranchLabel: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  commitBranchBadge: {
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  commitBranchBadgeText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.primary,
+  },
+  commitInputLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
+  commitMessageInput: {
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: colors.textPrimary,
+    marginBottom: Spacing.md,
+  },
+  commitDescInput: {
+    backgroundColor: colors.background,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 10,
+    fontSize: 13,
+    color: colors.textPrimary,
+    minHeight: 70,
+    marginBottom: Spacing.md,
+  },
+  commitWarningBox: {
+    backgroundColor: colors.cyanMuted,
+    borderRadius: 8,
+    padding: 10,
+    marginBottom: Spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.cyan,
+  },
+  commitWarningText: {
+    fontSize: 11,
+    color: colors.cyan,
+    lineHeight: 16,
+  },
+  commitModalActions: {
+    flexDirection: 'row',
+    gap: 10,
+  },
+  commitCancelBtn: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commitCancelBtnText: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  commitSubmitBtn: {
+    flex: 1.5,
+    backgroundColor: colors.emerald,
+    paddingVertical: 12,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  commitSubmitBtnDisabled: {
+    opacity: 0.5,
+  },
+  commitSubmitBtnText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: '#FFFFFF',
   },
   codeHorizontalScroll: {
     paddingVertical: Spacing.sm,

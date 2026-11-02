@@ -131,6 +131,34 @@ class GitServiceClass {
   }
 
   /**
+   * Commit and push file changes across active provider
+   */
+  async updateFileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    content: string,
+    message: string,
+    sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string; commitSha?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    return await p.updateFileContent(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      path,
+      content,
+      message,
+      sha,
+      branch
+    );
+  }
+
+  /**
    * Fetch repository commit history
    */
   async getRepoCommits(
