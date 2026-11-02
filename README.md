@@ -5,7 +5,13 @@
 </p>
 
 <p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img height="64" alt="Add to Obtainium" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png"></a>
+  <a href="https://buymeacoffee.com/athanasso"><img height="64" alt="Buy Me A Coffee" src="https://cdn.buymeacoffee.com/buttons/v2/default-yellow.png"></a>
+</p>
+
+<p align="center">
   <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.2&logo=android" alt="Latest Release"></a>
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
   <img src="https://img.shields.io/badge/TypeScript-5.9-3178C6?logo=typescript" alt="TypeScript">
@@ -157,7 +163,19 @@
 
 ## 📱 Download & Install
 
-Direct APK builds are published on GitHub Releases:
+### 1. Auto-Updates via Obtainium (Recommended)
+
+Get seamless automated background updates directly from GitHub Releases using **[Obtainium](https://github.com/ImranR98/Obtainium)**:
+
+<p align="center">
+  <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse">
+    <img height="64" alt="Add GitPulse to Obtainium" src="https://raw.githubusercontent.com/ImranR98/Obtainium/main/assets/graphics/badge_obtainium.png">
+  </a>
+</p>
+
+### 2. Direct APK Download
+
+Direct signed APK releases:
 
 👉 **[Download GitPulse v1.3.2 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
@@ -200,4 +218,4 @@ GitPulse connects strictly to official forge APIs (or your specified self-hosted
 
 ## 📄 License
 
-MIT © [Emmanouil Athanasopoulos](https://github.com/athanasso)
+MIT © [Emmanouil Athanasopoulos](https://github.com/athanasso) | [Buy Me a Coffee](https://buymeacoffee.com/athanasso)
