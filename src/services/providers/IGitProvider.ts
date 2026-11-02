@@ -9,6 +9,7 @@ import {
   UnifiedFileItem,
   UnifiedRelease,
   UnifiedContributor,
+  UnifiedNotification,
 } from '../../types/provider';
 
 export interface IGitProvider {
@@ -273,5 +274,42 @@ export interface IGitProvider {
     page?: number,
     perPage?: number
   ): Promise<UnifiedRelease[]>;
+
+  /**
+   * Fetch inbox / user notifications
+   */
+  getNotifications?(
+    token: string,
+    hostUrl: string | undefined,
+    page?: number,
+    perPage?: number
+  ): Promise<UnifiedNotification[]>;
+
+  /**
+   * Mark a notification as read
+   */
+  markNotificationRead?(
+    token: string,
+    hostUrl: string | undefined,
+    notificationId: string
+  ): Promise<boolean>;
+
+  /**
+   * Mark all notifications as read
+   */
+  markAllNotificationsRead?(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<boolean>;
+
+  /**
+   * Fetch user's starred repositories
+   */
+  getUserStarredRepos?(
+    token: string,
+    hostUrl: string | undefined,
+    page?: number,
+    perPage?: number
+  ): Promise<UnifiedRepo[]>;
 }
 

@@ -9,6 +9,9 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
+  UnifiedNotification,
 } from '../../types/provider';
 
 export class GiteaProvider implements IGitProvider {
@@ -175,12 +178,17 @@ export class GiteaProvider implements IGitProvider {
     owner: string,
     repo: string,
     path: string = '',
-    branch: string = 'main'
+    branch?: string
   ): Promise<UnifiedFileItem[]> {
     const api = this.getApiUrl(hostUrl);
     const cleanPath = path ? `/${encodeURIComponent(path)}` : '';
-    const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents${cleanPath}?ref=${encodeURIComponent(branch)}`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    const refParam = branch ? `?ref=${encodeURIComponent(branch)}` : '';
+    let url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents${cleanPath}${refParam}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
+    if (!res.ok && refParam) {
+      url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents${cleanPath}`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+    }
     if (!res.ok) return [];
     const list = await res.json();
     if (!Array.isArray(list)) return [];
@@ -207,9 +215,14 @@ export class GiteaProvider implements IGitProvider {
     branch: string = 'main'
   ): Promise<string> {
     const api = this.getApiUrl(hostUrl);
-    const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/raw/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    let url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/raw/${encodeURIComponent(path)}?ref=${encodeURIComponent(branch)}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
     if (res.ok) return await res.text();
+    if (branch === 'main') {
+      url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/raw/${encodeURIComponent(path)}`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+      if (res.ok) return await res.text();
+    }
     return '';
   }
 
@@ -636,6 +649,156 @@ export class GiteaProvider implements IGitProvider {
       return { success: false, message: data.message || `HTTP ${res.status}` };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async getNotifications(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedNotification[]> {
+    const api = this.getApiUrl(hostUrl);
+    const url = `${api}/notifications?page=${page}&limit=${perPage}`;
+    const res = await fetch(url, { headers: this.getHeaders(token) });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('Gitea token requires "read:notification" scope.');
+      }
+      return [];
+    }
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((n: any) => ({
+      id: String(n.id),
+      unread: !!n.unread,
+      reason: n.reason || 'mention',
+      updated_at: n.updated_at || new Date().toISOString(),
+      subject: {
+        title: n.subject?.title || 'Notification',
+        url: n.subject?.html_url || n.subject?.url || '',
+        type: (n.subject?.type === 'Pull' ? 'PullRequest' : n.subject?.type || 'Issue') as any,
+      },
+      repository: {
+        id: n.repository?.id || 0,
+        name: n.repository?.name || 'Repository',
+        full_name: n.repository?.full_name || 'Repository',
+        owner: {
+          login: n.repository?.owner?.login || n.repository?.owner?.username || 'Gitea',
+          avatar_url: n.repository?.owner?.avatar_url || '',
+        },
+      },
+    }));
+  }
+
+  async markNotificationRead(
+    token: string,
+    hostUrl: string | undefined,
+    notificationId: string
+  ): Promise<boolean> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/notifications/threads/${notificationId}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(token),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async markAllNotificationsRead(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<boolean> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/notifications?status-types=unread`, {
+        method: 'PUT',
+        headers: this.getHeaders(token),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async getUserStarredRepos(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedRepo[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const url = `${api}/user/starred?page=${page}&limit=${perPage}`;
+      const res = await fetch(url, { headers: this.getHeaders(token) });
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((r: any) => this.mapGiteaRepo(r));
+    } catch {
+      return [];
+    }
+  }
+
+  async getRepoLanguages(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<Record<string, number>> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/languages`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return {};
+      const data = await res.json();
+      return data && typeof data === 'object' ? data : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async getRepoReleases(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<UnifiedRelease[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases?page=${page}&limit=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((r: any) => ({
+        id: r.id,
+        tag_name: r.tag_name || '',
+        name: r.name || r.tag_name || 'Release',
+        body: r.body || null,
+        html_url: r.html_url || '',
+        created_at: r.created_at || new Date().toISOString(),
+        published_at: r.published_at || r.created_at || new Date().toISOString(),
+        draft: !!r.draft,
+        prerelease: !!r.prerelease,
+        author: {
+          login: r.author?.login || r.author?.username || 'Gitea',
+          avatar_url: r.author?.avatar_url || '',
+        },
+        assets: [],
+      }));
+    } catch {
+      return [];
     }
   }
 }

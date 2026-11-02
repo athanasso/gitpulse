@@ -9,6 +9,9 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
+  UnifiedNotification,
 } from '../../types/provider';
 
 export class GitHubProvider implements IGitProvider {
@@ -534,6 +537,143 @@ export class GitHubProvider implements IGitProvider {
       return { success: false, message: data.message || `HTTP ${res.status}` };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  async getNotifications(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedNotification[]> {
+    const base = this.getBaseUrl(hostUrl);
+    const res = await fetch(
+      `${base}/notifications?all=true&page=${page}&per_page=${perPage}`,
+      { headers: this.getHeaders(token) }
+    );
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('Your API token requires the "notifications" scope to access inbox.');
+      }
+      return [];
+    }
+    const data = await res.json();
+    return Array.isArray(data) ? data : [];
+  }
+
+  async markNotificationRead(
+    token: string,
+    hostUrl: string | undefined,
+    notificationId: string
+  ): Promise<boolean> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(`${base}/notifications/threads/${notificationId}`, {
+        method: 'PATCH',
+        headers: this.getHeaders(token),
+      });
+      return res.status === 205 || res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async markAllNotificationsRead(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<boolean> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(`${base}/notifications/threads`, {
+        method: 'PUT',
+        headers: this.getHeaders(token),
+        body: JSON.stringify({}),
+      });
+      return res.status === 205 || res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async getUserStarredRepos(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedRepo[]> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/user/starred?sort=created&direction=desc&page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async getRepoLanguages(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<Record<string, number>> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/languages`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return {};
+      const data = await res.json();
+      return data && typeof data === 'object' ? data : {};
+    } catch {
+      return {};
+    }
+  }
+
+  async getRepoContributors(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string
+  ): Promise<UnifiedContributor[]> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contributors?per_page=30`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async getRepoReleases(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<UnifiedRelease[]> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/releases?page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
     }
   }
 }

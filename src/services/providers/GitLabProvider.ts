@@ -10,6 +10,7 @@ import {
   UnifiedFileItem,
   UnifiedRelease,
   UnifiedContributor,
+  UnifiedNotification,
 } from '../../types/provider';
 
 export class GitLabProvider implements IGitProvider {
@@ -835,6 +836,111 @@ export class GitLabProvider implements IGitProvider {
         },
         assets: [],
       }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getNotifications(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedNotification[]> {
+    const api = this.getApiUrl(hostUrl);
+    const url = `${api}/todos?page=${page}&per_page=${perPage}`;
+    const res = await fetch(url, { headers: this.getHeaders(token) });
+    if (!res.ok) {
+      if (res.status === 401 || res.status === 403) {
+        throw new Error('GitLab token requires "api" or "read_user" scope to access inbox.');
+      }
+      return [];
+    }
+    const data = await res.json();
+    if (!Array.isArray(data)) return [];
+
+    return data.map((t: any) => {
+      let notifType: 'PullRequest' | 'Issue' | 'Commit' | 'Release' = 'Issue';
+      if (t.target_type === 'MergeRequest') notifType = 'PullRequest';
+      else if (t.target_type === 'Commit') notifType = 'Commit';
+      else if (t.target_type === 'Release') notifType = 'Release';
+
+      const targetTitle = t.target?.title || t.body || `Todo #${t.id}`;
+      const targetUrl = t.target?.web_url || t.target_url || t.project?.web_url || '';
+
+      return {
+        id: String(t.id),
+        unread: t.state === 'pending',
+        reason: t.action_name || 'assigned',
+        updated_at: t.updated_at || t.created_at || new Date().toISOString(),
+        subject: {
+          title: targetTitle,
+          url: targetUrl,
+          type: notifType,
+        },
+        repository: {
+          id: t.project?.id || 0,
+          name: t.project?.name || t.project?.path || 'Project',
+          full_name: t.project?.path_with_namespace || t.project?.name || 'Project',
+          owner: {
+            login:
+              (t.project?.path_with_namespace
+                ? t.project.path_with_namespace.split('/')[0]
+                : t.author?.username) || 'GitLab',
+            avatar_url: t.author?.avatar_url || '',
+          },
+        },
+      };
+    });
+  }
+
+  async markNotificationRead(
+    token: string,
+    hostUrl: string | undefined,
+    notificationId: string
+  ): Promise<boolean> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/todos/${notificationId}/mark_as_done`, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async markAllNotificationsRead(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<boolean> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/todos/mark_as_done`, {
+        method: 'POST',
+        headers: this.getHeaders(token),
+      });
+      return res.ok;
+    } catch {
+      return false;
+    }
+  }
+
+  async getUserStarredRepos(
+    token: string,
+    hostUrl: string | undefined,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedRepo[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const url = `${api}/projects?starred=true&page=${page}&per_page=${perPage}&order_by=updated_at`;
+      const res = await fetch(url, { headers: this.getHeaders(token) });
+      if (!res.ok) return [];
+      const list = await res.json();
+      if (!Array.isArray(list)) return [];
+      return list.map((p: any) => this.mapGitLabProject(p));
     } catch {
       return [];
     }

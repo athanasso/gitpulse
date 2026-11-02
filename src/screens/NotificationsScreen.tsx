@@ -45,6 +45,8 @@ export const NotificationsScreen: React.FC = () => {
   useEffect(() => {
     const unsub = AccountService.subscribe((active) => {
       setActiveAccount(active);
+      setScopeError(null);
+      loadNotifications(1);
     });
     return () => unsub();
   }, []);
@@ -161,13 +163,18 @@ export const NotificationsScreen: React.FC = () => {
 
   const getWebUrl = (notif: GitHubNotification): string => {
     if (notif.subject?.url) {
+      if (notif.subject.url.startsWith('http://') || notif.subject.url.startsWith('https://')) {
+        if (!notif.subject.url.includes('/api/')) {
+          return notif.subject.url;
+        }
+      }
       // Map API URL: https://api.github.com/repos/owner/repo/pulls/1 -> https://github.com/owner/repo/pull/1
       const url = notif.subject.url
         .replace('https://api.github.com/repos/', 'https://github.com/')
         .replace('/pulls/', '/pull/');
       return url;
     }
-    return `https://github.com/${notif.repository.full_name}`;
+    return (notif.repository as any)?.html_url || `https://github.com/${notif.repository.full_name}`;
   };
 
   const handleOpenNotification = async (item: GitHubNotification) => {

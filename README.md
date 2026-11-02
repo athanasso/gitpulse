@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.7&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.8&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -188,9 +188,14 @@
 - Toggleable feature in settings.
 - Requires typing exact `owner/repo-name` in a safety modal before unlocking permanent deletion.
 
-### 19. 🔔 Notifications Inbox & Sleep Prevention
-- Thread triage for review requests, issue assignments, and commit mentions.
-- **Forge-Adaptive Permission Warnings**: Alerts when tokens lack required notification scopes, dynamically indicating `notifications` (GitHub), `api` (GitLab), `read:notification` (Gitea), or `account:read` (Bitbucket).
+### 19. 🔔 Multi-Provider Notifications Inbox & Sleep Prevention
+- **Universal Multi-Provider Inbox**:
+  - Full notifications support across **GitHub**, **GitLab** (via native Todos API `/api/v4/todos`), and **Gitea/Codeberg**.
+  - Thread triage for review requests, issue assignments, merge requests, mentions, and CI/CD events.
+  - 1-tap "Mark as read / done" for individual items and "Mark all as read" across providers.
+  - Direct web links automatically resolve to target issue/PR/MR URLs across GitHub and GitLab instances.
+  - Real-time inbox refresh on account switcher events.
+- **Forge-Adaptive Permission Warnings**: Alerts when tokens lack required notification scopes, dynamically indicating `notifications` (GitHub), `api` / `read_user` (GitLab), `read:notification` (Gitea), or `account:read` (Bitbucket).
 - 1-tap `Edit Permissions on <Forge> ↗` button navigates directly to account settings.
 - `expo-keep-awake` prevents device screen timeout during long code reviews.
 
@@ -212,7 +217,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.7 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.8 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 

@@ -8,6 +8,9 @@ import {
   UnifiedPullRequest,
   UnifiedBranch,
   UnifiedFileItem,
+  UnifiedRelease,
+  UnifiedContributor,
+  UnifiedNotification,
 } from '../../types/provider';
 
 export class BitbucketProvider implements IGitProvider {
@@ -172,11 +175,16 @@ export class BitbucketProvider implements IGitProvider {
     owner: string,
     repo: string,
     path: string = '',
-    branch: string = 'main'
+    branch?: string
   ): Promise<UnifiedFileItem[]> {
     const cleanPath = path ? `/${encodeURIComponent(path)}` : '';
-    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/${encodeURIComponent(branch)}${cleanPath}?pagelen=100`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    const refSegment = branch ? encodeURIComponent(branch) : 'HEAD';
+    let url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/${refSegment}${cleanPath}?pagelen=100`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
+    if (!res.ok && branch && branch !== 'HEAD') {
+      url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/HEAD${cleanPath}?pagelen=100`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+    }
     if (!res.ok) return [];
     const data = await res.json();
     const list = data.values;
@@ -203,9 +211,14 @@ export class BitbucketProvider implements IGitProvider {
     path: string,
     branch: string = 'main'
   ): Promise<string> {
-    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/${encodeURIComponent(branch)}/${encodeURIComponent(path)}`;
-    const res = await fetch(url, { headers: this.getHeaders(token) });
+    let url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/${encodeURIComponent(branch)}/${encodeURIComponent(path)}`;
+    let res = await fetch(url, { headers: this.getHeaders(token) });
     if (res.ok) return await res.text();
+    if (branch === 'main') {
+      url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src/HEAD/${encodeURIComponent(path)}`;
+      res = await fetch(url, { headers: this.getHeaders(token) });
+      if (res.ok) return await res.text();
+    }
     return '';
   }
 
@@ -568,6 +581,30 @@ export class BitbucketProvider implements IGitProvider {
     } catch (e: any) {
       return { success: false, message: e?.message || 'Network error' };
     }
+  }
+
+  async getNotifications(): Promise<UnifiedNotification[]> {
+    return [];
+  }
+
+  async markNotificationRead(): Promise<boolean> {
+    return false;
+  }
+
+  async markAllNotificationsRead(): Promise<boolean> {
+    return false;
+  }
+
+  async getUserStarredRepos(): Promise<UnifiedRepo[]> {
+    return [];
+  }
+
+  async getRepoLanguages(): Promise<Record<string, number>> {
+    return {};
+  }
+
+  async getRepoReleases(): Promise<UnifiedRelease[]> {
+    return [];
   }
 }
 

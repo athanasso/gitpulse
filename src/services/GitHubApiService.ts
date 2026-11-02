@@ -542,6 +542,8 @@ class GitHubApiServiceClass {
    */
   async getSocialAccounts(username?: string): Promise<GitHubSocialAccount[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     try {
       const endpoint = this.token
         ? 'https://api.github.com/user/social_accounts'
@@ -569,6 +571,8 @@ class GitHubApiServiceClass {
    */
   async getPinnedItems(username?: string): Promise<GitHubPinnedItem[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     if (!this.token) return [];
 
     try {
@@ -1024,6 +1028,18 @@ class GitHubApiServiceClass {
   ): Promise<GitHubNotification[]> {
     await this.ensureInit();
     this.lastNotificationError = null;
+
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      try {
+        const notifs = await GitService.getNotifications(page, per_page);
+        return notifs as GitHubNotification[];
+      } catch (e: any) {
+        this.lastNotificationError = e?.message || 'Error fetching notifications.';
+        return [];
+      }
+    }
+
     if (!this.token) {
       return [];
     }
@@ -1056,6 +1072,10 @@ class GitHubApiServiceClass {
    */
   async markNotificationRead(threadId: string): Promise<boolean> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.markNotificationRead(threadId);
+    }
     if (!this.token) return false;
     try {
       const res = await fetch(
@@ -1076,6 +1096,10 @@ class GitHubApiServiceClass {
    */
   async markAllNotificationsRead(): Promise<boolean> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.markAllNotificationsRead();
+    }
     if (!this.token) return false;
     try {
       const res = await fetch('https://api.github.com/notifications', {
@@ -1100,6 +1124,10 @@ class GitHubApiServiceClass {
    */
   async getContributions(): Promise<{ total: number; days: ContributionDay[] }> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return { total: 0, days: [] };
+    }
     if (!this.token) {
       return { total: 0, days: [] };
     }
@@ -1192,6 +1220,11 @@ class GitHubApiServiceClass {
    */
   async getStarredCount(username?: string): Promise<number> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      const starred = await GitService.getUserStarredRepos(1, 100);
+      return starred.length;
+    }
     if (!this.token && !username) return 0;
     try {
       const endpoint = username
@@ -1223,6 +1256,10 @@ class GitHubApiServiceClass {
     direction: 'asc' | 'desc' = 'desc'
   ): Promise<GitHubRepo[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getUserStarredRepos(page, per_page)) as GitHubRepo[];
+    }
     if (!this.token) return [];
     try {
       const res = await fetch(
@@ -1358,6 +1395,8 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubGist[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     if (!this.token) return [];
     try {
       const res = await fetch(
@@ -1379,6 +1418,8 @@ class GitHubApiServiceClass {
    */
   async getOrgs(username?: string): Promise<GitHubOrg[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     try {
       const isMe =
         !username ||
@@ -1409,6 +1450,8 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubFollower[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     if (!this.token) return [];
     try {
       const endpoint = username
@@ -1436,6 +1479,8 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubFollower[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     if (!this.token) return [];
     try {
       const endpoint = username
@@ -1463,6 +1508,8 @@ class GitHubApiServiceClass {
     per_page: number = 30
   ): Promise<GitHubEvent[]> {
     await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') return [];
     if (!this.token) return [];
     try {
       const user = username || this.cachedUser?.login;

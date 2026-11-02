@@ -16,6 +16,7 @@ import {
   UnifiedFileItem,
   UnifiedRelease,
   UnifiedContributor,
+  UnifiedNotification,
   PROVIDER_REGISTRY,
 } from '../types/provider';
 
@@ -451,6 +452,50 @@ class GitServiceClass {
     const p = this.getProvider(providerType);
     if (!p.getRepoReleases) return [];
     return await p.getRepoReleases(acc?.token || '', acc?.hostUrl, owner, repo, page, perPage);
+  }
+
+  /**
+   * Fetch inbox notifications across providers
+   */
+  async getNotifications(page: number = 1, perPage: number = 30): Promise<UnifiedNotification[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getNotifications) return [];
+    return await p.getNotifications(acc?.token || '', acc?.hostUrl, page, perPage);
+  }
+
+  /**
+   * Mark a notification as read across providers
+   */
+  async markNotificationRead(notificationId: string): Promise<boolean> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.markNotificationRead) return false;
+    return await p.markNotificationRead(acc?.token || '', acc?.hostUrl, notificationId);
+  }
+
+  /**
+   * Mark all notifications as read across providers
+   */
+  async markAllNotificationsRead(): Promise<boolean> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.markAllNotificationsRead) return false;
+    return await p.markAllNotificationsRead(acc?.token || '', acc?.hostUrl);
+  }
+
+  /**
+   * Fetch user starred repos across providers
+   */
+  async getUserStarredRepos(page: number = 1, perPage: number = 30): Promise<UnifiedRepo[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getUserStarredRepos) return [];
+    return await p.getUserStarredRepos(acc?.token || '', acc?.hostUrl, page, perPage);
   }
 }
 
