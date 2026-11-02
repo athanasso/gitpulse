@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/License-MIT-10B981" alt="License">
 </p>
 
-> **GitPulse** is a universal, developer-first mobile Git client built with **React Native**, **Expo 58**, and **TypeScript**. Designed for developers who demand instant repository access, seamless multi-account switching across **GitHub**, **GitLab**, **Gitea/Codeberg**, and **Bitbucket**, GitHub-rendered HTML markdown, offline-first 0ms loading, syntax-highlighted code browsing, and unified PR/MR diff reviews on mobile.
+> **GitPulse** is a universal, developer-first mobile Git client built with **React Native**, **Expo 58**, and **TypeScript**. Designed for developers who demand instant repository access, seamless multi-account switching across **GitHub**, **GitLab**, **Gitea/Codeberg**, and **Bitbucket**, in-place code editing with direct git commit push, full git history inspection, deep linking auto-redirects, GitHub-rendered HTML markdown, offline-first 0ms loading, and unified PR/MR diff reviews on mobile.
 
 ---
 
@@ -31,17 +31,19 @@
   - 🍵 **Gitea / Forgejo / Codeberg**: Public forges and self-hosted instances via REST v1.
   - 🪣 **Bitbucket Cloud**: Workspaces and repositories via REST 2.0.
 - **Concurrent Multi-Account Switcher**:
-  - Connect unlimited accounts (personal, company, freelance, and self-hosted).
-  - 1-tap switching from the top header account pill (`[ ⚡ @athanasso ▾ ]` $\leftrightarrow$ `[ 🦊 @work ▾ ]`).
+  - Connect unlimited accounts across any combination of providers (personal, work, freelance, and self-hosted).
+  - **Live Account Counter Badge**: Top header account pill dynamically displays your active user and total connected accounts count (`[ ⚡ @athanasso  2  ▾ ]`).
+  - 1-tap switching from the header pill modal (`[ ⚡ @athanasso ▾ ]` $\leftrightarrow$ `[ 🦊 @work ▾ ]`).
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
+  - Robust singleton persistence across app launches and restarts.
 
 ### 2. 💻 In-App Mobile Code Editor & Direct Push
-- **Edit on the Go**: Tap `[ ✏️ Edit ]` on any file in the Code tab to open the full mobile editor.
+- **Edit on the Go**: Tap `[ ✏️ Edit ]` on any text/code file in the Code tab to open the full mobile editor.
 - **Code Editor Suite**:
   - Full multiline monospace editor with dark syntax background.
   - Live line count and character tracking.
   - Real-time unsaved changes detection (`● Modified` vs `○ Clean`).
-  - Safe discard confirmation alerts to prevent accidental data loss.
+  - Safe discard confirmation dialogs to prevent accidental loss on back navigation or modal close.
 - **1-Tap Direct Git Push**:
   - Tap `[ Push 🚀 ]` to open the Mobile Commit Modal.
   - Custom commit message + optional extended description.
@@ -50,7 +52,7 @@
 
 ### 3. 📄 File Actions Suite: History, Native Share & Direct Deletion Push
 - **🕒 File Commit History**:
-  - Filter commit logs specifically for the selected file (`?path=...`).
+  - Filter commit logs specifically for the selected file path (`?path=...`).
   - View SHA badges, commit author names, message previews, and precise timestamps.
   - 1-tap drill-down into commit diffs with stats (`+ additions`, `- deletions`).
   - Back navigation returns directly to file content without resetting directory position.
@@ -75,22 +77,22 @@
 ### 5. ⚡ Offline-First Stale-While-Revalidate (SWR) Caching
 - **0ms Instant Hydration**: Phone storage cache (`AsyncStorage` + warmed in-memory Map) displays your repositories, profile bio, heatmap, and README immediately on launch.
 - **Silent Background Revalidation**: Fetches fresh commits and repositories in the background without blocking spinners or UI flashes.
-- **Skeleton Loaders**: Polished 5-card placeholder animations on fresh installs when local storage is empty.
+- **Skeleton Loaders**: Polished placeholder animations on fresh installs when local storage is empty.
 
-### 5. 🧭 Explore & Trending Hub
+### 6. 🧭 Explore & Trending Hub
 - **Breakout Trending Repositories**: Filter by **Today**, **This Week**, or **This Month**.
 - **Language Filtering**: Explore trending repos across TypeScript, JavaScript, Python, Rust, Go, Swift, Kotlin, C++, and more.
 - **Curated Topics**: Dedicated feeds for `AI & Agents`, `React Native`, `Rust`, `DevOps`, `Security`, `Mobile`, `Web3`, and `Developer Tools`.
 - **Developer Discovery**: Explore high-impact open source creators with direct profiles.
 
-### 6. 🔍 Dual-Scope Search
+### 7. 🔍 Dual-Scope Search
 - **Segmented Search Switcher**:
   - `[ ⚡ My Repos ]`: 0ms local in-memory filtering across all your repositories.
   - `[ 🌐 All GitHub ]`: Debounced (350ms) background search across public repositories.
 - **Clear Visual Scope Indicators**: Global results display owner avatars, full paths (`owner/repo`), and bright `🌐 Global` badges.
 - **Smart Handoff**: If zero matches are found in your account, a 1-tap button immediately hands off to global search.
 
-### 7. 📖 GitHub-Rendered HTML Markdown Engine
+### 8. 📖 GitHub-Rendered HTML Markdown Engine
 - Direct DOM rendering via `react-native-webview` matching GitHub.com 1:1.
 - Flawless support for:
   - Shields.io and dynamic status badges
@@ -101,11 +103,11 @@
   - `<themed-picture>` adaptive dark/light GitHub assets
 - External links automatically open in system browser via `Linking.openURL()`.
 
-### 8. 📱 Safe-Area & Edge-to-Edge Navigation
+### 9. 📱 Safe-Area & Edge-to-Edge Navigation
 - Full compatibility with Android 3-button navigation bars and gesture pills (`useSafeAreaInsets`).
 - Dynamic bottom elevation ensures tab touch targets never overlap system buttons.
 
-### 9. 🎨 5 Dynamic Themes
+### 10. 🎨 5 Dynamic Themes
 - Switch instantly without reloading:
   1. **GitPulse Obsidian**: Deep space canvas (`#070B14`) with violet & cyan pulses.
   2. **GitHub Dimmed**: Soft slate dark canvas (`#22272E`) designed for long nighttime reading.
@@ -113,21 +115,21 @@
   4. **GitHub Clean Light**: Official daylight white (`#FFFFFF`) with GitHub light accents.
   5. **Neon Cyberpunk**: High-voltage electric dark with neon rose, emerald & amber accents.
 
-### 10. 🎛️ Modular Layout & Profile Customization
+### 11. 🎛️ Modular Layout & Profile Customization
 - **Modular Profile Sections**:
   - Reorder sections via drag-like touch controls.
   - Toggle visibility: Overview Metrics, 52-Week Contribution Heatmap, Pinned Repositories, Profile README, and Subtabs.
 - **Compact vs Spacious Density**: Choose between dense code review cards or spacious browsing.
 - **Default Subtab Configuration**: Customize default landing tabs for Repositories and Profiles.
 
-### 11. 🌲 Tree Explorer, Live Search & Monospace Code Viewer
+### 12. 🌲 Tree Explorer, Live Search & Monospace Code Viewer
 - Directory navigation with breadcrumb path history and instant folder filtering.
 - Monospace syntax viewer with line numbers, byte size tracking, and in-file text search.
 - Binary file detection (images, PDFs, archives, executables) with direct browser open fallback.
 - Hermes layout OOM protection capping unvirtualized line counts at 1,000 max.
 - Branch switcher (`main`, `master`, dev branches).
 
-### 12. 🔙 Hierarchical Back Navigation & Native Gestures
+### 13. 🔙 Hierarchical Back Navigation & Native Gestures
 - **Multi-Level Stack Traversal**:
   - Android system back button / swipe gesture in file viewer goes back one level to the containing directory.
   - Pressing back inside subdirectories (`/src/components`) navigates up one level (`.. (Up one level)`).
@@ -139,23 +141,29 @@
   - Header button adapts to `←` when viewing files or navigating subdirectories, and `✕` at the root.
   - Dedicated direct exit button (`✕`) in header actions allows 1-tap exit from any depth.
 
-### 13. 🔀 Unified Diffs & Commits
+### 14. 🔀 Unified Diffs & Commits
 - Full commit logs with author avatars, timestamp formatting, and SHA badges.
 - Line-by-line diff inspection with green addition (`+`) and red deletion (`-`) highlights.
 
-### 14. 📊 52-Week Contribution Heatmap
+### 15. 📊 52-Week Contribution Heatmap
 - Live contribution matrix derived from GitHub GraphQL API.
 - Day-by-day commit inspector, current streak, and longest streak counters.
 
-### 15. 💬 Issues, Pull Requests & Merge Requests
+### 16. 💬 Issues & Pull Requests with Tap-To-Expand
 - Filter by status: `Open`, `Closed`, `Merged`.
-- Pull request review tracking and release changelogs with asset downloads.
+- Pull request review tracking and additions/deletions diff pills (`+ additions`, `- deletions`).
+- **Tap-To-Expand Descriptions**: Tap any issue or PR description to toggle between compact 2-line preview and full untruncated text in-place.
 
-### 16. ⚠️ Danger Zone (Repository Deletion)
+### 17. 🏷️ Releases, Assets & Tap-To-Expand Changelogs
+- Tag badges (`🏷️ v1.x`), pre-release indicators, and formatted release dates.
+- **Tap-To-Expand Release Notes**: Tap any release body to expand from 4-line preview to full changelog notes with in-place toggle.
+- Direct 1-tap binary asset download links (`.apk`, `.zip`, `.tar.gz`) with byte size indicators.
+
+### 18. ⚠️ Danger Zone (Repository Deletion)
 - Toggleable feature in settings.
 - Requires typing exact `owner/repo-name` in a safety modal before unlocking permanent deletion.
 
-### 17. 🔔 Notifications Inbox & Sleep Prevention
+### 19. 🔔 Notifications Inbox & Sleep Prevention
 - Thread triage for review requests, issue assignments, and commit mentions.
 - `expo-keep-awake` prevents device screen timeout during long code reviews.
 
@@ -216,6 +224,6 @@ GitPulse connects strictly to official forge APIs (or your specified self-hosted
 
 ---
 
-## 📄 License
+## 📄 License & Maintainer
 
 MIT © [Emmanouil Athanasopoulos](https://github.com/athanasso) | [Buy Me a Coffee](https://buymeacoffee.com/athanasso)
