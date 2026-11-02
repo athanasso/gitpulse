@@ -18,7 +18,7 @@
   <img src="https://img.shields.io/badge/License-MIT-10B981" alt="License">
 </p>
 
-> **GitPulse** is a universal, developer-first mobile Git client built with **React Native**, **Expo 58**, and **TypeScript**. Designed for developers who demand instant repository access, seamless multi-account switching across **GitHub**, **GitLab**, **Gitea/Codeberg**, and **Bitbucket**, in-place code editing with direct git commit push, full git history inspection, deep linking auto-redirects, GitHub-rendered HTML markdown, offline-first 0ms loading, and unified PR/MR diff reviews on mobile.
+> **GitPulse** is a universal, developer-first mobile Git client built with **React Native**, **Expo 58**, and **TypeScript**. Designed for developers who demand instant repository access, seamless multi-account switching across **GitHub**, **GitLab**, **Gitea/Codeberg**, and **Bitbucket**, in-app **CodeMirror 6** code editing with full syntax highlighting, complete mobile Git operations (branch CRUD, in-app merges, PR/MR creation, new file commits), full git history inspection, deep linking auto-redirects, GitHub-rendered HTML markdown, offline-first 0ms loading, and unified PR/MR diff reviews on mobile.
 
 ---
 
@@ -148,6 +148,7 @@
 
 ### 12. 🌲 Tree Explorer, Live Search & Monospace Code Viewer
 - Directory navigation with breadcrumb path history and instant folder filtering.
+- **Code Action Bar**: 1-tap quick buttons for `➕ New File`, `🌿 Switch Branch`, and `🔀 New PR` directly above the directory tree.
 - Monospace syntax viewer with line numbers, byte size tracking, and in-file text search.
 - Binary file detection (images, PDFs, archives, executables) with direct browser open fallback.
 - Hermes layout OOM protection capping unvirtualized line counts at 1,000 max.
