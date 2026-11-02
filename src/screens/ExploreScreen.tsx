@@ -209,8 +209,12 @@ export const ExploreScreen: React.FC = () => {
 
   const handleSearchSubmit = () => {
     if (searchQuery.trim()) {
-      setIsSearchActive(true);
       setPage(1);
+      if (!isSearchActive) {
+        setIsSearchActive(true);
+      } else {
+        loadData(1);
+      }
     }
   };
 
@@ -227,9 +231,10 @@ export const ExploreScreen: React.FC = () => {
     setSearchQuery('');
   };
 
-  const formatStars = (count: number) => {
-    if (count >= 1000) return `${(count / 1000).toFixed(1)}k`;
-    return count.toString();
+  const formatStars = (count?: number | null) => {
+    const val = typeof count === 'number' && !isNaN(count) ? count : 0;
+    if (val >= 1000) return `${(val / 1000).toFixed(1)}k`;
+    return val.toString();
   };
 
   const renderRepoCard = ({
@@ -267,7 +272,7 @@ export const ExploreScreen: React.FC = () => {
             />
           )}
           <Text style={styles.repoTitle} numberOfLines={1}>
-            {isGlobal ? item.full_name : item.name}
+            {isGlobal ? (item.full_name || item.name || 'Repository') : (item.name || item.full_name || 'Repository')}
           </Text>
           {isSearchActive && (
             <View style={isGlobal ? styles.globalBadge : styles.mineBadge}>
@@ -633,7 +638,7 @@ export const ExploreScreen: React.FC = () => {
         <FlatList
           data={developers}
           renderItem={renderDeveloperCard}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => (item?.id ? `${item.id}-${index}` : `${index}`)}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
@@ -657,7 +662,7 @@ export const ExploreScreen: React.FC = () => {
         <FlatList
           data={repos}
           renderItem={renderRepoCard}
-          keyExtractor={(item) => item.id.toString()}
+          keyExtractor={(item, index) => (item?.id ? `${item.id}-${index}` : `${index}`)}
           contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl

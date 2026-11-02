@@ -240,7 +240,7 @@ export const RepositoriesScreen: React.FC = () => {
       const q = searchQuery.toLowerCase();
       result = result.filter(
         (r) =>
-          r.name.toLowerCase().includes(q) ||
+          (r.name && r.name.toLowerCase().includes(q)) ||
           (r.description && r.description.toLowerCase().includes(q)) ||
           (r.language && r.language.toLowerCase().includes(q))
       );
@@ -266,10 +266,12 @@ export const RepositoriesScreen: React.FC = () => {
 
     // Sort order
     return [...result].sort((a, b) => {
-      if (sortBy === 'stars') return b.stargazers_count - a.stargazers_count;
-      if (sortBy === 'forks') return b.forks_count - a.forks_count;
-      if (sortBy === 'name') return a.name.localeCompare(b.name);
-      return new Date(b.updated_at).getTime() - new Date(a.updated_at).getTime();
+      if (sortBy === 'stars') return (b.stargazers_count || 0) - (a.stargazers_count || 0);
+      if (sortBy === 'forks') return (b.forks_count || 0) - (a.forks_count || 0);
+      if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
+      const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
+      const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      return dateB - dateA;
     });
   }, [sourceList, isGlobalActive, searchQuery, selectedLanguage, typeFilter, sortBy]);
 
@@ -642,7 +644,7 @@ export const RepositoriesScreen: React.FC = () => {
       <FlatList
         ref={flatListRef}
         data={filteredRepos}
-        keyExtractor={(item) => `${item.id}-${item.full_name}`}
+        keyExtractor={(item, index) => (item?.id ? `${item.id}-${item.full_name || ''}-${index}` : `${index}`)}
         renderItem={renderRepoItem}
         contentContainerStyle={styles.listContent}
         refreshControl={

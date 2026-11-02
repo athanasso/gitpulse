@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import {
   View,
   Text,
@@ -134,7 +134,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const handleExecuteDelete = async () => {
     if (!repo || !isSafetyMatched) return;
     setIsDeletingRepo(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const res = await GitHubApiService.deleteRepo(owner, name);
     setIsDeletingRepo(false);
     setSafetyModalVisible(false);
@@ -187,7 +187,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           text: 'Delete Repo',
           style: 'destructive',
           onPress: async () => {
-            const [owner, name] = repo.full_name.split('/');
+            const [owner, name] = getRepoOwnerAndName();
             showDialog({
               title: 'Deleting...',
               message: `Deleting ${repo.full_name} from GitHub...`,
@@ -247,6 +247,48 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [fileTree, setFileTree] = useState<GitHubFileItem[]>([]);
   const [viewingFile, setViewingFile] = useState<GitHubFileItem | null>(null);
   const [fileContent, setFileContent] = useState<string>('');
+  const [codeFilterQuery, setCodeFilterQuery] = useState<string>('');
+  const [fileSearchQuery, setFileSearchQuery] = useState<string>('');
+
+  const getRepoOwnerAndName = useCallback((): [string, string] => {
+    if (!repo) return ['', ''];
+    if (repo.full_name && repo.full_name.includes('/')) {
+      const parts = repo.full_name.split('/');
+      return [parts[0] || '', parts[1] || ''];
+    }
+    return [repo.owner?.login || '', repo.name || ''];
+  }, [repo]);
+
+  const isBinaryFile = (item: GitHubFileItem | null, content?: string): boolean => {
+    if (!item) return false;
+    const binaryExts = [
+      '.png', '.jpg', '.jpeg', '.gif', '.ico', '.webp', '.bmp', '.tiff',
+      '.pdf', '.zip', '.tar', '.gz', '.7z', '.rar', '.bz2', '.xz',
+      '.wasm', '.exe', '.bin', '.iso', '.apk', '.dylib', '.so', '.dll',
+      '.woff', '.woff2', '.ttf', '.eot', '.otf',
+      '.mp4', '.mov', '.avi', '.mkv', '.mp3', '.wav', '.ogg',
+      '.jar', '.class', '.pyc', '.dex', '.o', '.a'
+    ];
+    const lowerName = (item.name || '').toLowerCase();
+    if (binaryExts.some((ext) => lowerName.endsWith(ext))) {
+      return true;
+    }
+    if (content) {
+      const checkSlice = content.slice(0, 1024);
+      if (checkSlice.includes('\0')) {
+        return true;
+      }
+    }
+    return false;
+  };
+
+  const filteredFileTree = useMemo(() => {
+    if (!codeFilterQuery.trim()) return fileTree;
+    const q = codeFilterQuery.toLowerCase();
+    return fileTree.filter(
+      (item) => item?.name && item.name.toLowerCase().includes(q)
+    );
+  }, [fileTree, codeFilterQuery]);
 
   // Commits with pagination
   const [commits, setCommits] = useState<GitHubCommit[]>([]);
@@ -308,7 +350,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         setActiveTab(settings.defaultRepoDetailTab);
       }
 
-      const [owner, name] = repo.full_name.split('/');
+      const [owner, name] = getRepoOwnerAndName();
       CacheService.get<string>(CacheKeys.REPO_README(owner, name)).then((cached) => {
         if (cached) setReadmeContent(cached);
       });
@@ -333,7 +375,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     const branch = branchRef || selectedBranch;
 
     try {
-      const [owner, name] = repo.full_name.split('/');
+      const [owner, name] = getRepoOwnerAndName();
 
       if (activeTab === 'readme') {
         const cacheKey = CacheKeys.REPO_README(owner, name);
@@ -413,7 +455,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const goToCommitsPage = async (newPage: number) => {
     if (!repo || loadingMoreCommits || newPage < 1) return;
     setLoadingMoreCommits(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const list = await GitHubApiService.getRepoCommits(
       owner,
       name,
@@ -430,7 +472,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const goToIssuesPage = async (newPage: number) => {
     if (!repo || loadingMoreIssues || newPage < 1) return;
     setLoadingMoreIssues(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const { issues: moreI, prs: moreP } = await GitHubApiService.getIssuesAndPRs(
       owner,
       name,
@@ -447,7 +489,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const goToWorkflowRunsPage = async (newPage: number) => {
     if (!repo || loadingMoreRuns || newPage < 1) return;
     setLoadingMoreRuns(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const list = await GitHubApiService.getWorkflowRuns(
       owner,
       name,
@@ -463,7 +505,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const goToReleasesPage = async (newPage: number) => {
     if (!repo || loadingMoreReleases || newPage < 1) return;
     setLoadingMoreReleases(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const list = await GitHubApiService.getRepoReleases(
       owner,
       name,
@@ -481,7 +523,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setBranchModalVisible(false);
     if (!repo) return;
 
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     if (activeTab === 'code') {
       setLoading(true);
       setCurrentPath('');
@@ -509,7 +551,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const handleToggleStar = async () => {
     if (!repo || starLoading) return;
     setStarLoading(true);
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
 
     try {
       if (isStarred) {
@@ -538,7 +580,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setCurrentPath(dirPath);
     setViewingFile(null);
 
-    const [owner, name] = repo.full_name.split('/');
+    const [owner, name] = getRepoOwnerAndName();
     const tree = await GitHubApiService.getRepoTree(
       owner,
       name,
@@ -561,16 +603,30 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     if (!repo) return;
     setLoading(true);
     setViewingFile(item);
+    setFileSearchQuery('');
 
-    const [owner, name] = repo.full_name.split('/');
-    const content = await GitHubApiService.getFileContent(
-      owner,
-      name,
-      item.path,
-      selectedBranch
-    );
-    setFileContent(content);
-    setLoading(false);
+    // If it's a known binary file, skip fetching raw text to avoid OOM or binary crashes
+    if (isBinaryFile(item)) {
+      setFileContent('');
+      setLoading(false);
+      return;
+    }
+
+    try {
+      const [owner, name] = getRepoOwnerAndName();
+      const content = await GitHubApiService.getFileContent(
+        owner,
+        name,
+        item.path,
+        selectedBranch
+      );
+      setFileContent(typeof content === 'string' ? content : '');
+    } catch (e) {
+      console.warn('Failed to load file content', e);
+      setFileContent('');
+    } finally {
+      setLoading(false);
+    }
   };
 
   const handleShare = async () => {
@@ -861,79 +917,218 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   <View style={styles.fileViewer}>
                     <View style={styles.fileViewerHeader}>
                       <TouchableOpacity
-                        onPress={() => setViewingFile(null)}
+                        onPress={() => {
+                          setViewingFile(null);
+                          setFileSearchQuery('');
+                        }}
                         style={styles.backButton}
                       >
                         <Text style={styles.backButtonText}>
-← {viewingFile.name}
+                          ← {viewingFile.name}
                         </Text>
                       </TouchableOpacity>
                       <Text style={styles.fileSizeText}>
-                        {Math.round(viewingFile.size / 1024)} KB
+                        {viewingFile.size ? `${Math.round(viewingFile.size / 1024)} KB` : ''}
                       </Text>
                     </View>
 
-                    <ScrollView
-                      horizontal
-                      showsHorizontalScrollIndicator={false}
-                      style={styles.codeHorizontalScroll}
-                    >
-                      <View style={styles.codeEditorBox}>
-                        {fileContent ? (
-                          fileContent.split('\n').map((line, idx) => (
-                            <View key={idx} style={styles.codeLineRow}>
-                              <Text style={styles.codeLineNumber}>
-                                {idx + 1}
-                              </Text>
-                              <Text style={styles.codeLineText}>
-                                {line || ' '}
-                              </Text>
-                            </View>
-                          ))
-                        ) : (
-                          <Text style={styles.emptyDetailText}>
-                            Empty file or binary content.
-                          </Text>
-                        )}
+                    {isBinaryFile(viewingFile, fileContent) ? (
+                      <View style={styles.binaryCard}>
+                        <Text style={styles.binaryIcon}>📦</Text>
+                        <Text style={styles.binaryTitle}>{viewingFile.name}</Text>
+                        <Text style={styles.binarySubtitle}>
+                          Binary file ({viewingFile.size ? `${Math.round(viewingFile.size / 1024)} KB` : 'preview unavailable'}). Raw text preview cannot be rendered.
+                        </Text>
+                        <TouchableOpacity
+                          style={styles.binaryOpenBtn}
+                          onPress={() => {
+                            const url = viewingFile.html_url || (repo ? `${repo.html_url}/blob/${selectedBranch}/${viewingFile.path}` : '');
+                            if (url) Linking.openURL(url).catch(() => {});
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.binaryOpenBtnText}>Open File in Browser ↗</Text>
+                        </TouchableOpacity>
                       </View>
-                    </ScrollView>
+                    ) : (
+                      <>
+                        <View style={styles.codeSearchBar}>
+                          <Text style={styles.codeSearchIcon}>🔍</Text>
+                          <TextInput
+                            style={styles.codeSearchInput}
+                            placeholder="Search in this file..."
+                            placeholderTextColor={colors.textMuted}
+                            value={fileSearchQuery}
+                            onChangeText={setFileSearchQuery}
+                            autoCapitalize="none"
+                            autoCorrect={false}
+                          />
+                          {fileSearchQuery ? (
+                            <TouchableOpacity onPress={() => setFileSearchQuery('')}>
+                              <Text style={styles.codeClearBtn}>✕</Text>
+                            </TouchableOpacity>
+                          ) : null}
+                        </View>
+
+                        <ScrollView
+                          horizontal
+                          showsHorizontalScrollIndicator={false}
+                          style={styles.codeHorizontalScroll}
+                        >
+                          <View style={styles.codeEditorBox}>
+                            {fileContent ? (
+                              (() => {
+                                const allLines = fileContent.split('\n');
+                                const q = fileSearchQuery.trim().toLowerCase();
+                                const isLarge = allLines.length > 1000;
+                                const maxItems = 1000;
+
+                                let displayItems: { line: string; idx: number }[] = [];
+                                if (q) {
+                                  for (let i = 0; i < allLines.length; i++) {
+                                    if (allLines[i].toLowerCase().includes(q)) {
+                                      displayItems.push({ line: allLines[i], idx: i });
+                                      if (displayItems.length >= maxItems) break;
+                                    }
+                                  }
+                                } else {
+                                  displayItems = allLines.slice(0, maxItems).map((line, idx) => ({ line, idx }));
+                                }
+
+                                if (q && displayItems.length === 0) {
+                                  return (
+                                    <View style={{ padding: 16 }}>
+                                      <Text style={styles.emptyDetailText}>
+                                        No lines matching "{fileSearchQuery}".
+                                      </Text>
+                                    </View>
+                                  );
+                                }
+
+                                return (
+                                  <>
+                                    {displayItems.map(({ line, idx }) => {
+                                      const isMatched = q && line.toLowerCase().includes(q);
+                                      return (
+                                        <View
+                                          key={idx}
+                                          style={[
+                                            styles.codeLineRow,
+                                            isMatched && styles.codeLineRowMatched,
+                                          ]}
+                                        >
+                                          <Text style={styles.codeLineNumber}>
+                                            {idx + 1}
+                                          </Text>
+                                          <Text
+                                            style={[
+                                              styles.codeLineText,
+                                              isMatched && styles.codeLineTextMatched,
+                                            ]}
+                                          >
+                                            {(line || ' ').replace(/\0/g, '')}
+                                          </Text>
+                                        </View>
+                                      );
+                                    })}
+                                    {isLarge && !q && (
+                                      <View style={styles.codeTruncatedBanner}>
+                                        <Text style={styles.codeTruncatedText}>
+                                          ⚠️ Showing first 1,000 of {allLines.length} lines.
+                                        </Text>
+                                        <TouchableOpacity
+                                          onPress={() => {
+                                            const url = viewingFile.html_url || (repo ? `${repo.html_url}/blob/${selectedBranch}/${viewingFile.path}` : '');
+                                            if (url) Linking.openURL(url).catch(() => {});
+                                          }}
+                                        >
+                                          <Text style={styles.codeTruncatedLink}>
+                                            Open full file in Browser ↗
+                                          </Text>
+                                        </TouchableOpacity>
+                                      </View>
+                                    )}
+                                  </>
+                                );
+                              })()
+                            ) : (
+                              <Text style={styles.emptyDetailText}>
+                                Empty file.
+                              </Text>
+                            )}
+                          </View>
+                        </ScrollView>
+                      </>
+                    )}
                   </View>
                 ) : fileTree.length > 0 ? (
                   // Directory Tree
                   <View style={styles.treeContainer}>
+                    {fileTree.length > 1 && (
+                      <View style={styles.codeSearchBar}>
+                        <Text style={styles.codeSearchIcon}>🔍</Text>
+                        <TextInput
+                          style={styles.codeSearchInput}
+                          placeholder={`Filter ${fileTree.length} files in this folder...`}
+                          placeholderTextColor={colors.textMuted}
+                          value={codeFilterQuery}
+                          onChangeText={setCodeFilterQuery}
+                          autoCapitalize="none"
+                          autoCorrect={false}
+                        />
+                        {codeFilterQuery ? (
+                          <TouchableOpacity onPress={() => setCodeFilterQuery('')}>
+                            <Text style={styles.codeClearBtn}>✕</Text>
+                          </TouchableOpacity>
+                        ) : null}
+                      </View>
+                    )}
+
                     {currentPath !== '' && (
                       <TouchableOpacity
                         style={styles.treeUpRow}
-                        onPress={navigateUp}
+                        onPress={() => {
+                          setCodeFilterQuery('');
+                          navigateUp();
+                        }}
                       >
                         <Text style={styles.treeIcon}>📁</Text>
                         <Text style={styles.treeUpText}>.. (Up one level)</Text>
                       </TouchableOpacity>
                     )}
 
-                    {fileTree.map((item, idx) => (
-                      <TouchableOpacity
-                        key={idx}
-                        style={styles.treeItemRow}
-                        onPress={() =>
-                          item.type === 'dir'
-                            ? navigateToDirectory(item.path)
-                            : openFile(item)
-                        }
-                      >
-                        <Text style={styles.treeIcon}>
-                          {item.type === 'dir' ? '📁' : '📄'}
+                    {filteredFileTree.length === 0 && codeFilterQuery ? (
+                      <View style={styles.emptyCard}>
+                        <Text style={styles.emptyDetailText}>
+                          No files matching "{codeFilterQuery}".
                         </Text>
-                        <Text style={styles.treeItemName}>{item.name}</Text>
-                        {item.type === 'file' && (
-                          <Text style={styles.treeItemSize}>
-                            {item.size > 1024
-                              ? `${Math.round(item.size / 1024)}KB`
-                              : `${item.size}B`}
+                      </View>
+                    ) : (
+                      filteredFileTree.map((item, idx) => (
+                        <TouchableOpacity
+                          key={item.sha || item.path || idx}
+                          style={styles.treeItemRow}
+                          onPress={() => {
+                            setCodeFilterQuery('');
+                            item.type === 'dir'
+                              ? navigateToDirectory(item.path)
+                              : openFile(item);
+                          }}
+                        >
+                          <Text style={styles.treeIcon}>
+                            {item.type === 'dir' ? '📁' : '📄'}
                           </Text>
-                        )}
-                      </TouchableOpacity>
-                    ))}
+                          <Text style={styles.treeItemName}>{item.name}</Text>
+                          {item.type === 'file' && item.size !== undefined && (
+                            <Text style={styles.treeItemSize}>
+                              {item.size > 1024
+                                ? `${Math.round(item.size / 1024)}KB`
+                                : `${item.size}B`}
+                            </Text>
+                          )}
+                        </TouchableOpacity>
+                      ))
+                    )}
                   </View>
                 ) : (
                   <View style={styles.emptyCard}>
@@ -996,17 +1191,17 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                       >
                         <View style={styles.commitHeaderRow}>
                           <Text style={styles.commitShaBadge}>
-                            {c.sha.substring(0, 7)}
+                            {c.sha ? c.sha.substring(0, 7) : ''}
                           </Text>
                           <Text style={styles.commitDate}>
-                            {formatRepoTimestamp(c.commit.author.date)}
+                            {c.commit?.author?.date ? formatRepoTimestamp(c.commit.author.date) : ''}
                           </Text>
                         </View>
                         <Text style={styles.commitMessage} numberOfLines={2}>
-                          {c.commit.message}
+                          {c.commit?.message || 'No commit message'}
                         </Text>
                         <Text style={styles.commitAuthorLine}>
-                          by {c.commit.author.name}
+                          by {c.commit?.author?.name || 'unknown'}
                         </Text>
                       </TouchableOpacity>
                     ))}
@@ -1819,6 +2014,92 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: colors.textPrimary,
     fontSize: 12,
     fontFamily: 'monospace',
+  },
+  codeSearchBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardElevated,
+    borderRadius: 10,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 6,
+    marginHorizontal: Spacing.sm,
+    marginVertical: Spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  codeSearchIcon: {
+    fontSize: 13,
+    marginRight: 6,
+  },
+  codeSearchInput: {
+    flex: 1,
+    color: colors.textPrimary,
+    fontSize: 13,
+    padding: 0,
+  },
+  codeClearBtn: {
+    fontSize: 13,
+    color: colors.textMuted,
+    paddingHorizontal: 6,
+  },
+  codeLineRowMatched: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 4,
+  },
+  codeLineTextMatched: {
+    color: colors.primary,
+    fontWeight: '700',
+  },
+  codeTruncatedBanner: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+    borderTopWidth: 1,
+    borderTopColor: colors.codeBorder,
+    marginTop: Spacing.sm,
+  },
+  codeTruncatedText: {
+    fontSize: 12,
+    color: colors.textMuted,
+    marginBottom: 6,
+  },
+  codeTruncatedLink: {
+    fontSize: 12,
+    color: colors.primary,
+    fontWeight: '600',
+  },
+  binaryCard: {
+    padding: Spacing.xl,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  binaryIcon: {
+    fontSize: 36,
+    marginBottom: Spacing.sm,
+  },
+  binaryTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  binarySubtitle: {
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+  },
+  binaryOpenBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: 10,
+    borderRadius: 10,
+  },
+  binaryOpenBtnText: {
+    color: '#FFFFFF',
+    fontSize: 13,
+    fontWeight: '700',
   },
   commitsContainer: {
     gap: 12,
