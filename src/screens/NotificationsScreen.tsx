@@ -15,6 +15,8 @@ import {
 
 import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { AccountService } from '../services/AccountService';
+import { GitAccount, PROVIDER_REGISTRY } from '../types/provider';
 import { formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
 import { ThemedDialog, DialogButton } from '../components/ThemedDialog';
@@ -36,6 +38,19 @@ export const NotificationsScreen: React.FC = () => {
   const [isAuth, setIsAuth] = useState(false);
   const [scopeError, setScopeError] = useState<string | null>(null);
   const [markingAll, setMarkingAll] = useState(false);
+  const [activeAccount, setActiveAccount] = useState<GitAccount | null>(() =>
+    AccountService.getActiveAccount()
+  );
+
+  useEffect(() => {
+    const unsub = AccountService.subscribe((active) => {
+      setActiveAccount(active);
+    });
+    return () => unsub();
+  }, []);
+
+  const providerMeta = PROVIDER_REGISTRY[activeAccount?.provider || 'github'];
+  const manageUrl = providerMeta.manageTokensUrl(activeAccount?.hostUrl);
 
   // App-themed Dialog state
   const [dialogConfig, setDialogConfig] = useState<{
@@ -122,7 +137,7 @@ export const NotificationsScreen: React.FC = () => {
     if (markingAll || notifications.length === 0) return;
     showDialog({
       title: 'Mark All as Read',
-      message: 'Are you sure you want to mark all inbox notifications as read on GitHub?',
+      message: `Are you sure you want to mark all inbox notifications as read on ${providerMeta.name}?`,
       icon: '📬',
       type: 'info',
       buttons: [
@@ -267,20 +282,28 @@ export const NotificationsScreen: React.FC = () => {
         <View style={styles.scopeWarningCard}>
           <Text style={styles.scopeWarningIcon}>⚠️</Text>
           <View style={styles.scopeWarningContent}>
-            <Text style={styles.scopeWarningTitle}>Notifications Scope Needed</Text>
+            <Text style={styles.scopeWarningTitle}>
+              {providerMeta.name} Notifications Permission Needed
+            </Text>
             <Text style={styles.scopeWarningText}>
-              Your GitHub Personal Access Token requires the{' '}
-              <Text style={styles.scopeBold}>notifications</Text> scope to access
-              your inbox.
+              Your {providerMeta.name} token requires{' '}
+              <Text style={styles.scopeBold}>
+                {providerMeta.type === 'github'
+                  ? 'notifications'
+                  : providerMeta.type === 'gitlab'
+                  ? 'api'
+                  : providerMeta.type === 'gitea'
+                  ? 'read:notification or read:issue'
+                  : 'account:read and pullrequest:read'}
+              </Text>{' '}
+              permission to access your inbox.
             </Text>
             <TouchableOpacity
-              onPress={() =>
-                Linking.openURL('https://github.com/settings/tokens')
-              }
+              onPress={() => Linking.openURL(manageUrl)}
               style={styles.scopeLinkBtn}
             >
               <Text style={styles.scopeLinkText}>
-                Edit Token Scopes on GitHub ↗
+                Edit Permissions on {providerMeta.name} ↗
               </Text>
             </TouchableOpacity>
           </View>
@@ -420,8 +443,7 @@ export const NotificationsScreen: React.FC = () => {
                 <Text style={styles.emptyIcon}>🔒</Text>
                 <Text style={styles.emptyTitle}>Personal Token Required</Text>
                 <Text style={styles.emptySubtitle}>
-                  Add a GitHub Personal Access Token (PAT) with notifications
-                  scope in the Profile tab to view your inbox.
+                  Connect an account ({providerMeta.name}, GitLab, Gitea, or Bitbucket) with notifications permission to view your inbox.
                 </Text>
               </View>
             ) : (

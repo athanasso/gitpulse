@@ -30,6 +30,7 @@ export interface ProviderMeta {
   tokenFormatHint: string;
   hasPreconfiguredScopes: boolean;
   getTokenUrl: (customHost?: string) => string;
+  manageTokensUrl: (customHost?: string) => string;
   scopes: ScopeRequirement[];
 }
 
@@ -62,6 +63,14 @@ export const PROVIDER_REGISTRY: Record<GitProviderType, ProviderMeta> = {
           ? base.replace(/\/api\/v3\/?$/, '')
           : 'https://github.com';
       return `${targetBase}/settings/tokens/new?description=GitPulse+Mobile&scopes=repo,read:user,notifications,delete_repo,read:org`;
+    },
+    manageTokensUrl: (customHost?: string) => {
+      const base = normalizeHost(customHost);
+      const targetBase =
+        base && !base.includes('api.github.com')
+          ? base.replace(/\/api\/v3\/?$/, '')
+          : 'https://github.com';
+      return `${targetBase}/settings/tokens`;
     },
     scopes: [
       {
@@ -112,6 +121,10 @@ export const PROVIDER_REGISTRY: Record<GitProviderType, ProviderMeta> = {
       const base = normalizeHost(customHost, 'https://gitlab.com').replace(/\/api\/v4\/?$/, '');
       return `${base}/-/user_settings/personal_access_tokens?name=GitPulse+Mobile&scopes=api,read_user,read_repository,write_repository`;
     },
+    manageTokensUrl: (customHost?: string) => {
+      const base = normalizeHost(customHost, 'https://gitlab.com').replace(/\/api\/v4\/?$/, '');
+      return `${base}/-/user_settings/personal_access_tokens`;
+    },
     scopes: [
       {
         scope: 'api',
@@ -151,6 +164,10 @@ export const PROVIDER_REGISTRY: Record<GitProviderType, ProviderMeta> = {
       'Generated under Settings -> Applications. Select repo, user, and issue scopes.',
     hasPreconfiguredScopes: false,
     getTokenUrl: (customHost?: string) => {
+      const base = normalizeHost(customHost, 'https://codeberg.org').replace(/\/api\/v1\/?$/, '');
+      return `${base}/user/settings/applications`;
+    },
+    manageTokensUrl: (customHost?: string) => {
       const base = normalizeHost(customHost, 'https://codeberg.org').replace(/\/api\/v1\/?$/, '');
       return `${base}/user/settings/applications`;
     },
@@ -199,6 +216,7 @@ export const PROVIDER_REGISTRY: Record<GitProviderType, ProviderMeta> = {
       'Format: username:AppPassword. Create an App Password with Repositories and Account permissions.',
     hasPreconfiguredScopes: false,
     getTokenUrl: () => 'https://bitbucket.org/account/settings/app-passwords/',
+    manageTokensUrl: () => 'https://bitbucket.org/account/settings/app-passwords/',
     scopes: [
       {
         scope: 'account:read',

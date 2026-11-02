@@ -25,6 +25,7 @@ import {
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { AccountService } from '../services/AccountService';
+import { GitAccount, PROVIDER_REGISTRY } from '../types/provider';
 import { CacheService, CacheKeys } from '../services/CacheService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
@@ -129,6 +130,9 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const styles = useMemo(() => createStyles(colors), [colors]);
 
   const [user, setUser] = useState<GitHubUser | null>(null);
+  const [activeAccount, setActiveAccount] = useState<GitAccount | null>(() =>
+    AccountService.getActiveAccount()
+  );
   const [tokenScopes, setTokenScopes] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [validating, setValidating] = useState(false);
@@ -136,6 +140,13 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [activeSubTab, setActiveSubTab] = useState<ProfileSubTab>(
     settings.defaultProfileSubTab || 'repos'
   );
+
+  useEffect(() => {
+    const unsub = AccountService.subscribe((active) => {
+      setActiveAccount(active);
+    });
+    return () => unsub();
+  }, []);
 
   useEffect(() => {
     if (settings.defaultProfileSubTab) {
@@ -793,67 +804,95 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
     );
   };
 
-  const renderTokenPermissions = () => (
-    <View key="tokenPermissions" style={styles.activeScopesCard}>
-      <View style={styles.activeScopesHeaderRow}>
-        <Text style={styles.activeScopesHeaderTitle}>
-          🔑 Token Permissions
-        </Text>
-        <TouchableOpacity
-          onPress={() => Linking.openURL('https://github.com/settings/tokens')}
-        >
-          <Text style={styles.editScopesLink}>Manage on GitHub ↗</Text>
-        </TouchableOpacity>
-      </View>
+  const renderTokenPermissions = () => {
+    const providerType = activeAccount?.provider || 'github';
+    const isGitHub = providerType === 'github';
+    const providerMeta = PROVIDER_REGISTRY[providerType];
+    const manageUrl = providerMeta.manageTokensUrl(activeAccount?.hostUrl);
 
-      {tokenScopes.length === 0 ? (
-        <Text style={styles.fineGrainedNote}>
-          ● Active Personal Access Token (Resource-scoped / Fine-Grained)
-        </Text>
-      ) : (
-        <>
-          <View style={styles.scopesPillsWrap}>
-            {SCOPES_SPECS.map((spec) => {
-              const hasThis =
-                tokenScopes.includes(spec.scope) ||
-                (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
-                (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
+    return (
+      <View key="tokenPermissions" style={styles.activeScopesCard}>
+        <View style={styles.activeScopesHeaderRow}>
+          <Text style={styles.activeScopesHeaderTitle}>
+            🔑 {providerMeta.name} Token Permissions
+          </Text>
+          <TouchableOpacity onPress={() => Linking.openURL(manageUrl)}>
+            <Text style={styles.editScopesLink}>
+              Manage on {providerMeta.name} ↗
+            </Text>
+          </TouchableOpacity>
+        </View>
 
-              return (
-                <View
-                  key={spec.scope}
-                  style={[
-                    styles.scopePill,
-                    hasThis ? styles.scopePillActive : styles.scopePillMissing,
-                  ]}
-                >
-                  <Text
-                    style={[
-                      styles.scopePillText,
-                      hasThis
-                        ? styles.scopePillTextActive
-                        : styles.scopePillTextMissing,
-                    ]}
-                  >
-                    {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
-                    {spec.scope}
+        {isGitHub ? (
+          tokenScopes.length === 0 ? (
+            <Text style={styles.fineGrainedNote}>
+              ● Active Personal Access Token (Resource-scoped / Fine-Grained)
+            </Text>
+          ) : (
+            <>
+              <View style={styles.scopesPillsWrap}>
+                {providerMeta.scopes.map((spec) => {
+                  const hasThis =
+                    tokenScopes.includes(spec.scope) ||
+                    (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
+                    (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
+
+                  return (
+                    <View
+                      key={spec.scope}
+                      style={[
+                        styles.scopePill,
+                        hasThis ? styles.scopePillActive : styles.scopePillMissing,
+                      ]}
+                    >
+                      <Text
+                        style={[
+                          styles.scopePillText,
+                          hasThis
+                            ? styles.scopePillTextActive
+                            : styles.scopePillTextMissing,
+                        ]}
+                      >
+                        {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
+                        {spec.scope}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+
+              {!tokenScopes.includes('notifications') && (
+                <View style={styles.scopeWarningInline}>
+                  <Text style={styles.scopeWarningInlineText}>
+                    ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
                   </Text>
                 </View>
-              );
-            })}
-          </View>
-
-          {!tokenScopes.includes('notifications') && (
-            <View style={styles.scopeWarningInline}>
-              <Text style={styles.scopeWarningInlineText}>
-                ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
-              </Text>
+              )}
+            </>
+          )
+        ) : (
+          /* Non-GitHub Provider: GitLab, Gitea, Bitbucket */
+          <>
+            <Text style={styles.fineGrainedNote}>
+              ● Active {providerMeta.name} Connected Token ({activeAccount?.username ? `@${activeAccount.username}` : 'Authenticated'})
+            </Text>
+            <View style={styles.scopesPillsWrap}>
+              {providerMeta.scopes.map((spec) => (
+                <View
+                  key={spec.scope}
+                  style={[styles.scopePill, styles.scopePillActive]}
+                >
+                  <Text style={[styles.scopePillText, styles.scopePillTextActive]}>
+                    ✓ {spec.scope}
+                  </Text>
+                </View>
+              ))}
             </View>
-          )}
-        </>
-      )}
-    </View>
-  );
+          </>
+        )}
+      </View>
+    );
+  };
 
   const renderReadme = () => {
     if (!profileReadme) return null;
