@@ -199,10 +199,12 @@ export class GiteaProvider implements IGitProvider {
     repo: string,
     branch: string = 'main',
     page: number = 1,
-    perPage: number = 30
+    perPage: number = 30,
+    path?: string
   ): Promise<UnifiedCommit[]> {
     const api = this.getApiUrl(hostUrl);
-    const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(branch)}&page=${page}&limit=${perPage}`;
+    const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
+    const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(branch)}&page=${page}&limit=${perPage}${queryPath}`;
     const res = await fetch(url, { headers: this.getHeaders(token) });
     if (!res.ok) return [];
     const list = await res.json();
@@ -418,6 +420,43 @@ export class GiteaProvider implements IGitProvider {
       return { success: true, commitSha: data.commit?.sha };
     }
     return { success: false, message: data.message || `HTTP ${res.status}` };
+  }
+
+  async deleteFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string }> {
+    const api = this.getApiUrl(hostUrl);
+    const url = `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+    const body: Record<string, any> = {
+      message: message.trim() || `Delete ${path}`,
+      branch,
+    };
+    if (sha) body.sha = sha;
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok || res.status === 204) {
+      return { success: true };
+    }
+    const err = await res.json().catch(() => ({}));
+    return {
+      success: false,
+      message: err.message || `Failed to delete file (${res.status})`,
+    };
   }
 }
 

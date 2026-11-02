@@ -159,6 +159,32 @@ class GitServiceClass {
   }
 
   /**
+   * Delete a file via git commit
+   */
+  async deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    return await p.deleteFile(
+      acc?.token || '',
+      acc?.hostUrl,
+      owner,
+      repo,
+      path,
+      message,
+      sha,
+      branch
+    );
+  }
+
+  /**
    * Fetch repository commit history
    */
   async getRepoCommits(
@@ -166,12 +192,13 @@ class GitServiceClass {
     repo: string,
     branch: string = 'main',
     page: number = 1,
-    perPage: number = 30
+    perPage: number = 30,
+    path?: string
   ): Promise<UnifiedCommit[]> {
     const acc = this.getActiveAccount();
     const providerType = acc ? acc.provider : 'github';
     const p = this.getProvider(providerType);
-    return await p.getRepoCommits(acc?.token || '', acc?.hostUrl, owner, repo, branch, page, perPage);
+    return await p.getRepoCommits(acc?.token || '', acc?.hostUrl, owner, repo, branch, page, perPage, path);
   }
 
   /**

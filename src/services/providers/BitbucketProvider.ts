@@ -200,9 +200,11 @@ export class BitbucketProvider implements IGitProvider {
     repo: string,
     branch: string = 'main',
     page: number = 1,
-    perPage: number = 30
+    perPage: number = 30,
+    path?: string
   ): Promise<UnifiedCommit[]> {
-    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(branch)}?page=${page}&pagelen=${perPage}`;
+    const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
+    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits/${encodeURIComponent(branch)}?page=${page}&pagelen=${perPage}${queryPath}`;
     const res = await fetch(url, { headers: this.getHeaders(token) });
     if (!res.ok) return [];
     const data = await res.json();
@@ -360,6 +362,34 @@ export class BitbucketProvider implements IGitProvider {
       body: formData,
     });
     if (res.ok) {
+      return { success: true };
+    }
+    const data = await res.json().catch(() => ({}));
+    return { success: false, message: data.error?.message || `HTTP ${res.status}` };
+  }
+
+  async deleteFile(
+    token: string,
+    _hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    _sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string }> {
+    const url = `${this.baseUrl}/repositories/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/src`;
+    const formData = new FormData();
+    formData.append('files', `-${path}`);
+    formData.append('message', message.trim() || `Delete ${path}`);
+    formData.append('branch', branch);
+
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: this.getHeaders(token),
+      body: formData,
+    });
+    if (res.ok || res.status === 201) {
       return { success: true };
     }
     const data = await res.json().catch(() => ({}));

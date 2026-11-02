@@ -81,7 +81,8 @@ export interface IGitProvider {
     repo: string,
     branch?: string,
     page?: number,
-    perPage?: number
+    perPage?: number,
+    path?: string
   ): Promise<UnifiedCommit[]>;
 
   /**
@@ -155,5 +156,19 @@ export interface IGitProvider {
     sha?: string,
     branch?: string
   ): Promise<{ success: boolean; message?: string; commitSha?: string }>;
+
+  /**
+   * Delete a file via git commit
+   */
+  deleteFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string }>;
 }
 

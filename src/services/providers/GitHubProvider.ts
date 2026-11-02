@@ -147,10 +147,12 @@ export class GitHubProvider implements IGitProvider {
     repo: string,
     branch: string = 'main',
     page: number = 1,
-    perPage: number = 30
+    perPage: number = 30,
+    path?: string
   ): Promise<UnifiedCommit[]> {
     const base = this.getBaseUrl(hostUrl);
-    const url = `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(branch)}&page=${page}&per_page=${perPage}`;
+    const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
+    const url = `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/commits?sha=${encodeURIComponent(branch)}&page=${page}&per_page=${perPage}${queryPath}`;
     const res = await fetch(url, { headers: this.getHeaders(token) });
     if (!res.ok) return [];
     const data = await res.json();
@@ -308,6 +310,43 @@ export class GitHubProvider implements IGitProvider {
       return { success: true, commitSha: data.commit?.sha };
     }
     return { success: false, message: data.message || `HTTP ${res.status}` };
+  }
+
+  async deleteFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const base = this.getBaseUrl(hostUrl);
+    const url = `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/contents/${path}`;
+    const body: Record<string, any> = {
+      message: message.trim() || `Delete ${path}`,
+    };
+    if (sha) body.sha = sha;
+    if (branch) body.branch = branch;
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(body),
+    });
+
+    if (res.ok) {
+      return { success: true };
+    }
+    const err = await res.json().catch(() => ({}));
+    return {
+      success: false,
+      message: err.message || `Failed to delete file (${res.status})`,
+    };
   }
 }
 

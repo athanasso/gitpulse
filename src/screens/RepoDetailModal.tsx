@@ -259,6 +259,16 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [commitDescription, setCommitDescription] = useState<string>('');
   const [isPushing, setIsPushing] = useState<boolean>(false);
 
+  // File History state
+  const [showingFileHistory, setShowingFileHistory] = useState<boolean>(false);
+  const [fileCommits, setFileCommits] = useState<GitHubCommit[]>([]);
+  const [fileCommitsLoading, setFileCommitsLoading] = useState<boolean>(false);
+
+  // File Deletion state
+  const [deleteFileModalVisible, setDeleteFileModalVisible] = useState<boolean>(false);
+  const [deleteFileMessage, setDeleteFileMessage] = useState<string>('');
+  const [isDeletingFile, setIsDeletingFile] = useState<boolean>(false);
+
   const getRepoOwnerAndName = useCallback((): [string, string] => {
     if (!repo) return ['', ''];
     if (repo.full_name && repo.full_name.includes('/')) {
@@ -663,6 +673,10 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setLoading(true);
     setViewingFile(item);
     setFileSearchQuery('');
+    setShowingFileHistory(false);
+    setFileCommits([]);
+    setIsEditing(false);
+    setEditContent('');
 
     // If it's a known binary file, skip fetching raw text to avoid OOM or binary crashes
     if (isBinaryFile(item)) {
@@ -700,6 +714,92 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     }
   };
 
+  const loadFileHistory = async (filePath: string) => {
+    if (!repo) return;
+    setFileCommitsLoading(true);
+    setShowingFileHistory(true);
+    try {
+      const [owner, name] = getRepoOwnerAndName();
+      const list = await GitHubApiService.getRepoCommits(
+        owner,
+        name,
+        selectedBranch,
+        1,
+        50,
+        filePath
+      );
+      setFileCommits(list);
+    } catch (e) {
+      console.warn('Failed to load file history', e);
+      setFileCommits([]);
+    } finally {
+      setFileCommitsLoading(false);
+    }
+  };
+
+  const handleShareFile = async () => {
+    if (!repo || !viewingFile) return;
+    try {
+      const fileUrl =
+        viewingFile.html_url ||
+        `${repo.html_url}/blob/${selectedBranch}/${viewingFile.path}`;
+      await Share.share({
+        message: `${viewingFile.name} (${viewingFile.path}) in ${repo.full_name}: ${fileUrl}`,
+        url: fileUrl,
+      });
+    } catch {
+      // ignore
+    }
+  };
+
+  const handlePromptDeleteFile = () => {
+    if (!viewingFile) return;
+    setDeleteFileMessage(`Delete ${viewingFile.name}`);
+    setDeleteFileModalVisible(true);
+  };
+
+  const handleExecuteDeleteFile = async () => {
+    if (!repo || !viewingFile) return;
+    setIsDeletingFile(true);
+
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.deleteFile(
+      owner,
+      name,
+      viewingFile.path,
+      deleteFileMessage.trim() || `Delete ${viewingFile.name}`,
+      viewingFile.sha,
+      selectedBranch
+    );
+
+    setIsDeletingFile(false);
+
+    if (res.success) {
+      const deletedName = viewingFile.name;
+      setDeleteFileModalVisible(false);
+      setViewingFile(null);
+      setFileContent('');
+      setShowingFileHistory(false);
+      showDialog({
+        title: 'File Deleted 🗑️',
+        message: `Successfully deleted "${deletedName}" and pushed commit to branch "${selectedBranch}".`,
+        type: 'success',
+        icon: '✅',
+        buttons: [{ text: 'OK', style: 'success', onPress: hideDialog }],
+      });
+      // Refresh directory tree
+      navigateToDirectory(currentPath);
+    } else {
+      showDialog({
+        title: 'Delete Failed ⚠️',
+        message: res.message || 'Could not delete file from repository.',
+        type: 'danger',
+        icon: '⚠️',
+        buttons: [{ text: 'Dismiss', style: 'primary', onPress: hideDialog }],
+      });
+    }
+  };
+
   const lastBackRef = useRef(0);
 
   const handleBackAction = useCallback((): boolean => {
@@ -723,7 +823,15 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       return true;
     }
 
-    // 3. Dismiss mobile commit modal
+    // 3. Dismiss file deletion modal
+    if (deleteFileModalVisible) {
+      if (!isDeletingFile) {
+        setDeleteFileModalVisible(false);
+      }
+      return true;
+    }
+
+    // 4. Dismiss mobile commit modal
     if (commitModalVisible) {
       if (!isPushing) {
         setCommitModalVisible(false);
@@ -731,13 +839,25 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       return true;
     }
 
-    // 4. Dismiss branch switcher modal
+    // 5. Dismiss branch switcher modal
     if (branchModalVisible) {
       setBranchModalVisible(false);
       return true;
     }
 
-    // 5. Code editor active -> prompt if dirty or cancel editing
+    // 6. If selected commit detail card is open (either from Commits tab or File History)
+    if (selectedCommit) {
+      setSelectedCommit(null);
+      return true;
+    }
+
+    // 7. If in file history view -> return to file content view
+    if (showingFileHistory) {
+      setShowingFileHistory(false);
+      return true;
+    }
+
+    // 8. Code editor active -> prompt if dirty or cancel editing
     if (isEditing) {
       if (editContent !== fileContent) {
         showDialog({
@@ -763,46 +883,44 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       return true;
     }
 
-    // 6. Viewing a file (file content viewer) -> return to current folder level
+    // 9. Viewing a file (file content viewer) -> return to current folder level
     if (viewingFile) {
       setViewingFile(null);
       setFileSearchQuery('');
+      setShowingFileHistory(false);
       return true;
     }
 
-    // 7. Viewing commit details -> return to commits list
-    if (selectedCommit) {
-      setSelectedCommit(null);
-      return true;
-    }
-
-    // 8. Filter active on directory tree -> clear filter first
+    // 10. Filter active on directory tree -> clear filter first
     if (activeTab === 'code' && codeFilterQuery.trim() !== '') {
       setCodeFilterQuery('');
       return true;
     }
 
-    // 9. Inside a subdirectory (Code tab) -> navigate up one level
+    // 11. Inside a subdirectory (Code tab) -> navigate up one level
     if (activeTab === 'code' && currentPath !== '') {
       navigateUp();
       return true;
     }
 
-    // 10. Root level of repository modal -> close modal
+    // 12. Root level of repository modal -> close modal
     onClose();
     return true;
   }, [
     dialogConfig.visible,
     safetyModalVisible,
     isDeletingRepo,
+    deleteFileModalVisible,
+    isDeletingFile,
     commitModalVisible,
     isPushing,
     branchModalVisible,
+    selectedCommit,
+    showingFileHistory,
     isEditing,
     editContent,
     fileContent,
     viewingFile,
-    selectedCommit,
     activeTab,
     codeFilterQuery,
     currentPath,
@@ -832,6 +950,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const isDeepNav = Boolean(
     viewingFile ||
     isEditing ||
+    showingFileHistory ||
     selectedCommit ||
     (activeTab === 'code' && currentPath !== '')
   );
@@ -1169,34 +1288,76 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             : ''}
                         </Text>
 
-                        {!isBinaryFile(viewingFile, fileContent) && (
-                          isEditing ? (
-                            <TouchableOpacity
-                              style={styles.pushActionBtn}
-                              onPress={() => {
-                                setCommitMessage(`Update ${viewingFile.name}`);
-                                setCommitDescription('');
-                                setCommitModalVisible(true);
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.pushActionBtnText}>Push 🚀</Text>
-                            </TouchableOpacity>
-                          ) : (
-                            <TouchableOpacity
-                              style={styles.editFileBtn}
-                              onPress={() => {
-                                setEditContent(fileContent);
-                                setIsEditing(true);
-                              }}
-                              activeOpacity={0.7}
-                            >
-                              <Text style={styles.editFileBtnText}>✏️ Edit</Text>
-                            </TouchableOpacity>
-                          )
+                        {isEditing && (
+                          <TouchableOpacity
+                            style={styles.pushActionBtn}
+                            onPress={() => {
+                              setCommitMessage(`Update ${viewingFile.name}`);
+                              setCommitDescription('');
+                              setCommitModalVisible(true);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.pushActionBtnText}>Push 🚀</Text>
+                          </TouchableOpacity>
                         )}
                       </View>
                     </View>
+
+                    {/* File Actions Bar: Edit, History, Share, Delete */}
+                    {!isEditing && (
+                      <View style={styles.fileActionsBar}>
+                        {!isBinaryFile(viewingFile, fileContent) && (
+                          <TouchableOpacity
+                            style={styles.fileActionBtn}
+                            onPress={() => {
+                              setEditContent(fileContent);
+                              setIsEditing(true);
+                            }}
+                            activeOpacity={0.7}
+                          >
+                            <Text style={styles.fileActionBtnText}>✏️ Edit</Text>
+                          </TouchableOpacity>
+                        )}
+
+                        <TouchableOpacity
+                          style={[
+                            styles.fileActionBtn,
+                            showingFileHistory && styles.fileActionBtnActive,
+                          ]}
+                          onPress={() => {
+                            if (showingFileHistory) {
+                              setShowingFileHistory(false);
+                            } else {
+                              loadFileHistory(viewingFile.path);
+                            }
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.fileActionBtnText}>
+                            {showingFileHistory ? '📄 View Code' : '🕒 History'}
+                          </Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={styles.fileActionBtn}
+                          onPress={handleShareFile}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.fileActionBtnText}>🔗 Share</Text>
+                        </TouchableOpacity>
+
+                        <TouchableOpacity
+                          style={[styles.fileActionBtn, styles.fileActionBtnDanger]}
+                          onPress={handlePromptDeleteFile}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={[styles.fileActionBtnText, styles.fileActionBtnDangerText]}>
+                            🗑️ Delete
+                          </Text>
+                        </TouchableOpacity>
+                      </View>
+                    )}
 
                     {isEditing ? (
                       <View style={styles.editorWrapper}>
@@ -1224,6 +1385,91 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                           placeholder="Type code here..."
                           placeholderTextColor={colors.textMuted}
                         />
+                      </View>
+                    ) : showingFileHistory ? (
+                      <View style={styles.fileHistoryContainer}>
+                        {selectedCommit ? (
+                          <View style={styles.commitDetailCard}>
+                            <TouchableOpacity
+                              onPress={() => setSelectedCommit(null)}
+                              style={styles.backButton}
+                            >
+                              <Text style={styles.backButtonText}>← Back to file history</Text>
+                            </TouchableOpacity>
+
+                            <Text style={styles.commitDetailMsg}>
+                              {selectedCommit.commit.message}
+                            </Text>
+
+                            <View style={styles.commitShaRow}>
+                              <Text style={styles.shaBadge}>
+                                {selectedCommit.sha.substring(0, 7)}
+                              </Text>
+                              <Text style={styles.commitAuthor}>
+                                {selectedCommit.commit.author.name} ·{' '}
+                                {formatLocalDateTime(selectedCommit.commit.author.date)}
+                              </Text>
+                            </View>
+
+                            {selectedCommit.stats && (
+                              <View style={styles.diffStatsRow}>
+                                <Text style={styles.diffAdd}>
+                                  +{selectedCommit.stats.additions}
+                                </Text>
+                                <Text style={styles.diffDel}>
+                                  -{selectedCommit.stats.deletions}
+                                </Text>
+                                <Text style={styles.diffTotal}>
+                                  {selectedCommit.stats.total} lines changed
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        ) : fileCommitsLoading ? (
+                          <View style={styles.fileHistoryLoading}>
+                            <ActivityIndicator size="small" color={colors.primary} />
+                            <Text style={styles.fileHistoryLoadingText}>
+                              Loading commit history for {viewingFile.name}...
+                            </Text>
+                          </View>
+                        ) : fileCommits.length === 0 ? (
+                          <View style={styles.emptyCard}>
+                            <Text style={styles.emptyDetailText}>
+                              No recent commits found touching "{viewingFile.name}".
+                            </Text>
+                          </View>
+                        ) : (
+                          <View style={styles.fileCommitsList}>
+                            <View style={styles.fileHistoryBanner}>
+                              <Text style={styles.fileHistoryBannerText}>
+                                🕒 Commits modifying <Text style={{ fontWeight: '700', color: colors.textPrimary }}>{viewingFile.name}</Text> ({fileCommits.length})
+                              </Text>
+                            </View>
+                            {fileCommits.map((c) => (
+                              <TouchableOpacity
+                                key={c.sha}
+                                style={styles.commitItem}
+                                onPress={() => setSelectedCommit(c)}
+                                activeOpacity={0.7}
+                              >
+                                <View style={styles.commitHeaderRow}>
+                                  <Text style={styles.commitShaBadge}>
+                                    {c.sha ? c.sha.substring(0, 7) : ''}
+                                  </Text>
+                                  <Text style={styles.commitDate}>
+                                    {c.commit?.author?.date ? formatRepoTimestamp(c.commit.author.date) : ''}
+                                  </Text>
+                                </View>
+                                <Text style={styles.commitMessage} numberOfLines={2}>
+                                  {c.commit?.message || 'No commit message'}
+                                </Text>
+                                <Text style={styles.commitAuthorLine}>
+                                  by {c.commit?.author?.name || 'unknown'}
+                                </Text>
+                              </TouchableOpacity>
+                            ))}
+                          </View>
+                        )}
                       </View>
                     ) : isBinaryFile(viewingFile, fileContent) ? (
                       <View style={styles.binaryCard}>
@@ -2100,6 +2346,93 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
           </View>
         </Modal>
 
+        {/* Mobile Git Delete File Modal */}
+        <Modal
+          visible={deleteFileModalVisible}
+          animationType="fade"
+          transparent
+          onRequestClose={() => {
+            if (!isDeletingFile) setDeleteFileModalVisible(false);
+          }}
+        >
+          <View style={styles.commitModalOverlay}>
+            <View style={styles.commitModalCard}>
+              <View style={styles.commitModalHeader}>
+                <View style={styles.commitModalHeaderTitleRow}>
+                  <Text style={styles.commitModalHeaderIcon}>🗑️</Text>
+                  <Text style={[styles.commitModalTitle, { color: colors.ruby }]}>Delete File</Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => {
+                    if (!isDeletingFile) setDeleteFileModalVisible(false);
+                  }}
+                  disabled={isDeletingFile}
+                  style={styles.safetyCloseBtn}
+                >
+                  <Text style={styles.safetyCloseText}>✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              <View style={styles.commitTargetCard}>
+                <Text style={styles.commitTargetPath} numberOfLines={1}>
+                  📄 {viewingFile?.path}
+                </Text>
+                <View style={styles.commitBranchRow}>
+                  <Text style={styles.commitBranchLabel}>Target Branch:</Text>
+                  <View style={styles.commitBranchBadge}>
+                    <Text style={styles.commitBranchBadgeText}>🌿 {selectedBranch}</Text>
+                  </View>
+                </View>
+              </View>
+
+              <Text style={styles.commitInputLabel}>Commit Message *</Text>
+              <TextInput
+                style={styles.commitMessageInput}
+                value={deleteFileMessage}
+                onChangeText={setDeleteFileMessage}
+                placeholder={`Delete ${viewingFile?.name || 'file'}`}
+                placeholderTextColor={colors.textMuted}
+                autoCapitalize="sentences"
+                editable={!isDeletingFile}
+              />
+
+              <View style={[styles.commitWarningBox, { borderColor: colors.rubyMuted, backgroundColor: colors.rubyMuted + '18' }]}>
+                <Text style={[styles.commitWarningText, { color: colors.ruby }]}>
+                  ⚠️ This action will commit and push the permanent deletion of this file directly to branch <Text style={{ fontWeight: 'bold' }}>{selectedBranch}</Text>.
+                </Text>
+              </View>
+
+              <View style={styles.commitModalActions}>
+                <TouchableOpacity
+                  style={styles.commitCancelBtn}
+                  onPress={() => setDeleteFileModalVisible(false)}
+                  disabled={isDeletingFile}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.commitCancelBtnText}>Cancel</Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={[
+                    styles.commitSubmitBtn,
+                    { backgroundColor: colors.ruby },
+                    (!deleteFileMessage.trim() || isDeletingFile) && styles.commitSubmitBtnDisabled,
+                  ]}
+                  onPress={handleExecuteDeleteFile}
+                  disabled={!deleteFileMessage.trim() || isDeletingFile}
+                  activeOpacity={0.8}
+                >
+                  {isDeletingFile ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.commitSubmitBtnText}>Push Deletion 🚀</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
         {/* App-Themed Pop-Up Dialog */}
         <ThemedDialog
           visible={dialogConfig.visible}
@@ -2410,6 +2743,69 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 12,
     fontWeight: '700',
+  },
+  fileActionsBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 8,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 8,
+    backgroundColor: colors.card,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+  },
+  fileActionBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.cardElevated,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  fileActionBtnActive: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  fileActionBtnText: {
+    color: colors.textPrimary,
+    fontSize: 12,
+    fontWeight: '600',
+  },
+  fileActionBtnDanger: {
+    borderColor: colors.rubyMuted,
+    backgroundColor: colors.rubyMuted + '18',
+  },
+  fileActionBtnDangerText: {
+    color: colors.ruby,
+  },
+  fileHistoryContainer: {
+    padding: Spacing.md,
+  },
+  fileHistoryLoading: {
+    padding: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  fileHistoryLoadingText: {
+    color: colors.textMuted,
+    fontSize: 13,
+    marginTop: 8,
+  },
+  fileHistoryBanner: {
+    paddingVertical: 8,
+    paddingHorizontal: 4,
+    marginBottom: 8,
+  },
+  fileHistoryBannerText: {
+    color: colors.textSecondary,
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  fileCommitsList: {
+    gap: 8,
   },
   editorWrapper: {
     backgroundColor: colors.codeBackground,

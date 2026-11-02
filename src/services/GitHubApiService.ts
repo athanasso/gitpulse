@@ -806,6 +806,99 @@ class GitHubApiServiceClass {
   }
 
   /**
+   * Delete a file via git commit
+   */
+  async deleteFile(
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    sha?: string,
+    branch?: string
+  ): Promise<{ success: boolean; message?: string }> {
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.deleteFile(
+        owner,
+        repo,
+        path,
+        message,
+        sha,
+        branch
+      );
+    }
+
+    if (!this.isAuthenticated()) {
+      return {
+        success: false,
+        message: 'Personal Access Token required with repo scope to delete files.',
+      };
+    }
+
+    try {
+      let fileSha = sha;
+      if (!fileSha) {
+        const queryRef = branch ? `?ref=${encodeURIComponent(branch)}` : '';
+        const metaRes = await fetch(
+          `https://api.github.com/repos/${owner}/${repo}/contents/${path}${queryRef}`,
+          {
+            headers: {
+              ...this.getHeaders(),
+              Accept: 'application/vnd.github.v3+json',
+            },
+          }
+        );
+        if (metaRes.ok) {
+          const metaData = await metaRes.json();
+          fileSha = metaData.sha;
+        }
+      }
+
+      const bodyPayload: Record<string, any> = {
+        message: message.trim() || `Delete ${path.split('/').pop() || path}`,
+      };
+      if (fileSha) bodyPayload.sha = fileSha;
+      if (branch) bodyPayload.branch = branch;
+
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/contents/${path}`,
+        {
+          method: 'DELETE',
+          headers: {
+            ...this.getHeaders(),
+            Accept: 'application/vnd.github.v3+json',
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify(bodyPayload),
+        }
+      );
+
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        return {
+          success: true,
+          message: 'File deleted and commit pushed successfully!',
+        };
+      } else {
+        const errMsg =
+          data.message ||
+          (res.status === 409
+            ? 'Conflict: file has been modified concurrently. Reload and try again.'
+            : res.status === 403
+            ? 'Delete denied: ensure your PAT has write/repo permissions.'
+            : `HTTP ${res.status}: Failed to delete file.`);
+        return { success: false, message: errMsg };
+      }
+    } catch (e: any) {
+      console.warn('deleteFile error', e);
+      return {
+        success: false,
+        message: e?.message || 'Network error occurred while deleting file.',
+      };
+    }
+  }
+
+  /**
    * Fetch commit history for a repository with pagination
    */
   async getRepoCommits(
@@ -813,18 +906,20 @@ class GitHubApiServiceClass {
     repo: string,
     branch?: string,
     page: number = 1,
-    per_page: number = 30
+    per_page: number = 30,
+    path?: string
   ): Promise<GitHubCommit[]> {
     await this.ensureInit();
     const active = AccountService.getActiveAccount();
     if (active && active.provider !== 'github') {
-      return (await GitService.getRepoCommits(owner, repo, branch, page, per_page)) as GitHubCommit[];
+      return (await GitService.getRepoCommits(owner, repo, branch, page, per_page, path)) as GitHubCommit[];
     }
 
     try {
       const queryBranch = branch ? `&sha=${encodeURIComponent(branch)}` : '';
+      const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
       const res = await fetch(
-        `https://api.github.com/repos/${owner}/${repo}/commits?page=${page}&per_page=${per_page}${queryBranch}`,
+        `https://api.github.com/repos/${owner}/${repo}/commits?page=${page}&per_page=${per_page}${queryBranch}${queryPath}`,
         { headers: this.getHeaders() }
       );
 

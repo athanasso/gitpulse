@@ -213,11 +213,13 @@ export class GitLabProvider implements IGitProvider {
     repo: string,
     branch: string = 'main',
     page: number = 1,
-    perPage: number = 30
+    perPage: number = 30,
+    path?: string
   ): Promise<UnifiedCommit[]> {
     const api = this.getApiUrl(hostUrl);
     const projId = this.getProjectIdentifier(owner, repo);
-    const url = `${api}/projects/${projId}/repository/commits?ref_name=${encodeURIComponent(branch)}&page=${page}&per_page=${perPage}`;
+    const queryPath = path ? `&path=${encodeURIComponent(path)}` : '';
+    const url = `${api}/projects/${projId}/repository/commits?ref_name=${encodeURIComponent(branch)}&page=${page}&per_page=${perPage}${queryPath}`;
     const res = await fetch(url, { headers: this.getHeaders(token) });
     if (!res.ok) return [];
     const list = await res.json();
@@ -433,6 +435,42 @@ export class GitLabProvider implements IGitProvider {
       return { success: true, commitSha: data.file_path };
     }
     return { success: false, message: data.message || `HTTP ${res.status}` };
+  }
+
+  async deleteFile(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    path: string,
+    message: string,
+    _sha?: string,
+    branch: string = 'main'
+  ): Promise<{ success: boolean; message?: string }> {
+    const api = this.getApiUrl(hostUrl);
+    const projId = this.getProjectIdentifier(owner, repo);
+    const url = `${api}/projects/${projId}/repository/files/${encodeURIComponent(path)}`;
+
+    const res = await fetch(url, {
+      method: 'DELETE',
+      headers: {
+        ...this.getHeaders(token),
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        branch,
+        commit_message: message.trim() || `Delete ${path}`,
+      }),
+    });
+
+    if (res.ok || res.status === 204) {
+      return { success: true };
+    }
+    const err = await res.json().catch(() => ({}));
+    return {
+      success: false,
+      message: err.message || `Failed to delete file (${res.status})`,
+    };
   }
 }
 
