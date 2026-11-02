@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -11,6 +11,7 @@ import {
   Linking,
   FlatList,
   TextInput,
+  BackHandler,
 } from 'react-native';
 import { ThemePalette, Spacing } from '../constants/theme';
 import { useTheme } from '../context/ThemeContext';
@@ -632,7 +633,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     }
   };
 
-  const navigateToDirectory = async (dirPath: string) => {
+  const navigateToDirectory = useCallback(async (dirPath: string) => {
     if (!repo) return;
     setLoading(true);
     setCurrentPath(dirPath);
@@ -647,15 +648,15 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     );
     setFileTree(tree);
     setLoading(false);
-  };
+  }, [repo, getRepoOwnerAndName, selectedBranch]);
 
-  const navigateUp = async () => {
+  const navigateUp = useCallback(async () => {
     if (!currentPath) return;
     const parts = currentPath.split('/');
     parts.pop();
     const parentPath = parts.join('/');
     await navigateToDirectory(parentPath);
-  };
+  }, [currentPath, navigateToDirectory]);
 
   const openFile = async (item: GitHubFileItem) => {
     if (!repo) return;
@@ -699,7 +700,141 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     }
   };
 
+  const lastBackRef = useRef(0);
+
+  const handleBackAction = useCallback((): boolean => {
+    const now = Date.now();
+    if (now - lastBackRef.current < 250) {
+      return true;
+    }
+    lastBackRef.current = now;
+
+    // 1. Dismiss active custom alert/confirmation dialog
+    if (dialogConfig.visible) {
+      hideDialog();
+      return true;
+    }
+
+    // 2. Dismiss repo deletion confirmation modal
+    if (safetyModalVisible) {
+      if (!isDeletingRepo) {
+        setSafetyModalVisible(false);
+      }
+      return true;
+    }
+
+    // 3. Dismiss mobile commit modal
+    if (commitModalVisible) {
+      if (!isPushing) {
+        setCommitModalVisible(false);
+      }
+      return true;
+    }
+
+    // 4. Dismiss branch switcher modal
+    if (branchModalVisible) {
+      setBranchModalVisible(false);
+      return true;
+    }
+
+    // 5. Code editor active -> prompt if dirty or cancel editing
+    if (isEditing) {
+      if (editContent !== fileContent) {
+        showDialog({
+          title: 'Discard Changes?',
+          message: 'You have unsaved changes in this file. Are you sure you want to discard them?',
+          type: 'warning',
+          buttons: [
+            { text: 'Keep Editing', style: 'cancel' },
+            {
+              text: 'Discard',
+              style: 'destructive',
+              onPress: () => {
+                setIsEditing(false);
+                setEditContent('');
+              },
+            },
+          ],
+        });
+      } else {
+        setIsEditing(false);
+        setEditContent('');
+      }
+      return true;
+    }
+
+    // 6. Viewing a file (file content viewer) -> return to current folder level
+    if (viewingFile) {
+      setViewingFile(null);
+      setFileSearchQuery('');
+      return true;
+    }
+
+    // 7. Viewing commit details -> return to commits list
+    if (selectedCommit) {
+      setSelectedCommit(null);
+      return true;
+    }
+
+    // 8. Filter active on directory tree -> clear filter first
+    if (activeTab === 'code' && codeFilterQuery.trim() !== '') {
+      setCodeFilterQuery('');
+      return true;
+    }
+
+    // 9. Inside a subdirectory (Code tab) -> navigate up one level
+    if (activeTab === 'code' && currentPath !== '') {
+      navigateUp();
+      return true;
+    }
+
+    // 10. Root level of repository modal -> close modal
+    onClose();
+    return true;
+  }, [
+    dialogConfig.visible,
+    safetyModalVisible,
+    isDeletingRepo,
+    commitModalVisible,
+    isPushing,
+    branchModalVisible,
+    isEditing,
+    editContent,
+    fileContent,
+    viewingFile,
+    selectedCommit,
+    activeTab,
+    codeFilterQuery,
+    currentPath,
+    hideDialog,
+    showDialog,
+    navigateUp,
+    onClose,
+  ]);
+
+  useEffect(() => {
+    if (!visible) return;
+
+    const onBackPress = () => {
+      handleBackAction();
+      return true;
+    };
+
+    const subscription = BackHandler.addEventListener(
+      'hardwareBackPress',
+      onBackPress
+    );
+    return () => subscription.remove();
+  }, [visible, handleBackAction]);
+
   if (!repo) return null;
+
+  const isDeepNav = Boolean(
+    viewingFile ||
+    isEditing ||
+    selectedCommit ||
+    (activeTab === 'code' && currentPath !== '')
+  );
 
   // Language Breakdown Calculations
   const totalBytes = Object.values(languages).reduce((sum, b) => sum + b, 0);
@@ -713,19 +848,29 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     .sort((a, b) => b.bytes - a.bytes);
 
   return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
+    <Modal visible={visible} animationType="slide" onRequestClose={() => { handleBackAction(); }}>
       <View style={styles.container}>
         {/* Header Bar */}
         <View style={styles.header}>
-          <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-            <Text style={styles.closeButtonText}>✕</Text>
+          <TouchableOpacity
+            onPress={handleBackAction}
+            style={styles.closeButton}
+            accessibilityLabel={isDeepNav ? 'Go back' : 'Close repository modal'}
+          >
+            <Text style={styles.closeButtonText}>{isDeepNav ? '←' : '✕'}</Text>
           </TouchableOpacity>
 
           <View style={styles.headerTitleBox}>
             <Text style={styles.repoName} numberOfLines={1}>
               {repo.name}
             </Text>
-            <Text style={styles.repoOwner}>{repo.owner.login}</Text>
+            <Text style={styles.repoOwner} numberOfLines={1}>
+              {viewingFile
+                ? viewingFile.path
+                : currentPath
+                ? `/${currentPath}`
+                : repo.owner.login}
+            </Text>
           </View>
 
           {/* Star & Share Buttons */}
@@ -748,6 +893,38 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
             <TouchableOpacity onPress={handleShare} style={styles.iconButton}>
               <Text style={styles.actionIcon}>🔗</Text>
             </TouchableOpacity>
+
+            {isDeepNav && (
+              <TouchableOpacity
+                onPress={() => {
+                  if (isEditing && editContent !== fileContent) {
+                    showDialog({
+                      title: 'Discard Changes?',
+                      message: 'You have unsaved changes. Discard and exit repository?',
+                      type: 'warning',
+                      buttons: [
+                        { text: 'Keep Editing', style: 'cancel' },
+                        {
+                          text: 'Discard & Close',
+                          style: 'destructive',
+                          onPress: () => {
+                            setIsEditing(false);
+                            setEditContent('');
+                            onClose();
+                          },
+                        },
+                      ],
+                    });
+                    return;
+                  }
+                  onClose();
+                }}
+                style={styles.iconButton}
+                accessibilityLabel="Close repository"
+              >
+                <Text style={styles.actionIcon}>✕</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -975,34 +1152,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                   <View style={styles.fileViewer}>
                     <View style={styles.fileViewerHeader}>
                       <TouchableOpacity
-                        onPress={() => {
-                          if (isEditing) {
-                            if (editContent !== fileContent) {
-                              showDialog({
-                                title: 'Discard Changes?',
-                                message: 'You have unsaved changes in this file. Are you sure you want to discard them?',
-                                type: 'warning',
-                                buttons: [
-                                  { text: 'Keep Editing', style: 'cancel' },
-                                  {
-                                    text: 'Discard',
-                                    style: 'destructive',
-                                    onPress: () => {
-                                      setIsEditing(false);
-                                      setEditContent('');
-                                    },
-                                  },
-                                ],
-                              });
-                              return;
-                            }
-                            setIsEditing(false);
-                            setEditContent('');
-                            return;
-                          }
-                          setViewingFile(null);
-                          setFileSearchQuery('');
-                        }}
+                        onPress={handleBackAction}
                         style={styles.backButton}
                       >
                         <Text style={styles.backButtonText}>
@@ -1289,7 +1439,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 {selectedCommit ? (
                   <View style={styles.commitDetailCard}>
                     <TouchableOpacity
-                      onPress={() => setSelectedCommit(null)}
+                      onPress={handleBackAction}
                       style={styles.backButton}
                     >
                       <Text style={styles.backButtonText}>← Back to commits</Text>
