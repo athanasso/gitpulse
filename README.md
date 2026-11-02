@@ -37,6 +37,12 @@
   - Active workspace automatically dispatches repo lists, commit logs, branches, and tree navigation.
   - Robust singleton persistence across app launches and restarts.
   - **Auto-Configured Token Redirects & Scope Guide**: 1-tap token creation shortcut automatically pre-selects required scopes in GitHub and GitLab URLs, while a visible in-app permissions breakdown guides setup across GitHub, GitLab, Gitea, and Bitbucket.
+- **🔍 Live Token Permissions Inspector**:
+  - Live inspection card displays active token permissions tailored to the current git provider.
+  - Verification badges: `✓ GRANTED` (emerald), `✕ MISSING` (ruby required), `⚠️ RECOMMENDED`, and `○ OPTIONAL`.
+  - Dynamic granted ratio pill badge (`4/4 Granted` vs `2/4 Granted`).
+  - High-precision detection: reads `x-oauth-scopes` on GitHub, `/personal_access_tokens/self` on GitLab, and REST permission probing on Gitea and Bitbucket.
+  - Dynamic `Manage on <Forge> ↗` links opening token settings on the correct cloud or self-hosted instance.
 
 ### 2. 💻 In-App Mobile Code Editor & Direct Push
 - **Edit on the Go**: Tap `[ ✏️ Edit ]` on any text/code file in the Code tab to open the full mobile editor.
@@ -122,6 +128,10 @@
   - Toggle visibility: Overview Metrics, 52-Week Contribution Heatmap, Pinned Repositories, Profile README, and Subtabs.
 - **Compact vs Spacious Density**: Choose between dense code review cards or spacious browsing.
 - **Default Subtab Configuration**: Customize default landing tabs for Repositories and Profiles.
+- **⭐ Starred Repositories with GitHub-Parity Sorting**:
+  - Defaults to sorting by when repositories were starred (`sort=created&direction=desc`), matching GitHub.com 1:1.
+  - Interactive `[ ⭐ Starred ]` vs `[ 🕒 Active ]` switcher to toggle between recently starred and recently pushed repositories.
+  - Complete pagination with live page counters and total count badges.
 
 ### 12. 🌲 Tree Explorer, Live Search & Monospace Code Viewer
 - Directory navigation with breadcrumb path history and instant folder filtering.
@@ -166,6 +176,8 @@
 
 ### 19. 🔔 Notifications Inbox & Sleep Prevention
 - Thread triage for review requests, issue assignments, and commit mentions.
+- **Forge-Adaptive Permission Warnings**: Alerts when tokens lack required notification scopes, dynamically indicating `notifications` (GitHub), `api` (GitLab), `read:notification` (Gitea), or `account:read` (Bitbucket).
+- 1-tap `Edit Permissions on <Forge> ↗` button navigates directly to account settings.
 - `expo-keep-awake` prevents device screen timeout during long code reviews.
 
 ---
