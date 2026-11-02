@@ -25,6 +25,7 @@ import {
   GitHubBranch,
   GitHubRelease,
   GitHubContributor,
+  GitHubIssueComment,
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { CacheService, CacheKeys } from '../services/CacheService';
@@ -377,6 +378,20 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setExpandedIssues((prev) => ({ ...prev, [id]: !prev[id] }));
   };
 
+  // Issue / PR Comments & Actions
+  const [selectedIssueForComments, setSelectedIssueForComments] = useState<{
+    number: number;
+    title: string;
+    type: 'issue' | 'pr';
+    state: string;
+  } | null>(null);
+  const [issueComments, setIssueComments] = useState<GitHubIssueComment[]>([]);
+  const [commentsLoading, setCommentsLoading] = useState(false);
+  const [newCommentText, setNewCommentText] = useState('');
+  const [postingComment, setPostingComment] = useState(false);
+  const [closingIssue, setClosingIssue] = useState(false);
+  const [showDiffInCommitModal, setShowDiffInCommitModal] = useState(true);
+
   // Insights
   const [languages, setLanguages] = useState<Record<string, number>>({});
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
@@ -408,6 +423,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       setCurrentPath('');
       setViewingFile(null);
       setSelectedCommit(null);
+      setSelectedIssueForComments(null);
+      setIssueComments([]);
+      setNewCommentText('');
       if (settings.defaultRepoDetailTab) {
         setActiveTab(settings.defaultRepoDetailTab);
       }
@@ -748,6 +766,116 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     setLoadingMoreIssues(false);
   };
 
+  const loadIssueComments = async (issueNumber: number) => {
+    if (!repo) return;
+    setCommentsLoading(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const comments = await GitHubApiService.getIssueComments(owner, name, issueNumber);
+    setIssueComments(comments);
+    setCommentsLoading(false);
+  };
+
+  const handlePostComment = async () => {
+    if (!newCommentText.trim() || !repo || !selectedIssueForComments || postingComment) return;
+    setPostingComment(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const res = await GitHubApiService.postIssueComment(
+      owner,
+      name,
+      selectedIssueForComments.number,
+      newCommentText.trim()
+    );
+    if (res.success && res.comment) {
+      setIssueComments((prev) => [...prev, res.comment!]);
+      setNewCommentText('');
+    } else {
+      showDialog({
+        title: 'Error',
+        message: 'Failed to post comment. Check your permissions and token scopes.',
+        type: 'danger',
+        buttons: [{ text: 'OK', onPress: hideDialog }],
+      });
+    }
+    setPostingComment(false);
+  };
+
+  const handleToggleIssueState = async () => {
+    if (!repo || !selectedIssueForComments || closingIssue) return;
+    setClosingIssue(true);
+    const [owner, name] = getRepoOwnerAndName();
+    const isOpen = selectedIssueForComments.state === 'open';
+    const ok = isOpen
+      ? await GitHubApiService.closeIssueOrPR(
+          owner,
+          name,
+          selectedIssueForComments.number,
+          selectedIssueForComments.type
+        )
+      : await GitHubApiService.reopenIssueOrPR(
+          owner,
+          name,
+          selectedIssueForComments.number,
+          selectedIssueForComments.type
+        );
+
+    if (ok.success) {
+      const newState = isOpen ? 'closed' : 'open';
+      setSelectedIssueForComments((prev) => (prev ? { ...prev, state: newState } : null));
+      if (selectedIssueForComments.type === 'issue') {
+        setIssues((prev) =>
+          prev.map((i) =>
+            i.number === selectedIssueForComments.number ? { ...i, state: newState } : i
+          )
+        );
+      } else {
+        setPrs((prev) =>
+          prev.map((p) =>
+            p.number === selectedIssueForComments.number ? { ...p, state: newState } : p
+          )
+        );
+      }
+    } else {
+      showDialog({
+        title: 'Error',
+        message: `Failed to ${isOpen ? 'close' : 'reopen'} ${selectedIssueForComments.type}.`,
+        type: 'danger',
+        buttons: [{ text: 'OK', onPress: hideDialog }],
+      });
+    }
+    setClosingIssue(false);
+  };
+
+  // Pre-commit diff calculation
+  const commitDiffLines = useMemo(() => {
+    if (!isEditing || !fileContent) return [];
+    const oldLines = fileContent.split('\n');
+    const newLines = editContent.split('\n');
+    const maxLen = Math.max(oldLines.length, newLines.length);
+    const diffs: { type: 'add' | 'del' | 'ctx'; text: string; lineNo: number }[] = [];
+    for (let i = 0; i < maxLen; i++) {
+      const oldL = oldLines[i];
+      const newL = newLines[i];
+      if (oldL !== newL) {
+        if (oldL !== undefined) {
+          diffs.push({ type: 'del', text: oldL, lineNo: i + 1 });
+        }
+        if (newL !== undefined) {
+          diffs.push({ type: 'add', text: newL, lineNo: i + 1 });
+        }
+      }
+    }
+    return diffs;
+  }, [fileContent, editContent, isEditing]);
+
+  const commitDiffAdditions = useMemo(
+    () => commitDiffLines.filter((l) => l.type === 'add').length,
+    [commitDiffLines]
+  );
+  const commitDiffDeletions = useMemo(
+    () => commitDiffLines.filter((l) => l.type === 'del').length,
+    [commitDiffLines]
+  );
+
   const goToWorkflowRunsPage = async (newPage: number) => {
     if (!repo || loadingMoreRuns || newPage < 1) return;
     setLoadingMoreRuns(true);
@@ -796,6 +924,9 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
     } else if (activeTab === 'commits') {
       setLoading(true);
       setSelectedCommit(null);
+      setSelectedIssueForComments(null);
+      setIssueComments([]);
+      setNewCommentText('');
       setCommitsPage(1);
       const cList = await GitHubApiService.getRepoCommits(
         owner,
@@ -886,7 +1017,16 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
         item.path,
         selectedBranch
       );
-      setFileContent(typeof content === 'string' ? content : '');
+      const raw = typeof content === 'string' ? content : '';
+      const MAX_PREVIEW_BYTES = 1024 * 1024; // 1MB limit for safe mobile rendering
+      if (raw.length > MAX_PREVIEW_BYTES) {
+        setFileContent(
+          raw.slice(0, 500000) +
+            '\n\n// ⚠️ File exceeds 1MB. Truncated for smooth mobile rendering & editor stability.'
+        );
+      } else {
+        setFileContent(raw);
+      }
     } catch (e) {
       console.warn('Failed to load file content', e);
       setFileContent('');
@@ -1038,7 +1178,13 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       return true;
     }
 
-    // 6. If selected commit detail card is open (either from Commits tab or File History)
+    // 6. If issue/PR comments drawer is open
+    if (selectedIssueForComments) {
+      setSelectedIssueForComments(null);
+      return true;
+    }
+
+    // 7. If selected commit detail card is open (either from Commits tab or File History)
     if (selectedCommit) {
       setSelectedCommit(null);
       return true;
@@ -2094,6 +2240,24 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             <Text style={styles.diffDel}>-{p.deletions}</Text>
                           </View>
                         )}
+
+                        <TouchableOpacity
+                          style={styles.discussionButton}
+                          onPress={() => {
+                            setSelectedIssueForComments({
+                              number: p.number,
+                              title: p.title,
+                              type: 'pr',
+                              state: p.state,
+                            });
+                            loadIssueComments(p.number);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.discussionButtonText}>
+                            💬 Discussion & Comments ({p.comments || 0}) ↗
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ))
                 ) : (
@@ -2144,6 +2308,24 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                             )}
                           </TouchableOpacity>
                         )}
+
+                        <TouchableOpacity
+                          style={styles.discussionButton}
+                          onPress={() => {
+                            setSelectedIssueForComments({
+                              number: i.number,
+                              title: i.title,
+                              type: 'issue',
+                              state: i.state,
+                            });
+                            loadIssueComments(i.number);
+                          }}
+                          activeOpacity={0.7}
+                        >
+                          <Text style={styles.discussionButtonText}>
+                            💬 Discussion & Comments ({i.comments || 0}) ↗
+                          </Text>
+                        </TouchableOpacity>
                       </View>
                     ))
                 ) : (
@@ -2207,7 +2389,7 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 ) : (
                   <View style={styles.emptyCard}>
                     <Text style={styles.emptyDetailText}>
-                      No GitHub Actions workflow runs found for this repository.
+                      No CI/CD pipeline runs found for this repository.
                     </Text>
                   </View>
                 )}
@@ -2871,6 +3053,68 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                 </View>
               </View>
 
+              {/* Pre-Commit Diff Summary & Review */}
+              <View style={styles.diffPreviewContainer}>
+                <TouchableOpacity
+                  style={styles.diffSummaryHeader}
+                  onPress={() => setShowDiffInCommitModal((prev) => !prev)}
+                  activeOpacity={0.7}
+                >
+                  <View style={styles.diffPills}>
+                    <Text style={styles.diffAdd}>+{commitDiffAdditions}</Text>
+                    <Text style={styles.diffDel}>-{commitDiffDeletions}</Text>
+                  </View>
+                  <Text style={styles.diffReviewToggleText}>
+                    {showDiffInCommitModal ? '▲ Hide Line Diff' : '▼ Review Line Diff'}
+                  </Text>
+                </TouchableOpacity>
+
+                {showDiffInCommitModal && (
+                  <ScrollView
+                    style={styles.diffLinesScrollView}
+                    nestedScrollEnabled
+                    showsVerticalScrollIndicator
+                  >
+                    {commitDiffLines.length === 0 ? (
+                      <Text style={styles.diffEmptyText}>No line changes detected</Text>
+                    ) : (
+                      commitDiffLines.slice(0, 35).map((l, idx) => (
+                        <View
+                          key={idx}
+                          style={[
+                            styles.diffLineRow,
+                            l.type === 'add' ? styles.diffLineRowAdd : styles.diffLineRowDel,
+                          ]}
+                        >
+                          <Text
+                            style={[
+                              styles.diffLinePrefix,
+                              l.type === 'add' ? styles.diffPrefixAdd : styles.diffPrefixDel,
+                            ]}
+                          >
+                            {l.type === 'add' ? '+' : '-'}
+                          </Text>
+                          <Text
+                            style={[
+                              styles.diffLineContent,
+                              l.type === 'add' ? styles.diffContentAdd : styles.diffContentDel,
+                            ]}
+                            numberOfLines={2}
+                          >
+                            {l.text || ' '}
+                          </Text>
+                        </View>
+                      ))
+                    )}
+                    {commitDiffLines.length > 35 && (
+                      <Text style={styles.diffMoreText}>
+                        ... and {commitDiffLines.length - 35} more changed lines
+                      </Text>
+                    )}
+                  </ScrollView>
+                )}
+              </View>
+
               <Text style={styles.commitInputLabel}>Commit Message *</Text>
               <TextInput
                 style={styles.commitMessageInput}
@@ -3011,6 +3255,136 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
                     <Text style={styles.commitSubmitBtnText}>Push Deletion 🚀</Text>
+                  )}
+                </TouchableOpacity>
+              </View>
+            </View>
+          </View>
+        </Modal>
+
+        {/* Issue / PR Discussion & Comments Modal */}
+        <Modal
+          visible={selectedIssueForComments !== null}
+          animationType="slide"
+          transparent
+          onRequestClose={() => setSelectedIssueForComments(null)}
+        >
+          <View style={styles.commentsModalContainer}>
+            <View style={styles.commentsModalContent}>
+              <View style={styles.commentsModalHeader}>
+                <TouchableOpacity
+                  style={styles.commentsBackBtn}
+                  onPress={() => {
+                    setSelectedIssueForComments(null);
+                    setIssueComments([]);
+                    setNewCommentText('');
+                  }}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.commentsBackText}>← Back</Text>
+                </TouchableOpacity>
+
+                <View style={styles.commentsHeaderTitleBox}>
+                  <Text style={styles.commentsModalTitle} numberOfLines={1}>
+                    #{selectedIssueForComments?.number} {selectedIssueForComments?.title}
+                  </Text>
+                  <Text style={styles.commentsModalSubtitle}>
+                    {selectedIssueForComments?.type === 'pr' ? 'Pull Request' : 'Issue'} ·{' '}
+                    <Text
+                      style={{
+                        color:
+                          selectedIssueForComments?.state === 'open'
+                            ? colors.emerald
+                            : colors.ruby,
+                        fontWeight: '700',
+                      }}
+                    >
+                      {(selectedIssueForComments?.state || '').toUpperCase()}
+                    </Text>
+                  </Text>
+                </View>
+
+                <TouchableOpacity
+                  style={[
+                    styles.stateToggleBtn,
+                    selectedIssueForComments?.state === 'open'
+                      ? styles.closeIssueBtn
+                      : styles.reopenIssueBtn,
+                  ]}
+                  onPress={handleToggleIssueState}
+                  disabled={closingIssue}
+                  activeOpacity={0.7}
+                >
+                  <Text style={styles.stateToggleBtnText}>
+                    {closingIssue
+                      ? '...'
+                      : selectedIssueForComments?.state === 'open'
+                      ? '✕ Close'
+                      : '↺ Reopen'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              <ScrollView
+                style={styles.commentsScrollView}
+                contentContainerStyle={{ padding: Spacing.md, paddingBottom: 24 }}
+              >
+                {commentsLoading ? (
+                  <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                    <ActivityIndicator size="small" color={colors.primary} />
+                    <Text style={[styles.emptySubText, { marginTop: 8 }]}>
+                      Loading discussion...
+                    </Text>
+                  </View>
+                ) : issueComments.length === 0 ? (
+                  <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                    <Text style={styles.emptySubText}>
+                      No comments yet on this discussion.
+                    </Text>
+                  </View>
+                ) : (
+                  issueComments.map((c) => (
+                    <View key={c.id} style={styles.commentItemCard}>
+                      <View style={styles.commentMetaRow}>
+                        <Text style={styles.commentAuthor}>@{c.user.login}</Text>
+                        <Text style={styles.commentTimestamp}>
+                          {formatRepoTimestamp(c.created_at)}
+                        </Text>
+                      </View>
+                      <Text style={styles.commentBodyText} selectable>
+                        {c.body}
+                      </Text>
+                    </View>
+                  ))
+                )}
+              </ScrollView>
+
+              {/* Reply Input Bar */}
+              <View style={styles.commentInputRow}>
+                <TextInput
+                  style={styles.commentTextInput}
+                  value={newCommentText}
+                  onChangeText={setNewCommentText}
+                  placeholder="Write a comment..."
+                  placeholderTextColor={colors.textMuted}
+                  multiline
+                  numberOfLines={2}
+                  editable={!postingComment}
+                />
+                <TouchableOpacity
+                  style={[
+                    styles.commentSendBtn,
+                    (!newCommentText.trim() || postingComment) &&
+                      styles.commentSendBtnDisabled,
+                  ]}
+                  onPress={handlePostComment}
+                  disabled={!newCommentText.trim() || postingComment}
+                  activeOpacity={0.7}
+                >
+                  {postingComment ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.commentSendBtnText}>Post</Text>
                   )}
                 </TouchableOpacity>
               </View>
@@ -4486,6 +4860,229 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 13,
     fontWeight: '800',
+    textAlign: 'center',
+  },
+  discussionButton: {
+    marginTop: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  discussionButtonText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  commentsModalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    justifyContent: 'flex-end',
+  },
+  commentsModalContent: {
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 18,
+    borderTopRightRadius: 18,
+    maxHeight: '85%',
+    minHeight: '60%',
+  },
+  commentsModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    gap: 8,
+  },
+  commentsBackBtn: {
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  commentsBackText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  commentsHeaderTitleBox: {
+    flex: 1,
+  },
+  commentsModalTitle: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: colors.textPrimary,
+  },
+  commentsModalSubtitle: {
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 2,
+  },
+  stateToggleBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 8,
+    borderWidth: 1,
+  },
+  closeIssueBtn: {
+    backgroundColor: 'rgba(239, 68, 68, 0.1)',
+    borderColor: 'rgba(239, 68, 68, 0.3)',
+  },
+  reopenIssueBtn: {
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  stateToggleBtnText: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  commentsScrollView: {
+    flex: 1,
+  },
+  commentItemCard: {
+    backgroundColor: colors.card,
+    borderRadius: 12,
+    padding: Spacing.md,
+    marginBottom: Spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  commentMetaRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  commentAuthor: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.primary,
+  },
+  commentTimestamp: {
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  commentBodyText: {
+    fontSize: 13,
+    color: colors.textPrimary,
+    lineHeight: 18,
+  },
+  commentInputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    padding: Spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    gap: 8,
+    backgroundColor: colors.card,
+  },
+  commentTextInput: {
+    flex: 1,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    color: colors.textPrimary,
+    fontSize: 13,
+    maxHeight: 90,
+  },
+  commentSendBtn: {
+    backgroundColor: colors.primary,
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  commentSendBtnDisabled: {
+    opacity: 0.35,
+  },
+  commentSendBtnText: {
+    fontSize: 13,
+    fontWeight: '800',
+    color: '#FFFFFF',
+  },
+  diffPreviewContainer: {
+    marginVertical: Spacing.sm,
+    backgroundColor: colors.cardElevated,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: 'hidden',
+  },
+  diffSummaryHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+  },
+  diffReviewToggleText: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.cyan,
+  },
+  diffLinesScrollView: {
+    maxHeight: 130,
+    borderTopWidth: 1,
+    borderTopColor: colors.cardBorder,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+  },
+  diffEmptyText: {
+    fontSize: 12,
+    fontStyle: 'italic',
+    color: colors.textMuted,
+    padding: 8,
+    textAlign: 'center',
+  },
+  diffLineRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 2,
+    paddingHorizontal: 4,
+    borderRadius: 4,
+    marginVertical: 1,
+  },
+  diffLineRowAdd: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  diffLineRowDel: {
+    backgroundColor: 'rgba(239, 68, 68, 0.12)',
+  },
+  diffLinePrefix: {
+    width: 14,
+    fontSize: 11,
+    fontFamily: 'monospace',
+    fontWeight: '700',
+  },
+  diffPrefixAdd: {
+    color: colors.emerald,
+  },
+  diffPrefixDel: {
+    color: colors.ruby,
+  },
+  diffLineContent: {
+    flex: 1,
+    fontSize: 11,
+    fontFamily: 'monospace',
+  },
+  diffContentAdd: {
+    color: colors.emerald,
+  },
+  diffContentDel: {
+    color: colors.ruby,
+  },
+  diffMoreText: {
+    fontSize: 11,
+    color: colors.textMuted,
+    fontStyle: 'italic',
+    padding: 4,
     textAlign: 'center',
   },
 });

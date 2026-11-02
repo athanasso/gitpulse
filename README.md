@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.8&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.9&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -170,12 +170,23 @@
 - Full commit logs with author avatars, timestamp formatting, and SHA badges.
 - Line-by-line diff inspection with green addition (`+`) and red deletion (`-`) highlights.
 
-### 15. 📊 52-Week Contribution Heatmap
-- Live contribution matrix derived from GitHub GraphQL API.
-- Day-by-day commit inspector, current streak, and longest streak counters.
+### 15. 📊 Multi-Provider 52-Week Contribution Heatmap & Groups
+- **Cross-Forge Activity Matrix**:
+  - **GitHub**: High-precision GraphQL contribution calendar matrix.
+  - **GitLab**: 365-day event stream aggregation (`GET /users/:username/events`) calculating daily commit and merge activity levels (0–4).
+  - **Gitea / Codeberg**: Direct integration with Gitea's native heatmap API (`GET /users/:username/heatmap`).
+- **Organizations & Groups Support**:
+  - GitLab user profile lists **Groups and Subgroups** (`GET /groups?membership=true`).
+  - Gitea lists user organizations (`GET /user/orgs`).
+  - GitHub lists affiliated organizations (`GET /user/orgs`).
 
-### 16. 💬 Issues & Pull Requests with Tap-To-Expand
-- Filter by status: `Open`, `Closed`, `Merged`.
+### 16. 💬 Issues, Pull Requests & In-App Discussions
+- **Thread Discussions & Mobile Replies**:
+  - Tap `💬 Discussion & Comments ↗` on any Issue or Pull Request to launch the full-screen discussion drawer.
+  - Read comment thread history with author attribution and relative timestamps.
+  - Post new replies and reviews directly from mobile.
+  - **1-Tap Issue / PR Triage**: Close or reopen issues and pull requests on the fly (`✕ Close Issue` / `↺ Reopen Issue`).
+- Filter by status: `Open`, `Closed`, `All`.
 - Pull request review tracking and additions/deletions diff pills (`+ additions`, `- deletions`).
 - **Tap-To-Expand Descriptions**: Tap any issue or PR description to toggle between compact 2-line preview and full untruncated text in-place.
 
@@ -184,11 +195,18 @@
 - **Tap-To-Expand Release Notes**: Tap any release body to expand from 4-line preview to full changelog notes with in-place toggle.
 - Direct 1-tap binary asset download links (`.apk`, `.zip`, `.tar.gz`) with byte size indicators.
 
-### 18. ⚠️ Danger Zone (Repository Deletion)
+### 18. 🚀 Multi-Provider CI/CD Pipelines
+- Unified CI/CD workflow tracking across forge types:
+  - **GitHub Actions**: Workflow runs, conclusions (`✅`, `❌`, `⏳`), and head SHA badges.
+  - **GitLab CI/CD**: Native pipeline tracking (`GET /projects/:id/pipelines`) with status mapping (`success`, `failed`, `running`, `canceled`).
+  - **Gitea Actions**: Native action runs (`GET /repos/:owner/:repo/actions/runs`).
+- Paged navigation for inspecting past workflow and pipeline runs.
+
+### 19. ⚠️ Danger Zone (Repository Deletion)
 - Toggleable feature in settings.
 - Requires typing exact `owner/repo-name` in a safety modal before unlocking permanent deletion.
 
-### 19. 🔔 Multi-Provider Notifications Inbox & Sleep Prevention
+### 20. 🔔 Multi-Provider Notifications Inbox & Sleep Prevention
 - **Universal Multi-Provider Inbox**:
   - Full notifications support across **GitHub**, **GitLab** (via native Todos API `/api/v4/todos`), and **Gitea/Codeberg**.
   - Thread triage for review requests, issue assignments, merge requests, mentions, and CI/CD events.
@@ -217,7 +235,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.8 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.3.9 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -225,7 +243,7 @@ Direct signed APK releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.7`
+- **Version**: `1.3.9`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 

@@ -12,7 +12,9 @@ import {
   UnifiedRelease,
   UnifiedContributor,
   UnifiedNotification,
+  UnifiedIssueComment,
 } from '../../types/provider';
+import { GitHubWorkflowRun, ContributionDay } from '../../types/github';
 
 export class GiteaProvider implements IGitProvider {
   readonly type: GitProviderType = 'gitea';
@@ -796,6 +798,258 @@ export class GiteaProvider implements IGitProvider {
           avatar_url: r.author?.avatar_url || '',
         },
         assets: [],
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getWorkflowRuns(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<GitHubWorkflowRun[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/actions/runs?page=${page}&limit=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      const runs = Array.isArray(data.workflow_runs)
+        ? data.workflow_runs
+        : Array.isArray(data)
+        ? data
+        : [];
+      return runs.map((r: any) => ({
+        id: r.id,
+        name: r.title || r.name || `Run #${r.id}`,
+        head_branch: r.head_branch || '',
+        head_sha: r.head_sha || '',
+        status:
+          r.status === 'running'
+            ? 'in_progress'
+            : r.status === 'waiting'
+            ? 'queued'
+            : 'completed',
+        conclusion:
+          r.conclusion === 'success'
+            ? 'success'
+            : r.conclusion === 'failure'
+            ? 'failure'
+            : r.conclusion === 'cancelled'
+            ? 'cancelled'
+            : null,
+        run_number: r.run_number || r.id,
+        event: r.event || 'push',
+        created_at: r.created_at || new Date().toISOString(),
+        updated_at: r.updated_at || new Date().toISOString(),
+        html_url: r.html_url || '',
+        actor: {
+          login: r.actor?.login || r.actor?.username || '',
+          avatar_url: r.actor?.avatar_url || '',
+        },
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getIssueComments(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedIssueComment[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments?page=${page}&limit=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((c: any) => ({
+        id: c.id,
+        body: c.body || '',
+        created_at: c.created || c.created_at || '',
+        updated_at: c.updated || c.updated_at || '',
+        user: {
+          login: c.user?.login || c.user?.username || 'unknown',
+          avatar_url: c.user?.avatar_url || '',
+        },
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async postIssueComment(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: UnifiedIssueComment }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
+        {
+          method: 'POST',
+          headers: {
+            ...this.getHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ body }),
+        }
+      );
+      if (!res.ok) return { success: false };
+      const c = await res.json();
+      return {
+        success: true,
+        comment: {
+          id: c.id,
+          body: c.body || '',
+          created_at: c.created || c.created_at || '',
+          updated_at: c.updated || c.updated_at || '',
+          user: {
+            login: c.user?.login || c.user?.username || '',
+            avatar_url: c.user?.avatar_url || '',
+          },
+        },
+      };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async closeIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    _type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: {
+            ...this.getHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ state: 'closed' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async reopenIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    _type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: {
+            ...this.getHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ state: 'open' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async getUserContributions(
+    token: string,
+    hostUrl: string | undefined,
+    username: string
+  ): Promise<{ total: number; days: ContributionDay[] }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/users/${encodeURIComponent(username)}/heatmap`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return { total: 0, days: [] };
+      const data: any[] = await res.json();
+      if (!Array.isArray(data)) return { total: 0, days: [] };
+
+      const countsByDate: Record<string, number> = {};
+      let total = 0;
+      for (const item of data) {
+        const date = new Date(item.timestamp * 1000).toISOString().split('T')[0];
+        const count = item.contributions || 1;
+        countsByDate[date] = (countsByDate[date] || 0) + count;
+        total += count;
+      }
+
+      const today = new Date();
+      const days: ContributionDay[] = [];
+      for (let i = 364; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const count = countsByDate[dateStr] || 0;
+        const level: 0 | 1 | 2 | 3 | 4 =
+          count === 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 9 ? 3 : 4;
+        days.push({ date: dateStr, count, level });
+      }
+
+      return { total, days };
+    } catch (e) {
+      console.warn('Gitea contributions failed', e);
+      return { total: 0, days: [] };
+    }
+  }
+
+  async getOrgs(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<any[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/user/orgs?limit=50`, {
+        headers: this.getHeaders(token),
+      });
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((org: any) => ({
+        id: org.id,
+        login: org.username || org.name,
+        avatar_url: org.avatar_url || '',
+        description: org.description || '',
+        name: org.full_name || org.name,
+        url: org.website || '',
+        repos_url: '',
       }));
     } catch {
       return [];

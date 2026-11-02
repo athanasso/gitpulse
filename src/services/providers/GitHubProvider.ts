@@ -12,6 +12,7 @@ import {
   UnifiedRelease,
   UnifiedContributor,
   UnifiedNotification,
+  UnifiedIssueComment,
 } from '../../types/provider';
 
 export class GitHubProvider implements IGitProvider {
@@ -674,6 +675,103 @@ export class GitHubProvider implements IGitProvider {
       return Array.isArray(data) ? data : [];
     } catch {
       return [];
+    }
+  }
+
+  async getIssueComments(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedIssueComment[]> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments?page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      return Array.isArray(data) ? data : [];
+    } catch {
+      return [];
+    }
+  }
+
+  async postIssueComment(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: UnifiedIssueComment }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${issueNumber}/comments`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        }
+      );
+      if (!res.ok) return { success: false };
+      const comment = await res.json();
+      return { success: true, comment };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async closeIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    _type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'closed' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async reopenIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    _type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(
+        `${base}/repos/${encodeURIComponent(owner)}/${encodeURIComponent(repo)}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: { ...this.getHeaders(token), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'open' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
     }
   }
 }

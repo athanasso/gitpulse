@@ -11,7 +11,9 @@ import {
   UnifiedRelease,
   UnifiedContributor,
   UnifiedNotification,
+  UnifiedIssueComment,
 } from '../../types/provider';
+import { GitHubWorkflowRun, ContributionDay } from '../../types/github';
 
 export class GitLabProvider implements IGitProvider {
   readonly type: GitProviderType = 'gitlab';
@@ -941,6 +943,294 @@ export class GitLabProvider implements IGitProvider {
       const list = await res.json();
       if (!Array.isArray(list)) return [];
       return list.map((p: any) => this.mapGitLabProject(p));
+    } catch {
+      return [];
+    }
+  }
+
+  async getWorkflowRuns(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<GitHubWorkflowRun[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const pid = this.getProjectIdentifier(owner, repo);
+      const res = await fetch(
+        `${api}/projects/${pid}/pipelines?page=${page}&per_page=${perPage}`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((p: any) => ({
+        id: p.id,
+        name: `Pipeline #${p.id}`,
+        head_branch: p.ref || '',
+        head_sha: p.sha || '',
+        status:
+          p.status === 'running'
+            ? 'in_progress'
+            : p.status === 'pending'
+            ? 'queued'
+            : 'completed',
+        conclusion:
+          p.status === 'success'
+            ? 'success'
+            : p.status === 'failed'
+            ? 'failure'
+            : p.status === 'canceled'
+            ? 'cancelled'
+            : null,
+        run_number: p.id,
+        event: p.source || 'push',
+        created_at: p.created_at || '',
+        updated_at: p.updated_at || '',
+        html_url: p.web_url || '',
+        actor: {
+          login: p.user?.username || '',
+          avatar_url: p.user?.avatar_url || '',
+        },
+      }));
+    } catch {
+      return [];
+    }
+  }
+
+  async getIssueComments(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedIssueComment[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const pid = this.getProjectIdentifier(owner, repo);
+      let res = await fetch(
+        `${api}/projects/${pid}/issues/${issueNumber}/notes?page=${page}&per_page=${perPage}&sort=asc`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) {
+        res = await fetch(
+          `${api}/projects/${pid}/merge_requests/${issueNumber}/notes?page=${page}&per_page=${perPage}&sort=asc`,
+          { headers: this.getHeaders(token) }
+        );
+      }
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data
+        .filter((n: any) => !n.system)
+        .map((n: any) => ({
+          id: n.id,
+          body: n.body || '',
+          created_at: n.created_at || '',
+          updated_at: n.updated_at || '',
+          user: {
+            login: n.author?.username || 'unknown',
+            avatar_url: n.author?.avatar_url || '',
+          },
+        }));
+    } catch {
+      return [];
+    }
+  }
+
+  async postIssueComment(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: UnifiedIssueComment }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const pid = this.getProjectIdentifier(owner, repo);
+      let res = await fetch(
+        `${api}/projects/${pid}/issues/${issueNumber}/notes`,
+        {
+          method: 'POST',
+          headers: {
+            ...this.getHeaders(token),
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ body }),
+        }
+      );
+      if (!res.ok) {
+        res = await fetch(
+          `${api}/projects/${pid}/merge_requests/${issueNumber}/notes`,
+          {
+            method: 'POST',
+            headers: {
+              ...this.getHeaders(token),
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ body }),
+          }
+        );
+      }
+      if (!res.ok) return { success: false };
+      const note = await res.json();
+      return {
+        success: true,
+        comment: {
+          id: note.id,
+          body: note.body || '',
+          created_at: note.created_at || '',
+          updated_at: note.updated_at || '',
+          user: {
+            login: note.author?.username || '',
+            avatar_url: note.author?.avatar_url || '',
+          },
+        },
+      };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async closeIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const pid = this.getProjectIdentifier(owner, repo);
+      const endpoint =
+        type === 'pr'
+          ? `${api}/projects/${pid}/merge_requests/${number}`
+          : `${api}/projects/${pid}/issues/${number}`;
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          ...this.getHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state_event: 'close' }),
+      });
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async reopenIssueOrPR(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const pid = this.getProjectIdentifier(owner, repo);
+      const endpoint =
+        type === 'pr'
+          ? `${api}/projects/${pid}/merge_requests/${number}`
+          : `${api}/projects/${pid}/issues/${number}`;
+      const res = await fetch(endpoint, {
+        method: 'PUT',
+        headers: {
+          ...this.getHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ state_event: 'reopen' }),
+      });
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  async getUserContributions(
+    token: string,
+    hostUrl: string | undefined,
+    username: string
+  ): Promise<{ total: number; days: ContributionDay[] }> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const after = new Date();
+      after.setFullYear(after.getFullYear() - 1);
+      const afterStr = after.toISOString().split('T')[0];
+
+      const countsByDate: Record<string, number> = {};
+      let page = 1;
+      let total = 0;
+
+      while (page <= 5) {
+        const res = await fetch(
+          `${api}/users/${encodeURIComponent(username)}/events?per_page=100&page=${page}&after=${afterStr}`,
+          { headers: this.getHeaders(token) }
+        );
+        if (!res.ok) break;
+        const events: any[] = await res.json();
+        if (!Array.isArray(events) || events.length === 0) break;
+
+        for (const ev of events) {
+          const dateStr = (ev.created_at || '').substring(0, 10);
+          if (dateStr >= afterStr) {
+            countsByDate[dateStr] = (countsByDate[dateStr] || 0) + 1;
+            total++;
+          }
+        }
+        if (events.length < 100) break;
+        page++;
+      }
+
+      const days: ContributionDay[] = [];
+      const today = new Date();
+      for (let i = 364; i >= 0; i--) {
+        const d = new Date(today);
+        d.setDate(d.getDate() - i);
+        const dateStr = d.toISOString().split('T')[0];
+        const count = countsByDate[dateStr] || 0;
+        const level: 0 | 1 | 2 | 3 | 4 =
+          count === 0 ? 0 : count <= 2 ? 1 : count <= 5 ? 2 : count <= 9 ? 3 : 4;
+        days.push({ date: dateStr, count, level });
+      }
+
+      return { total, days };
+    } catch (e) {
+      console.warn('GitLab contributions fetch failed', e);
+      return { total: 0, days: [] };
+    }
+  }
+
+  async getOrgs(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<any[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(
+        `${api}/groups?membership=true&per_page=100&top_level_only=false`,
+        { headers: this.getHeaders(token) }
+      );
+      if (!res.ok) return [];
+      const data = await res.json();
+      if (!Array.isArray(data)) return [];
+      return data.map((g: any) => ({
+        id: g.id,
+        login: g.full_path || g.path,
+        avatar_url: g.avatar_url || '',
+        description: g.description || '',
+        name: g.full_name || g.name || g.path,
+        url: g.web_url || '',
+        repos_url: '',
+      }));
     } catch {
       return [];
     }

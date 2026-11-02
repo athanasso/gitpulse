@@ -12,6 +12,7 @@ import {
   GitHubPullRequest,
   GitHubWorkflowRun,
   GitHubNotification,
+  GitHubIssueComment,
   ContributionDay,
   GitHubGist,
   GitHubOrg,
@@ -994,7 +995,7 @@ class GitHubApiServiceClass {
     await this.ensureInit();
     const active = AccountService.getActiveAccount();
     if (active && active.provider !== 'github') {
-      return [];
+      return await GitService.getWorkflowRuns(owner, repo, page, per_page);
     }
     try {
       const res = await fetch(
@@ -1126,7 +1127,7 @@ class GitHubApiServiceClass {
     await this.ensureInit();
     const active = AccountService.getActiveAccount();
     if (active && active.provider !== 'github') {
-      return { total: 0, days: [] };
+      return await GitService.getUserContributions(active.username);
     }
     if (!this.token) {
       return { total: 0, days: [] };
@@ -1419,7 +1420,12 @@ class GitHubApiServiceClass {
   async getOrgs(username?: string): Promise<GitHubOrg[]> {
     await this.ensureInit();
     const active = AccountService.getActiveAccount();
-    if (active && active.provider !== 'github') return [];
+    if (active && active.provider !== 'github') {
+      if (!username) {
+        return (await GitService.getOrgs()) as GitHubOrg[];
+      }
+      return [];
+    }
     try {
       const isMe =
         !username ||
@@ -1852,6 +1858,142 @@ class GitHubApiServiceClass {
       return { success: false, message: data.message || `HTTP ${res.status}` };
     } catch (e: any) {
       return { success: false, message: e?.message || 'Network error' };
+    }
+  }
+
+  /**
+   * Fetch issue or PR comments with pagination
+   */
+  async getIssueComments(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page: number = 1,
+    per_page: number = 30
+  ): Promise<GitHubIssueComment[]> {
+    await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.getIssueComments(
+        owner,
+        repo,
+        issueNumber,
+        page,
+        per_page
+      )) as GitHubIssueComment[];
+    }
+    if (!this.token) return [];
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments?page=${page}&per_page=${per_page}`,
+        { headers: this.getHeaders() }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        return Array.isArray(data) ? data : [];
+      }
+    } catch (e) {
+      console.warn('Failed to fetch issue comments', e);
+    }
+    return [];
+  }
+
+  /**
+   * Post comment on an issue or PR
+   */
+  async postIssueComment(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: GitHubIssueComment }> {
+    await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return (await GitService.postIssueComment(
+        owner,
+        repo,
+        issueNumber,
+        body
+      )) as { success: boolean; comment?: GitHubIssueComment };
+    }
+    if (!this.token) return { success: false };
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${issueNumber}/comments`,
+        {
+          method: 'POST',
+          headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ body }),
+        }
+      );
+      if (res.ok) {
+        const comment = await res.json();
+        return { success: true, comment };
+      }
+    } catch (e) {
+      console.warn('Failed to post issue comment', e);
+    }
+    return { success: false };
+  }
+
+  /**
+   * Close issue or PR
+   */
+  async closeIssueOrPR(
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.closeIssueOrPR(owner, repo, number, type);
+    }
+    if (!this.token) return { success: false };
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'closed' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
+    }
+  }
+
+  /**
+   * Reopen issue or PR
+   */
+  async reopenIssueOrPR(
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    await this.ensureInit();
+    const active = AccountService.getActiveAccount();
+    if (active && active.provider !== 'github') {
+      return await GitService.reopenIssueOrPR(owner, repo, number, type);
+    }
+    if (!this.token) return { success: false };
+    try {
+      const res = await fetch(
+        `https://api.github.com/repos/${owner}/${repo}/issues/${number}`,
+        {
+          method: 'PATCH',
+          headers: { ...this.getHeaders(), 'Content-Type': 'application/json' },
+          body: JSON.stringify({ state: 'open' }),
+        }
+      );
+      return { success: res.ok };
+    } catch {
+      return { success: false };
     }
   }
 }

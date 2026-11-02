@@ -1143,7 +1143,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const renderHeatmap = () => (
     <View key="heatmap" style={styles.heatmapCardWrapper}>
-      <Text style={styles.sectionHeader}>Contribution Activity (Official API)</Text>
+      <Text style={styles.sectionHeader}>Contribution Activity</Text>
       <ContributionHeatmap
         days={contributions.days}
         total={contributions.total}

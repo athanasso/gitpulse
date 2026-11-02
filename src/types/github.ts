@@ -271,4 +271,15 @@ export interface GitHubFollower {
   html_url: string;
 }
 
+export interface GitHubIssueComment {
+  id: number;
+  body: string;
+  created_at: string;
+  updated_at: string;
+  user: {
+    login: string;
+    avatar_url: string;
+  };
+}
+
 

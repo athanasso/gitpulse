@@ -9,6 +9,7 @@ import {
   GitHubRelease,
   GitHubContributor,
   GitHubNotification,
+  GitHubIssueComment,
 } from './github';
 
 export type GitProviderType = 'github' | 'gitlab' | 'gitea' | 'bitbucket';
@@ -282,4 +283,5 @@ export type UnifiedFileItem = GitHubFileItem;
 export type UnifiedRelease = GitHubRelease;
 export type UnifiedContributor = GitHubContributor;
 export type UnifiedNotification = GitHubNotification;
+export type UnifiedIssueComment = GitHubIssueComment;
 

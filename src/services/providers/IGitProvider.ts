@@ -10,7 +10,9 @@ import {
   UnifiedRelease,
   UnifiedContributor,
   UnifiedNotification,
+  UnifiedIssueComment,
 } from '../../types/provider';
+import { GitHubWorkflowRun, ContributionDay } from '../../types/github';
 
 export interface IGitProvider {
   readonly type: GitProviderType;
@@ -276,6 +278,18 @@ export interface IGitProvider {
   ): Promise<UnifiedRelease[]>;
 
   /**
+   * Fetch CI/CD pipeline / workflow runs
+   */
+  getWorkflowRuns?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    page?: number,
+    perPage?: number
+  ): Promise<GitHubWorkflowRun[]>;
+
+  /**
    * Fetch inbox / user notifications
    */
   getNotifications?(
@@ -311,5 +325,71 @@ export interface IGitProvider {
     page?: number,
     perPage?: number
   ): Promise<UnifiedRepo[]>;
+
+  /**
+   * Fetch issue or pull request comments
+   */
+  getIssueComments?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page?: number,
+    perPage?: number
+  ): Promise<UnifiedIssueComment[]>;
+
+  /**
+   * Post a comment on an issue or pull request
+   */
+  postIssueComment?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: UnifiedIssueComment }>;
+
+  /**
+   * Close an issue or PR
+   */
+  closeIssueOrPR?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }>;
+
+  /**
+   * Reopen an issue or PR
+   */
+  reopenIssueOrPR?(
+    token: string,
+    hostUrl: string | undefined,
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }>;
+
+  /**
+   * Fetch user contribution activity for heatmap
+   */
+  getUserContributions?(
+    token: string,
+    hostUrl: string | undefined,
+    username: string
+  ): Promise<{ total: number; days: ContributionDay[] }>;
+
+  /**
+   * Fetch user organizations or groups
+   */
+  getOrgs?(
+    token: string,
+    hostUrl: string | undefined
+  ): Promise<any[]>;
 }
 

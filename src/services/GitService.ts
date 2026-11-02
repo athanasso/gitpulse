@@ -17,8 +17,10 @@ import {
   UnifiedRelease,
   UnifiedContributor,
   UnifiedNotification,
+  UnifiedIssueComment,
   PROVIDER_REGISTRY,
 } from '../types/provider';
+import { GitHubWorkflowRun, ContributionDay } from '../types/github';
 
 class GitServiceClass {
   private providers: Record<GitProviderType, IGitProvider> = {
@@ -496,6 +498,111 @@ class GitServiceClass {
     const p = this.getProvider(providerType);
     if (!p.getUserStarredRepos) return [];
     return await p.getUserStarredRepos(acc?.token || '', acc?.hostUrl, page, perPage);
+  }
+
+  /**
+   * Fetch CI/CD workflow runs across providers
+   */
+  async getWorkflowRuns(
+    owner: string,
+    repo: string,
+    page: number = 1,
+    perPage: number = 20
+  ): Promise<GitHubWorkflowRun[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getWorkflowRuns) return [];
+    return await p.getWorkflowRuns(acc?.token || '', acc?.hostUrl, owner, repo, page, perPage);
+  }
+
+  /**
+   * Fetch issue or PR comments across providers
+   */
+  async getIssueComments(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    page: number = 1,
+    perPage: number = 30
+  ): Promise<UnifiedIssueComment[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getIssueComments) return [];
+    return await p.getIssueComments(acc?.token || '', acc?.hostUrl, owner, repo, issueNumber, page, perPage);
+  }
+
+  /**
+   * Post issue or PR comment across providers
+   */
+  async postIssueComment(
+    owner: string,
+    repo: string,
+    issueNumber: number,
+    body: string
+  ): Promise<{ success: boolean; comment?: UnifiedIssueComment }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.postIssueComment) return { success: false };
+    return await p.postIssueComment(acc?.token || '', acc?.hostUrl, owner, repo, issueNumber, body);
+  }
+
+  /**
+   * Close issue or PR across providers
+   */
+  async closeIssueOrPR(
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.closeIssueOrPR) return { success: false };
+    return await p.closeIssueOrPR(acc?.token || '', acc?.hostUrl, owner, repo, number, type);
+  }
+
+  /**
+   * Reopen issue or PR across providers
+   */
+  async reopenIssueOrPR(
+    owner: string,
+    repo: string,
+    number: number,
+    type: 'issue' | 'pr'
+  ): Promise<{ success: boolean }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.reopenIssueOrPR) return { success: false };
+    return await p.reopenIssueOrPR(acc?.token || '', acc?.hostUrl, owner, repo, number, type);
+  }
+
+  /**
+   * Fetch user contributions heatmap across providers
+   */
+  async getUserContributions(
+    username: string
+  ): Promise<{ total: number; days: ContributionDay[] }> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getUserContributions) return { total: 0, days: [] };
+    return await p.getUserContributions(acc?.token || '', acc?.hostUrl, username);
+  }
+
+  /**
+   * Fetch organizations or groups across providers
+   */
+  async getOrgs(): Promise<any[]> {
+    const acc = this.getActiveAccount();
+    const providerType = acc ? acc.provider : 'github';
+    const p = this.getProvider(providerType);
+    if (!p.getOrgs) return [];
+    return await p.getOrgs(acc?.token || '', acc?.hostUrl);
   }
 }
 
