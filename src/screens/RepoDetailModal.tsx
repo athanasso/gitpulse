@@ -336,6 +336,18 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
   const [hasMoreReleases, setHasMoreReleases] = useState(true);
   const [loadingMoreReleases, setLoadingMoreReleases] = useState(false);
 
+  // In-place text expansion toggles
+  const [expandedReleases, setExpandedReleases] = useState<Record<number, boolean>>({});
+  const [expandedIssues, setExpandedIssues] = useState<Record<number, boolean>>({});
+
+  const toggleReleaseExpand = (id: number) => {
+    setExpandedReleases((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
+  const toggleIssueExpand = (id: number) => {
+    setExpandedIssues((prev) => ({ ...prev, [id]: !prev[id] }));
+  };
+
   // Insights
   const [languages, setLanguages] = useState<Record<string, number>>({});
   const [contributors, setContributors] = useState<GitHubContributor[]>([]);
@@ -360,6 +372,8 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
       setReleases([]);
       setReleasesPage(1);
       setHasMoreReleases(true);
+      setExpandedReleases({});
+      setExpandedIssues({});
       setLanguages({});
       setContributors([]);
       setCurrentPath('');
@@ -1843,9 +1857,23 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         </View>
                         <Text style={styles.issueTitle}>{p.title}</Text>
                         {p.body && (
-                          <Text style={styles.issueBody} numberOfLines={2}>
-                            {p.body}
-                          </Text>
+                          <TouchableOpacity
+                            onPress={() => toggleIssueExpand(p.id)}
+                            activeOpacity={0.7}
+                            style={styles.expandableTextContainer}
+                          >
+                            <Text
+                              style={styles.issueBody}
+                              numberOfLines={expandedIssues[p.id] ? undefined : 2}
+                            >
+                              {p.body}
+                            </Text>
+                            {(p.body.split('\n').length > 2 || p.body.length > 90) && (
+                              <Text style={[styles.expandToggleText, { color: colors.primary }]}>
+                                {expandedIssues[p.id] ? '▲ Show less' : '▼ Show full description'}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
                         )}
                         {p.additions !== undefined && (
                           <View style={styles.diffPills}>
@@ -1885,9 +1913,23 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         </View>
                         <Text style={styles.issueTitle}>{i.title}</Text>
                         {i.body && (
-                          <Text style={styles.issueBody} numberOfLines={2}>
-                            {i.body}
-                          </Text>
+                          <TouchableOpacity
+                            onPress={() => toggleIssueExpand(i.id)}
+                            activeOpacity={0.7}
+                            style={styles.expandableTextContainer}
+                          >
+                            <Text
+                              style={styles.issueBody}
+                              numberOfLines={expandedIssues[i.id] ? undefined : 2}
+                            >
+                              {i.body}
+                            </Text>
+                            {(i.body.split('\n').length > 2 || i.body.length > 90) && (
+                              <Text style={[styles.expandToggleText, { color: colors.primary }]}>
+                                {expandedIssues[i.id] ? '▲ Show less' : '▼ Show full description'}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
                         )}
                       </View>
                     ))
@@ -1985,9 +2027,23 @@ export const RepoDetailModal: React.FC<RepoDetailModalProps> = ({
                         </Text>
 
                         {rel.body && (
-                          <Text style={styles.releaseBody} numberOfLines={4}>
-                            {rel.body}
-                          </Text>
+                          <TouchableOpacity
+                            onPress={() => toggleReleaseExpand(rel.id)}
+                            activeOpacity={0.7}
+                            style={styles.expandableTextContainer}
+                          >
+                            <Text
+                              style={styles.releaseBody}
+                              numberOfLines={expandedReleases[rel.id] ? undefined : 4}
+                            >
+                              {rel.body}
+                            </Text>
+                            {(rel.body.split('\n').length > 4 || rel.body.length > 180) && (
+                              <Text style={[styles.expandToggleText, { color: colors.primary }]}>
+                                {expandedReleases[rel.id] ? '▲ Show less' : '▼ Show full release notes'}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
                         )}
 
                         {/* Assets Section */}
@@ -3394,6 +3450,15 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     fontSize: 12,
     color: colors.textSecondary,
     lineHeight: 18,
+    marginBottom: 4,
+  },
+  expandableTextContainer: {
+    marginVertical: 2,
+  },
+  expandToggleText: {
+    fontSize: 11,
+    fontWeight: '700',
+    marginTop: 2,
     marginBottom: Spacing.sm,
   },
   assetsSection: {

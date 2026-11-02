@@ -137,7 +137,7 @@ function AppContent() {
             ]}
           >
             <Text style={[styles.versionText, { color: colors.primary }]}>
-              v1.3.2
+              v1.3.3
             </Text>
           </View>
         </View>
