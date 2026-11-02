@@ -1209,17 +1209,20 @@ class GitHubApiServiceClass {
   }
 
   /**
-   * Fetch authenticated user's starred repositories with pagination
+   * Fetch authenticated user's starred repositories with pagination.
+   * Defaults to sort=created&direction=desc (recently starred first, matching GitHub.com).
    */
   async getUserStarredRepos(
     page: number = 1,
-    per_page: number = 30
+    per_page: number = 30,
+    sort: 'created' | 'updated' = 'created',
+    direction: 'asc' | 'desc' = 'desc'
   ): Promise<GitHubRepo[]> {
     await this.ensureInit();
     if (!this.token) return [];
     try {
       const res = await fetch(
-        `https://api.github.com/user/starred?sort=updated&page=${page}&per_page=${per_page}`,
+        `https://api.github.com/user/starred?sort=${sort}&direction=${direction}&page=${page}&per_page=${per_page}`,
         { headers: this.getHeaders() }
       );
       if (res.ok) {

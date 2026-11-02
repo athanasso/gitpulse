@@ -161,6 +161,7 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const [pageStarred, setPageStarred] = useState(1);
   const [hasMoreStarred, setHasMoreStarred] = useState(true);
   const [loadingMoreStarred, setLoadingMoreStarred] = useState(false);
+  const [starredSort, setStarredSort] = useState<'created' | 'updated'>('created');
 
   // Gists with pagination
   const [gists, setGists] = useState<GitHubGist[]>([]);
@@ -412,10 +413,22 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   const goToStarredPage = async (newPage: number) => {
     if (loadingMoreStarred || newPage < 1) return;
     setLoadingMoreStarred(true);
-    const list = await GitHubApiService.getUserStarredRepos(newPage, PAGE_SIZE);
+    const list = await GitHubApiService.getUserStarredRepos(newPage, PAGE_SIZE, starredSort, 'desc');
     setStarredRepos(list);
     setHasMoreStarred(list.length >= PAGE_SIZE);
     setPageStarred(newPage);
+    setLoadingMoreStarred(false);
+    starredScrollRef.current?.scrollTo({ y: 0, animated: true });
+  };
+
+  const handleChangeStarredSort = async (sort: 'created' | 'updated') => {
+    if (starredSort === sort || loadingMoreStarred) return;
+    setStarredSort(sort);
+    setLoadingMoreStarred(true);
+    const list = await GitHubApiService.getUserStarredRepos(1, PAGE_SIZE, sort, 'desc');
+    setStarredRepos(list);
+    setHasMoreStarred(list.length >= PAGE_SIZE);
+    setPageStarred(1);
     setLoadingMoreStarred(false);
     starredScrollRef.current?.scrollTo({ y: 0, animated: true });
   };
@@ -1239,9 +1252,44 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                 <View style={styles.reposScrollCard}>
                   <View style={styles.reposCardTopHeader}>
                     <Text style={styles.reposCardTopTitle}>
-                      Starred Repositories ({totalStarredCount || starredRepos.length})
+                      Starred ({totalStarredCount || starredRepos.length})
                     </Text>
-                    <Text style={styles.reposCardScrollHint}>↕ Scroll inside card</Text>
+                    <View style={styles.starredSortPillsWrap}>
+                      <TouchableOpacity
+                        style={[
+                          styles.starredSortPill,
+                          starredSort === 'created' && styles.starredSortPillActive,
+                        ]}
+                        onPress={() => handleChangeStarredSort('created')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.starredSortPillText,
+                            starredSort === 'created' && styles.starredSortPillTextActive,
+                          ]}
+                        >
+                          ⭐ Starred
+                        </Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={[
+                          styles.starredSortPill,
+                          starredSort === 'updated' && styles.starredSortPillActive,
+                        ]}
+                        onPress={() => handleChangeStarredSort('updated')}
+                        activeOpacity={0.7}
+                      >
+                        <Text
+                          style={[
+                            styles.starredSortPillText,
+                            starredSort === 'updated' && styles.starredSortPillTextActive,
+                          ]}
+                        >
+                          🕒 Active
+                        </Text>
+                      </TouchableOpacity>
+                    </View>
                   </View>
 
                   {starredRepos.length > 0 ? (
@@ -1262,6 +1310,12 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
                             page={pageStarred}
                             hasNext={hasMoreStarred}
                             hasPrev={pageStarred > 1}
+                            totalPages={
+                              totalStarredCount
+                                ? Math.ceil(totalStarredCount / PAGE_SIZE)
+                                : undefined
+                            }
+                            totalCount={totalStarredCount || undefined}
                             loading={loadingMoreStarred}
                             onPageChange={goToStarredPage}
                           />
@@ -2495,6 +2549,32 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     color: colors.textPrimary,
+  },
+  starredSortPillsWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  starredSortPill: {
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    backgroundColor: colors.cardElevated,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+  },
+  starredSortPillActive: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  starredSortPillText: {
+    fontSize: 11,
+    fontWeight: '600',
+    color: colors.textMuted,
+  },
+  starredSortPillTextActive: {
+    color: colors.primary,
+    fontWeight: '700',
   },
   reposCardScrollHint: {
     fontSize: 11,
