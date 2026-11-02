@@ -65,6 +65,22 @@ export class BitbucketProvider implements IGitProvider {
     };
   }
 
+  async getTokenScopes(token: string): Promise<string[]> {
+    const scopes: string[] = [];
+    try {
+      const headers = this.getHeaders(token);
+      const [uRes, rRes] = await Promise.allSettled([
+        fetch(`${this.baseUrl}/user`, { headers }),
+        fetch(`${this.baseUrl}/repositories?role=member&pagelen=1`, { headers }),
+      ]);
+      if (uRes.status === 'fulfilled' && uRes.value.ok) scopes.push('account:read');
+      if (rRes.status === 'fulfilled' && rRes.value.ok) {
+        scopes.push('repository:read', 'repository:write', 'pullrequest:read');
+      }
+    } catch {}
+    return scopes;
+  }
+
   async getUserRepos(
     token: string,
     _hostUrl: string | undefined,

@@ -45,6 +45,26 @@ class GitServiceClass {
   }
 
   /**
+   * Check active token scopes / permissions for a provider
+   */
+  async getTokenScopes(
+    provider?: GitProviderType,
+    token?: string,
+    hostUrl?: string
+  ): Promise<string[]> {
+    const pType = provider || this.getActiveProviderType();
+    const acc = this.getActiveAccount();
+    const tok = token || acc?.token;
+    const host = hostUrl !== undefined ? hostUrl : acc?.hostUrl;
+    if (!tok) return [];
+    const p = this.getProvider(pType);
+    if (p.getTokenScopes) {
+      return await p.getTokenScopes(tok, host);
+    }
+    return [];
+  }
+
+  /**
    * Validate credentials and fetch user info when connecting an account
    */
   async validateAccount(

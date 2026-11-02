@@ -66,6 +66,31 @@ export class GitLabProvider implements IGitProvider {
     };
   }
 
+  async getTokenScopes(token: string, hostUrl?: string): Promise<string[]> {
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const res = await fetch(`${api}/personal_access_tokens/self`, {
+        headers: this.getHeaders(token),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (Array.isArray(data?.scopes)) {
+          return data.scopes;
+        }
+      }
+      const scopes: string[] = ['read_user'];
+      const repoCheck = await fetch(`${api}/projects?membership=true&per_page=1`, {
+        headers: this.getHeaders(token),
+      });
+      if (repoCheck.ok) {
+        scopes.push('read_repository', 'write_repository');
+      }
+      return scopes;
+    } catch {
+      return ['read_user', 'read_repository'];
+    }
+  }
+
   async getUserRepos(
     token: string,
     hostUrl: string | undefined,

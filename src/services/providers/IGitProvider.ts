@@ -18,6 +18,11 @@ export interface IGitProvider {
   validateToken(token: string, hostUrl?: string): Promise<UnifiedUser>;
 
   /**
+   * Retrieve active scopes or permissions granted to the token
+   */
+  getTokenScopes?(token: string, hostUrl?: string): Promise<string[]>;
+
+  /**
    * Fetch user repositories with pagination
    */
   getUserRepos(

@@ -25,7 +25,9 @@ import {
 } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { AccountService } from '../services/AccountService';
+import { GitService } from '../services/GitService';
 import { GitAccount, PROVIDER_REGISTRY } from '../types/provider';
+import { evaluateProviderScopes } from '../utils/permissionHelper';
 import { CacheService, CacheKeys } from '../services/CacheService';
 import { ContributionHeatmap } from '../components/ContributionHeatmap';
 import { RepoDetailModal } from './RepoDetailModal';
@@ -142,8 +144,18 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
   );
 
   useEffect(() => {
-    const unsub = AccountService.subscribe((active) => {
+    const unsub = AccountService.subscribe(async (active) => {
       setActiveAccount(active);
+      if (active) {
+        const scopes = await GitService.getTokenScopes(
+          active.provider,
+          active.token,
+          active.hostUrl
+        );
+        setTokenScopes(scopes);
+      } else {
+        setTokenScopes(GitHubApiService.getTokenScopes());
+      }
     });
     return () => unsub();
   }, []);
@@ -294,10 +306,17 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
       setIsAuth(auth);
 
       if (auth) {
-        setTokenScopes(GitHubApiService.getTokenScopes());
+        const activeAcc = AccountService.getActiveAccount();
+        const initialScopes = await GitService.getTokenScopes(
+          activeAcc?.provider,
+          activeAcc?.token,
+          activeAcc?.hostUrl
+        );
+        setTokenScopes(
+          initialScopes.length > 0 ? initialScopes : GitHubApiService.getTokenScopes()
+        );
         const u = await GitHubApiService.getCurrentUser();
         setUser(u);
-        setTokenScopes(GitHubApiService.getTokenScopes());
 
         if (u) {
           const [
@@ -806,16 +825,51 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
 
   const renderTokenPermissions = () => {
     const providerType = activeAccount?.provider || 'github';
-    const isGitHub = providerType === 'github';
     const providerMeta = PROVIDER_REGISTRY[providerType];
     const manageUrl = providerMeta.manageTokensUrl(activeAccount?.hostUrl);
+    const evaluated = evaluateProviderScopes(
+      providerType,
+      providerMeta.scopes,
+      tokenScopes
+    );
+    const missingRequired = evaluated.filter(
+      (e) => !e.isGranted && e.level === 'Required'
+    );
+    const grantedCount = evaluated.filter((e) => e.isGranted).length;
 
     return (
       <View key="tokenPermissions" style={styles.activeScopesCard}>
         <View style={styles.activeScopesHeaderRow}>
-          <Text style={styles.activeScopesHeaderTitle}>
-            🔑 {providerMeta.name} Token Permissions
-          </Text>
+          <View style={styles.scopesTitleWrap}>
+            <Text style={styles.activeScopesHeaderTitle}>
+              🔑 {providerMeta.name} Token Permissions
+            </Text>
+            <View
+              style={[
+                styles.grantedCountPill,
+                {
+                  backgroundColor:
+                    missingRequired.length === 0
+                      ? colors.emeraldMuted
+                      : 'rgba(239, 68, 68, 0.15)',
+                  borderColor:
+                    missingRequired.length === 0 ? colors.emerald : '#EF4444',
+                },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.grantedCountText,
+                  {
+                    color:
+                      missingRequired.length === 0 ? colors.emerald : '#EF4444',
+                  },
+                ]}
+              >
+                {grantedCount}/{evaluated.length} Granted
+              </Text>
+            </View>
+          </View>
           <TouchableOpacity onPress={() => Linking.openURL(manageUrl)}>
             <Text style={styles.editScopesLink}>
               Manage on {providerMeta.name} ↗
@@ -823,72 +877,65 @@ export const ProfileScreen: React.FC<ProfileScreenProps> = ({
           </TouchableOpacity>
         </View>
 
-        {isGitHub ? (
-          tokenScopes.length === 0 ? (
-            <Text style={styles.fineGrainedNote}>
-              ● Active Personal Access Token (Resource-scoped / Fine-Grained)
-            </Text>
-          ) : (
-            <>
-              <View style={styles.scopesPillsWrap}>
-                {providerMeta.scopes.map((spec) => {
-                  const hasThis =
-                    tokenScopes.includes(spec.scope) ||
-                    (spec.scope === 'read:user' && tokenScopes.includes('user')) ||
-                    (spec.scope === 'read:org' && tokenScopes.includes('admin:org'));
+        <Text style={styles.fineGrainedNote}>
+          ● Connected via {providerMeta.name} (
+          {activeAccount?.username
+            ? `@${activeAccount.username}`
+            : user?.login
+            ? `@${user.login}`
+            : 'Authenticated'}
+          )
+        </Text>
 
-                  return (
-                    <View
-                      key={spec.scope}
-                      style={[
-                        styles.scopePill,
-                        hasThis ? styles.scopePillActive : styles.scopePillMissing,
-                      ]}
-                    >
-                      <Text
-                        style={[
-                          styles.scopePillText,
-                          hasThis
-                            ? styles.scopePillTextActive
-                            : styles.scopePillTextMissing,
-                        ]}
-                      >
-                        {hasThis ? '✓' : spec.level === 'Required' ? '✕' : '⚠️'}{' '}
-                        {spec.scope}
-                      </Text>
-                    </View>
-                  );
-                })}
+        <View style={styles.scopesListContainer}>
+          {evaluated.map((item) => (
+            <View key={item.scope} style={styles.scopeEvalRow}>
+              <View style={styles.scopeEvalTop}>
+                <View style={styles.scopeNameWrap}>
+                  <Text style={styles.scopeCodeBadge}>{item.scope}</Text>
+                  <Text style={styles.scopeFriendlyName}>{item.name}</Text>
+                </View>
+
+                <View
+                  style={[
+                    styles.scopeStatusBadge,
+                    item.isGranted
+                      ? styles.badgeGranted
+                      : item.level === 'Required'
+                      ? styles.badgeRequired
+                      : item.level === 'Recommended'
+                      ? styles.badgeRecommended
+                      : styles.badgeOptional,
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.scopeStatusText,
+                      item.isGranted
+                        ? styles.badgeTextGranted
+                        : item.level === 'Required'
+                        ? styles.badgeTextRequired
+                        : item.level === 'Recommended'
+                        ? styles.badgeTextRecommended
+                        : styles.badgeTextOptional,
+                    ]}
+                  >
+                    {item.statusBadgeText}
+                  </Text>
+                </View>
               </View>
 
-              {!tokenScopes.includes('notifications') && (
-                <View style={styles.scopeWarningInline}>
-                  <Text style={styles.scopeWarningInlineText}>
-                    ⚠️ Missing <Text style={styles.scopeCodeTextInline}>notifications</Text> scope. Inbox tab notifications are disabled.
-                  </Text>
-                </View>
-              )}
-            </>
-          )
-        ) : (
-          /* Non-GitHub Provider: GitLab, Gitea, Bitbucket */
-          <>
-            <Text style={styles.fineGrainedNote}>
-              ● Active {providerMeta.name} Connected Token ({activeAccount?.username ? `@${activeAccount.username}` : 'Authenticated'})
-            </Text>
-            <View style={styles.scopesPillsWrap}>
-              {providerMeta.scopes.map((spec) => (
-                <View
-                  key={spec.scope}
-                  style={[styles.scopePill, styles.scopePillActive]}
-                >
-                  <Text style={[styles.scopePillText, styles.scopePillTextActive]}>
-                    ✓ {spec.scope}
-                  </Text>
-                </View>
-              ))}
+              <Text style={styles.scopeDescText}>{item.desc}</Text>
             </View>
-          </>
+          ))}
+        </View>
+
+        {missingRequired.length > 0 && (
+          <View style={styles.scopeWarningInline}>
+            <Text style={styles.scopeWarningInlineText}>
+              ⚠️ Missing {missingRequired.map((m) => m.scope).join(', ')} permission(s). Tap "Manage on {providerMeta.name} ↗" to grant full access.
+            </Text>
+          </View>
         )}
       </View>
     );
@@ -2341,6 +2388,85 @@ const createStyles = (colors: ThemePalette) => StyleSheet.create({
     color: colors.textPrimary,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  scopesTitleWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  grantedCountPill: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  grantedCountText: {
+    fontSize: 10,
+    fontWeight: '800',
+  },
+  scopesListContainer: {
+    gap: 8,
+    marginTop: 8,
+  },
+  scopeEvalRow: {
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.cardBorder,
+    gap: 4,
+  },
+  scopeEvalTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+  },
+  scopeNameWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
+    flexWrap: 'wrap',
+  },
+  scopeCodeBadge: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.cyan,
+    backgroundColor: colors.cardElevated,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+    borderColor: colors.cardBorder,
+    overflow: 'hidden',
+  },
+  scopeFriendlyName: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: colors.textPrimary,
+  },
+  scopeStatusBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 6,
+    borderWidth: 1,
+  },
+  scopeStatusText: {
+    fontSize: 9,
+    fontWeight: '800',
+    letterSpacing: 0.5,
+  },
+  badgeGranted: {
+    backgroundColor: colors.emeraldMuted,
+    borderColor: colors.emerald,
+  },
+  badgeTextGranted: {
+    color: colors.emerald,
+  },
+  scopeDescText: {
+    fontSize: 11,
+    color: colors.textSecondary,
+    lineHeight: 16,
   },
   editScopesLink: {
     fontSize: 11,

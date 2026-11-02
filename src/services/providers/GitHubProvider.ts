@@ -51,6 +51,27 @@ export class GitHubProvider implements IGitProvider {
     };
   }
 
+  async getTokenScopes(token: string, hostUrl?: string): Promise<string[]> {
+    try {
+      const base = this.getBaseUrl(hostUrl);
+      const res = await fetch(`${base}/user`, {
+        headers: this.getHeaders(token),
+      });
+      if (!res.ok) return [];
+      const scopesHeader =
+        res.headers.get('x-oauth-scopes') || res.headers.get('X-OAuth-Scopes');
+      if (scopesHeader) {
+        return scopesHeader
+          .split(',')
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+      return ['fine-grained', 'repo', 'read:user'];
+    } catch {
+      return [];
+    }
+  }
+
   async getUserRepos(
     token: string,
     hostUrl: string | undefined,

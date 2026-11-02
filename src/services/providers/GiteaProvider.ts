@@ -63,6 +63,27 @@ export class GiteaProvider implements IGitProvider {
     };
   }
 
+  async getTokenScopes(token: string, hostUrl?: string): Promise<string[]> {
+    const scopes: string[] = [];
+    try {
+      const api = this.getApiUrl(hostUrl);
+      const headers = this.getHeaders(token);
+      const [uRes, rRes, nRes] = await Promise.allSettled([
+        fetch(`${api}/user`, { headers }),
+        fetch(`${api}/user/repos?limit=1`, { headers }),
+        fetch(`${api}/notifications?limit=1`, { headers }),
+      ]);
+      if (uRes.status === 'fulfilled' && uRes.value.ok) scopes.push('read:user');
+      if (rRes.status === 'fulfilled' && rRes.value.ok) {
+        scopes.push('read:repository', 'write:repository');
+      }
+      if (nRes.status === 'fulfilled' && nRes.value.ok) {
+        scopes.push('read:issue', 'read:notification');
+      }
+    } catch {}
+    return scopes;
+  }
+
   async getUserRepos(
     token: string,
     hostUrl: string | undefined,
