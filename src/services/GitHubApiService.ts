@@ -1107,10 +1107,11 @@ class GitHubApiServiceClass {
         method: 'PUT',
         headers: {
           ...this.getHeaders(),
-          'Content-Length': '0',
+          'Content-Type': 'application/json',
         },
         body: JSON.stringify({
           last_read_at: new Date().toISOString(),
+          read: true,
         }),
       });
       return res.status === 205 || res.ok;

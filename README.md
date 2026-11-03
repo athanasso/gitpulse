@@ -10,7 +10,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.3.9&logo=android" alt="Latest Release"></a>
+  <a href="https://github.com/athanasso/gitpulse/releases/latest"><img src="https://img.shields.io/github/v/release/athanasso/gitpulse?color=8B5CF6&label=APK%20Release%20v1.4.0&logo=android" alt="Latest Release"></a>
   <a href="https://apps.obtainium.imranr.dev/redirect?r=obtainium://add/https://github.com/athanasso/gitpulse"><img alt="Get in Obtainium" src="https://img.shields.io/badge/Get%20in-Obtainium-blue"></a>
   <img src="https://img.shields.io/badge/React%20Native-0.88.1-06B6D4?logo=react" alt="React Native">
   <img src="https://img.shields.io/badge/Expo-SDK%2058-white?logo=expo" alt="Expo">
@@ -207,6 +207,7 @@
 - Requires typing exact `owner/repo-name` in a safety modal before unlocking permanent deletion.
 
 ### 20. 🔔 Multi-Provider Notifications Inbox & Sleep Prevention
+- **Real-Time Tab Badge Sync**: Bottom navigation bar unread counter dynamically updates and clears on "Mark All as Read", single-item read, or thread clicks via `NotificationService`.
 - **Universal Multi-Provider Inbox**:
   - Full notifications support across **GitHub**, **GitLab** (via native Todos API `/api/v4/todos`), and **Gitea/Codeberg**.
   - Thread triage for review requests, issue assignments, merge requests, mentions, and CI/CD events.
@@ -235,7 +236,7 @@ Get seamless automated background updates directly from GitHub Releases using **
 
 Direct signed APK releases:
 
-👉 **[Download GitPulse v1.3.9 APK](https://github.com/athanasso/gitpulse/releases/latest)**
+👉 **[Download GitPulse v1.4.0 APK](https://github.com/athanasso/gitpulse/releases/latest)**
 
 ---
 
@@ -243,7 +244,7 @@ Direct signed APK releases:
 
 - **Name**: GitPulse
 - **Slug**: `gitpulse`
-- **Version**: `1.3.9`
+- **Version**: `1.4.0`
 - **Package**: `com.athanasso.gitpulse`
 - **Framework**: Expo 58 / React Native 0.88 / React 19 / TypeScript 5.9
 

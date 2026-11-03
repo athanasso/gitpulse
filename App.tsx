@@ -27,6 +27,7 @@ import { ExploreScreen } from './src/screens/ExploreScreen';
 import { NotificationsScreen } from './src/screens/NotificationsScreen';
 import { ProfileScreen } from './src/screens/ProfileScreen';
 import { GitHubApiService } from './src/services/GitHubApiService';
+import { NotificationService } from './src/services/NotificationService';
 import { RepoDetailModal } from './src/screens/RepoDetailModal';
 import { DeepLinkService } from './src/services/DeepLinkService';
 import { GitHubRepo } from './src/types/github';
@@ -79,13 +80,16 @@ function AppContent() {
   }, []);
 
   useEffect(() => {
-    GitHubApiService.init().then((isAuth) => {
-      if (isAuth) {
-        GitHubApiService.getNotifications().then((n) => {
-          setUnreadCount(n.filter((x) => x.unread).length);
-        });
-      }
+    const unsubNotif = NotificationService.subscribe((count) => {
+      setUnreadCount(count);
     });
+    return () => {
+      unsubNotif();
+    };
+  }, []);
+
+  useEffect(() => {
+    NotificationService.refresh();
   }, [accountKey]);
 
   // Hardware back button returns to Repositories tab

@@ -585,10 +585,16 @@ export class GitHubProvider implements IGitProvider {
   ): Promise<boolean> {
     try {
       const base = this.getBaseUrl(hostUrl);
-      const res = await fetch(`${base}/notifications/threads`, {
+      const res = await fetch(`${base}/notifications`, {
         method: 'PUT',
-        headers: this.getHeaders(token),
-        body: JSON.stringify({}),
+        headers: {
+          ...this.getHeaders(token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          last_read_at: new Date().toISOString(),
+          read: true,
+        }),
       });
       return res.status === 205 || res.ok;
     } catch {

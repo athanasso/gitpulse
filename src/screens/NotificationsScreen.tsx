@@ -16,6 +16,7 @@ import {
 import { GitHubNotification } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
 import { AccountService } from '../services/AccountService';
+import { NotificationService } from '../services/NotificationService';
 import { GitAccount, PROVIDER_REGISTRY } from '../types/provider';
 import { formatRepoTimestamp } from '../utils/date';
 import { PaginationControl } from '../components/PaginationControl';
@@ -111,8 +112,13 @@ export const NotificationsScreen: React.FC = () => {
       setNotifications(list);
       setPage(targetPage);
       setHasMore(list.length >= PAGE_SIZE);
+
+      // Keep tab badge count in sync with unread notifications
+      const unreadCount = list.filter((n) => n.unread).length;
+      NotificationService.setUnreadCount(unreadCount);
     } else {
       setNotifications([]);
+      NotificationService.clear();
     }
 
     if (isRefresh) setRefreshing(false);
@@ -131,6 +137,7 @@ export const NotificationsScreen: React.FC = () => {
     setNotifications((prev) =>
       prev.map((n) => (n.id === id ? { ...n, unread: false } : n))
     );
+    NotificationService.decrement(1);
     // Remote GitHub API update
     await GitHubApiService.markNotificationRead(id);
   };
@@ -152,6 +159,7 @@ export const NotificationsScreen: React.FC = () => {
             setMarkingAll(true);
             // Optimistic UI update
             setNotifications((prev) => prev.map((n) => ({ ...n, unread: false })));
+            NotificationService.clear();
             // Remote GitHub API update
             await GitHubApiService.markAllNotificationsRead();
             setMarkingAll(false);
