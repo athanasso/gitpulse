@@ -72,35 +72,48 @@ class GitHubApiServiceClass {
         const activeAcc = AccountService.getActiveAccount();
         if (activeAcc) {
           this.token = activeAcc.token;
-          this.cachedUser = {
-            id: 1,
-            login: activeAcc.username,
-            name: activeAcc.displayName || activeAcc.username,
-            avatar_url: activeAcc.avatarUrl || '',
-            html_url: activeAcc.hostUrl || '',
-            public_repos: 0,
-            followers: 0,
-            following: 0,
-            created_at: new Date(activeAcc.createdAt).toISOString(),
-            updated_at: new Date().toISOString(),
-          } as GitHubUser;
+          // Preserve cached user with real public_repos and total_private_repos if it matches active account
+          if (
+            !this.cachedUser ||
+            !this.cachedUser.login ||
+            this.cachedUser.login.toLowerCase() !== activeAcc.username.toLowerCase()
+          ) {
+            this.cachedUser = {
+              id: 1,
+              login: activeAcc.username,
+              name: activeAcc.displayName || activeAcc.username,
+              avatar_url: activeAcc.avatarUrl || '',
+              html_url: activeAcc.hostUrl || '',
+              public_repos: 0,
+              followers: 0,
+              following: 0,
+              created_at: new Date(activeAcc.createdAt).toISOString(),
+              updated_at: new Date().toISOString(),
+            } as GitHubUser;
+          }
         }
 
         AccountService.subscribe((acc) => {
           if (acc) {
             this.token = acc.token;
-            this.cachedUser = {
-              id: 1,
-              login: acc.username,
-              name: acc.displayName || acc.username,
-              avatar_url: acc.avatarUrl || '',
-              html_url: acc.hostUrl || '',
-              public_repos: 0,
-              followers: 0,
-              following: 0,
-              created_at: new Date(acc.createdAt).toISOString(),
-              updated_at: new Date().toISOString(),
-            } as GitHubUser;
+            if (
+              !this.cachedUser ||
+              !this.cachedUser.login ||
+              this.cachedUser.login.toLowerCase() !== acc.username.toLowerCase()
+            ) {
+              this.cachedUser = {
+                id: 1,
+                login: acc.username,
+                name: acc.displayName || acc.username,
+                avatar_url: acc.avatarUrl || '',
+                html_url: acc.hostUrl || '',
+                public_repos: 0,
+                followers: 0,
+                following: 0,
+                created_at: new Date(acc.createdAt).toISOString(),
+                updated_at: new Date().toISOString(),
+              } as GitHubUser;
+            }
           } else {
             this.token = null;
             this.cachedUser = null;
@@ -108,9 +121,10 @@ class GitHubApiServiceClass {
         });
 
         // Warm up cached repositories and critical data into memory
-        const keysToWarm = [CacheKeys.USER_REPOS_PAGE_1];
-        if (this.cachedUser?.login) {
-          keysToWarm.push(CacheKeys.PROFILE_BUNDLE(this.cachedUser.login));
+        const currentLogin = this.cachedUser?.login || activeAcc?.username;
+        const keysToWarm = [CacheKeys.USER_REPOS_PAGE_1(currentLogin), CacheKeys.LEGACY_USER_REPOS_PAGE_1];
+        if (currentLogin) {
+          keysToWarm.push(CacheKeys.PROFILE_BUNDLE(currentLogin));
         }
         await CacheService.warmup(keysToWarm);
 
@@ -141,7 +155,8 @@ class GitHubApiServiceClass {
         AsyncStorage.removeItem(PAT_STORAGE_KEY),
         AsyncStorage.removeItem(USER_CACHE_KEY),
         AsyncStorage.removeItem(SCOPES_STORAGE_KEY),
-        CacheService.remove(CacheKeys.USER_REPOS_PAGE_1),
+        CacheService.remove(CacheKeys.USER_REPOS_PAGE_1(this.cachedUser?.login)),
+        CacheService.remove(CacheKeys.LEGACY_USER_REPOS_PAGE_1),
       ];
       if (this.cachedUser?.login) {
         removals.push(CacheService.remove(CacheKeys.PROFILE_BUNDLE(this.cachedUser.login)));
@@ -310,7 +325,7 @@ class GitHubApiServiceClass {
 
     try {
       const res = await fetch(
-        `https://api.github.com/user/repos?sort=updated&page=${page}&per_page=${per_page}&affiliation=owner,collaborator`,
+        `https://api.github.com/user/repos?sort=pushed&direction=desc&page=${page}&per_page=${per_page}&affiliation=owner,collaborator`,
         { headers: this.getHeaders() }
       );
 
@@ -321,7 +336,8 @@ class GitHubApiServiceClass {
       const data = await res.json();
       const list = Array.isArray(data) ? data : [];
       if (page === 1 && list.length > 0) {
-        CacheService.set(CacheKeys.USER_REPOS_PAGE_1, list);
+        const username = this.cachedUser?.login || AccountService.getActiveAccount()?.username;
+        CacheService.set(CacheKeys.USER_REPOS_PAGE_1(username), list);
       }
       return list;
     } catch (e) {
@@ -334,7 +350,10 @@ class GitHubApiServiceClass {
    * Get cached user repos from local storage immediately (0ms)
    */
   async getCachedUserRepos(): Promise<GitHubRepo[]> {
-    return (await CacheService.get<GitHubRepo[]>(CacheKeys.USER_REPOS_PAGE_1)) || [];
+    const username = this.cachedUser?.login || AccountService.getActiveAccount()?.username;
+    const cached = await CacheService.get<GitHubRepo[]>(CacheKeys.USER_REPOS_PAGE_1(username));
+    if (cached && cached.length > 0) return cached;
+    return (await CacheService.get<GitHubRepo[]>(CacheKeys.LEGACY_USER_REPOS_PAGE_1)) || [];
   }
 
   /**

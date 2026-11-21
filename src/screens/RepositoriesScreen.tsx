@@ -15,6 +15,7 @@ import * as Haptics from 'expo-haptics';
 import { ThemePalette, Spacing } from '../constants/theme';
 import { GitHubRepo, GitHubUser } from '../types/github';
 import { GitHubApiService } from '../services/GitHubApiService';
+import { AccountService } from '../services/AccountService';
 import { CacheService, CacheKeys } from '../services/CacheService';
 import { RepoDetailModal } from './RepoDetailModal';
 import { formatRepoTimestamp } from '../utils/date';
@@ -46,6 +47,21 @@ const LANGUAGE_COLORS: Record<string, string> = {
 };
 
 const PAGE_SIZE = 30;
+
+const getRepoActivityTimestamp = (r: GitHubRepo): number => {
+  const p = r.pushed_at ? new Date(r.pushed_at).getTime() : 0;
+  const u = r.updated_at ? new Date(r.updated_at).getTime() : 0;
+  return Math.max(p, u);
+};
+
+const getRepoActivityDate = (r: GitHubRepo): string => {
+  if (r.pushed_at && r.updated_at) {
+    return new Date(r.pushed_at).getTime() >= new Date(r.updated_at).getTime()
+      ? r.pushed_at
+      : r.updated_at;
+  }
+  return r.pushed_at || r.updated_at || '';
+};
 
 export const RepositoriesScreen: React.FC = () => {
   const [repos, setRepos] = useState<GitHubRepo[]>([]);
@@ -92,16 +108,48 @@ export const RepositoriesScreen: React.FC = () => {
   );
 
   const flatListRef = useRef<FlatList<GitHubRepo>>(null);
+  const hasLoadedFromNetworkRef = useRef(false);
 
   useEffect(() => {
+    const activeAcc = AccountService.getActiveAccount();
+    const username = currentUser?.login || activeAcc?.username;
+
     // 1. Hydrate from phone storage immediately (0ms)
-    CacheService.get<GitHubRepo[]>(CacheKeys.USER_REPOS_PAGE_1).then((cached) => {
-      if (cached && cached.length > 0 && repos.length === 0) {
-        setRepos(cached);
+    const cacheKey = CacheKeys.USER_REPOS_PAGE_1(username);
+    CacheService.get<GitHubRepo[]>(cacheKey).then(async (cached) => {
+      let data = cached;
+      if ((!data || data.length === 0) && cacheKey !== CacheKeys.LEGACY_USER_REPOS_PAGE_1) {
+        data = await CacheService.get<GitHubRepo[]>(CacheKeys.LEGACY_USER_REPOS_PAGE_1);
+      }
+      if (data && data.length > 0 && !hasLoadedFromNetworkRef.current) {
+        setRepos((prev) => (prev.length === 0 ? data! : prev));
       }
     });
+
     // 2. Refresh from network in background
     loadRepos(1);
+
+    // 3. Listen to account changes
+    const unsub = AccountService.subscribe(async (active) => {
+      hasLoadedFromNetworkRef.current = false;
+      if (active) {
+        const u = await GitHubApiService.getCurrentUser();
+        setCurrentUser(u);
+        const newCacheKey = CacheKeys.USER_REPOS_PAGE_1(active.username);
+        const newCached = await CacheService.get<GitHubRepo[]>(newCacheKey);
+        if (newCached && newCached.length > 0) {
+          setRepos(newCached);
+        } else {
+          setRepos([]);
+        }
+        loadRepos(1, true);
+      } else {
+        setRepos([]);
+        setCurrentUser(null);
+      }
+    });
+
+    return () => unsub();
   }, []);
 
   const loadRepos = async (targetPage: number = 1, isRefresh: boolean = false) => {
@@ -112,16 +160,24 @@ export const RepositoriesScreen: React.FC = () => {
     }
 
     try {
+      const userHasZeroCounts =
+        !currentUser ||
+        ((currentUser.public_repos || 0) + (currentUser.total_private_repos || 0) === 0);
+
       const [list, u] = await Promise.all([
         GitHubApiService.getUserRepos(targetPage, PAGE_SIZE),
-        currentUser ? Promise.resolve(currentUser) : GitHubApiService.getCurrentUser(),
+        (isRefresh || userHasZeroCounts)
+          ? GitHubApiService.getCurrentUser()
+          : Promise.resolve(currentUser),
       ]);
 
-      if (list && list.length > 0) {
+      if (list) {
+        hasLoadedFromNetworkRef.current = true;
         setRepos(list);
         setHasMore(list.length >= PAGE_SIZE);
-        if (targetPage === 1) {
-          CacheService.set(CacheKeys.USER_REPOS_PAGE_1, list);
+        if (targetPage === 1 && list.length > 0) {
+          const activeUser = u?.login || currentUser?.login || AccountService.getActiveAccount()?.username;
+          CacheService.set(CacheKeys.USER_REPOS_PAGE_1(activeUser), list);
         }
       }
       setPage(targetPage);
@@ -203,13 +259,18 @@ export const RepositoriesScreen: React.FC = () => {
     ).length;
   }, [repos, searchQuery]);
 
+  // User total repository count from profile metrics
+  const userTotalCount = currentUser
+    ? (currentUser.public_repos || 0) + (currentUser.total_private_repos || 0)
+    : 0;
+
   // Real total number of repositories
   const realTotalRepos = isGlobalActive
     ? globalMatchCount
     : searchQuery.trim()
     ? localMatchCount
-    : currentUser
-    ? (currentUser.public_repos || 0) + (currentUser.total_private_repos || 0)
+    : userTotalCount > 0
+    ? userTotalCount
     : repos.length;
 
   const totalPages =
@@ -269,8 +330,8 @@ export const RepositoriesScreen: React.FC = () => {
       if (sortBy === 'stars') return (b.stargazers_count || 0) - (a.stargazers_count || 0);
       if (sortBy === 'forks') return (b.forks_count || 0) - (a.forks_count || 0);
       if (sortBy === 'name') return (a.name || '').localeCompare(b.name || '');
-      const dateA = a.updated_at ? new Date(a.updated_at).getTime() : 0;
-      const dateB = b.updated_at ? new Date(b.updated_at).getTime() : 0;
+      const dateA = getRepoActivityTimestamp(a);
+      const dateB = getRepoActivityTimestamp(b);
       return dateB - dateA;
     });
   }, [sourceList, isGlobalActive, searchQuery, selectedLanguage, typeFilter, sortBy]);
@@ -373,7 +434,7 @@ export const RepositoriesScreen: React.FC = () => {
           </View>
 
           <Text style={styles.updatedDate}>
-            Updated {formatRepoTimestamp(item.updated_at)}
+            Updated {formatRepoTimestamp(getRepoActivityDate(item))}
           </Text>
         </View>
       </TouchableOpacity>

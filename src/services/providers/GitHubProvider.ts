@@ -83,7 +83,7 @@ export class GitHubProvider implements IGitProvider {
     perPage: number
   ): Promise<UnifiedRepo[]> {
     const base = this.getBaseUrl(hostUrl);
-    const url = `${base}/user/repos?page=${page}&per_page=${perPage}&sort=updated&affiliation=owner,collaborator,organization_member`;
+    const url = `${base}/user/repos?page=${page}&per_page=${perPage}&sort=pushed&direction=desc&affiliation=owner,collaborator,organization_member`;
     const res = await fetch(url, { headers: this.getHeaders(token) });
     if (!res.ok) return [];
     const list = await res.json();

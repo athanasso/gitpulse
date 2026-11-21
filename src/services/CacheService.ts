@@ -1,7 +1,11 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 export const CacheKeys = {
-  USER_REPOS_PAGE_1: 'gitpulse_cache_user_repos_p1',
+  USER_REPOS_PAGE_1: (username?: string) =>
+    username
+      ? `gitpulse_cache_user_repos_p1_${username.toLowerCase()}`
+      : 'gitpulse_cache_user_repos_p1',
+  LEGACY_USER_REPOS_PAGE_1: 'gitpulse_cache_user_repos_p1',
   PROFILE_BUNDLE: (username: string) =>
     `gitpulse_cache_profile_${username.toLowerCase()}`,
   REPO_README: (owner: string, repo: string) =>
