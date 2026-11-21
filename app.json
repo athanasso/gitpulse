@@ -2,7 +2,7 @@
   "expo": {
     "name": "GitPulse",
     "slug": "gitpulse",
-    "version": "1.4.0",
+    "version": "1.4.1",
     "orientation": "portrait",
     "scheme": "gitpulse",
     "icon": "./assets/icon.png",
@@ -18,7 +18,7 @@
     },
     "android": {
       "package": "com.athanasso.gitpulse",
-      "versionCode": 16,
+      "versionCode": 17,
       "adaptiveIcon": {
         "backgroundColor": "#070B14",
         "foregroundImage": "./assets/android-icon-foreground.png",
